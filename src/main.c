@@ -1,13 +1,15 @@
 #include "../include/layer.h"
 #include <stdio.h>
 #include <string.h>
+#ifdef USE_MP
+#include <omp.h>
+#endif
 
 int main(int argc, char **argv) {
     GCNNetwork network;
     SparseGraph graph;
-    init_param init_param;
     FILE *fp_weight, *fp_graph;
-    int num_layers, dim_in, dim_out, i;
+    int num_layers, dim_in, dim_out, i, j;
     float *tmp_weight, *tmp_vectors;
     Ull version, sizeEdgeTy, nv;
     Ull *vertices;
@@ -40,12 +42,27 @@ int main(int argc, char **argv) {
     edges = (Uint*) malloc(sizeof(Uint)*vertices[nv]);
     edges_val = (Uint*) malloc(sizeof(Uint)*vertices[nv]);
     fgets(edges, sizeof(Uint)*vertices[nv], fp_graph);
-    memset(edges_val, 1, sizeof(Uint)*vertices[nv]);
+
+    // D^-1*A*D^-1
+    #ifdef USE_MP
+    #pragma omp parallel for
+    #endif
+    for(i = 0; i < nv; i++) {
+        for (j = vertices[i]; j < vertices[i+1]; j++) {
+            int col = edges[j];
+            float d_row = 1/sqrt(vertices[i+1] - vertices[i]);
+            float d_col = 1/sqrt(vertices[col+1] - vertices[col]);
+            float d_row_col = d_row * d_col;
+            edges_val[j] = *(Uint*)&d_row_col;
+        }
+    }
+
     graph.matrix.nnz = vertices[nv];
     graph.matrix.col_size = nv;
     graph.matrix.row_size = nv;
-    graph.matrix.row_p = (int*)&vertices_int;
-    graph.matrix.col_p = (int*)&edges;
+    graph.matrix.row_p = (int*)vertices_int;
+    graph.matrix.col_p = (int*)edges;
+    graph.matrix.val = edges_val;
 
     fgets(&num_layers, 4, fp_weight);
     for (i = 0; i< num_layers; i++) {

@@ -1,4 +1,5 @@
-
+#include <time.h>
+#include <stdio.h>
 /* EMAX6 library                        */
 /*         Copyright (C) 2013- by NAIST */
 /*          Primary writer: Y.Nakashima */
@@ -46,13 +47,13 @@ struct dma_ctrl {
   Uint ZDMA_CH_IMR;      	/* 0x00000104	32	mixed	0x00000FFF	Interrupt Mask Register for intrN. This is a read-only location and can be atomically altered by either the IDR or the IER. */
   Uint ZDMA_CH_IEN;      	/* 0x00000108	32	mixed	0x00000000	Interrupt Enable Register. A write of to this location will unmask the interrupt. (IMR: 0) */
   Uint ZDMA_CH_IDS;      	/* 0x0000010C	32	mixed	0x00000000	Interrupt Disable Register. A write of one to this location will mask the interrupt. (IMR: 1) */
-  Uint ZDMA_CH_CTRL0;    	/* 0x00000110¡ú	32	mixed	0x00000080	Channel Control Register 0 */
+  Uint ZDMA_CH_CTRL0;    	/* 0x00000110ï¿½ï¿½	32	mixed	0x00000080	Channel Control Register 0 */
 	/*   Field Name  Bits  Type Reset Value  Description            */
 	/*   Reserved	 31:8  raz  0x0	         Reseved for future use */
 	/*   OVR_FETCH	    7  rw   0x1	         0: DMA channel is not allowed to over-fetch on SRC */
 	/*                                       1: DMA channel is allowed to over-fetch */
 	/*                                       This field must remain stable while DMA Channel is enabled */
-	/*   POINT_TYPE	    6  rw   0x0	       ¡ú0: Simple mode DMA. Descriptor (DMA command) from APB register space. */
+	/*   POINT_TYPE	    6  rw   0x0	       ï¿½ï¿½0: Simple mode DMA. Descriptor (DMA command) from APB register space. */
 	/*                                       1: Scatter-gather mode DMA. Descriptor are stored in Memory. */
 	/*                                       This field must remain stable while DMA Channel is enabled */
 	/*   MODE	  5:4  rw   0x0	         00: Normal read & write DMA (default) */
@@ -74,28 +75,28 @@ struct dma_ctrl {
 
   Uint ZDMA_CH_CTRL1;    	/* 0x00000114	32	mixed	0x000003FF	Channel Flow Control Register */
   Uint ZDMA_CH_FCI;      	/* 0x00000118	32	mixed 	0x00000000	Channel Control Register 1 */
-  Uint ZDMA_CH_STATUS;   	/* 0x0000011C¡ú	32	mixed	0x00000000	Channel Status Register */
+  Uint ZDMA_CH_STATUS;   	/* 0x0000011Cï¿½ï¿½	32	mixed	0x00000000	Channel Status Register */
 	/*   Field Name  Bits  Type Reset Value  Description            */
 	/*   Reserved    31:2  raz  0x0          Reseved for future use */
-	/*   STATE        1:0  ro   0x0        ¡ú00: Done with no error (as a result Enable bit is cleared by HW) */
+	/*   STATE        1:0  ro   0x0        ï¿½ï¿½00: Done with no error (as a result Enable bit is cleared by HW) */
 	/*                                       01: paused with no error (as a result Enable bit remains set). */
 	/*                                       10: DMA is busy transferring */
-	/*                                     ¡ú11: DMA done with error (error condition captured in otherregisters) */
+	/*                                     ï¿½ï¿½11: DMA done with error (error condition captured in otherregisters) */
 	/*                                       This bit is cleared by HW when Enable or Unpause is set to 1. */
 
   Uint ZDMA_CH_DATA_ATTR;	/* 0x00000120	32	mixed	0x0483D20F	Channel DATA AXI parameter Register */
   Uint ZDMA_CH_DSCR_ATTR;	/* 0x00000124	32	mixed	0x00000000	Channel DSCR AXI parameter Register */
-  Uint ZDMA_CH_SRC_DSCR_WORD0;	/* 0x00000128¡ú	32	rw	0x00000000	SRC DSCR Word 0 */
-  Uint ZDMA_CH_SRC_DSCR_WORD1;  /* 0x0000012C¡ú	32	mixed	0x00000000	SRC DSCR Word 1 */
-  Uint ZDMA_CH_SRC_DSCR_WORD2;  /* 0x00000130¡ú	32	mixed	0x00000000	SRC DSCR Word 2 */
+  Uint ZDMA_CH_SRC_DSCR_WORD0;	/* 0x00000128ï¿½ï¿½	32	rw	0x00000000	SRC DSCR Word 0 */
+  Uint ZDMA_CH_SRC_DSCR_WORD1;  /* 0x0000012Cï¿½ï¿½	32	mixed	0x00000000	SRC DSCR Word 1 */
+  Uint ZDMA_CH_SRC_DSCR_WORD2;  /* 0x00000130ï¿½ï¿½	32	mixed	0x00000000	SRC DSCR Word 2 */
 	/*   Field Name  Bits  Type Reset Value  Description            */
 	/*   Reserved	 31:30 raz  0x0	         Reserved for furure use */
 	/*   SIZE	 29:0  rw   0x0	         Buffer size in bytes (1G=2^30) */
 
   Uint ZDMA_CH_SRC_DSCR_WORD3;  /* 0x00000134	32	mixed	0x00000000	SRC DSCR Word 3 */
-  Uint ZDMA_CH_DST_DSCR_WORD0;  /* 0x00000138¡ú	32	rw	0x00000000	DST DSCR Word 0 */
-  Uint ZDMA_CH_DST_DSCR_WORD1;  /* 0x0000013C¡ú	32	mixed	0x00000000	DST DSCR Word 1 */
-  Uint ZDMA_CH_DST_DSCR_WORD2;  /* 0x00000140¡ú	32	mixed	0x00000000	DST DSCR Word 2 */
+  Uint ZDMA_CH_DST_DSCR_WORD0;  /* 0x00000138ï¿½ï¿½	32	rw	0x00000000	DST DSCR Word 0 */
+  Uint ZDMA_CH_DST_DSCR_WORD1;  /* 0x0000013Cï¿½ï¿½	32	mixed	0x00000000	DST DSCR Word 1 */
+  Uint ZDMA_CH_DST_DSCR_WORD2;  /* 0x00000140ï¿½ï¿½	32	mixed	0x00000000	DST DSCR Word 2 */
 	/*   Field Name  Bits  Type Reset Value  Description            */
 	/*   Reserved	 31:30 raz  0x0	         Reserved for furure use */
 	/*   SIZE	 29:0  rw   0x0	         Buffer size in bytes (1G=2^30) */
@@ -114,7 +115,7 @@ struct dma_ctrl {
   Uint ZDMA_CH_IRQ_SRC_ACCT;    /* 0x00000190	32	mixed	0x00000000	SRC Interrupt Account Count Register */
   Uint ZDMA_CH_IRQ_DST_ACCT;    /* 0x00000194	32	mixed	0x00000000	DST Interrupt Account Count Register */
   Uint dmy2[26];
-  Uint ZDMA_CH_CTRL2;  		/* 0x00000200¡ú	32	mixed	0x00000000	zDMA Control Register 2 */
+  Uint ZDMA_CH_CTRL2;  		/* 0x00000200ï¿½ï¿½	32	mixed	0x00000000	zDMA Control Register 2 */
 	/*   Field Name  Bits  Type Reset Value  Description            */
 	/*   Reserved	 31:1  raz  0x0	         Reseved for future use */
 	/*   EN	            0  rw   0x0	         Channel is enabled */
@@ -123,25 +124,25 @@ struct dma_ctrl {
 	/*                                       HW clears this flag after finishing DMA opertion. */
 
   /* Simple Mode */
-  /* 1. ZDMA_CH_STATUS ¥ì¥¸¥¹¥¿¤òÆÉ¤ß½Ð¤·¡¢STATE¤¬00¤Þ¤¿¤Ï11(DMA¤¬IDLE¥¹¥Æ¡¼¥È) ¤Ë¤Ê¤ë¤Þ¤ÇÂÔ¤Ä. */
-  /*    DMA¤¬PAUSE¥¹¥Æ¡¼¥È¤Î¾ì¹ç¡¢¡Ö¥Á¥ã¥Í¥ë°ì»þÄä»ß¡×¤ÇÀâÌÀ¤¹¤ë¼ê½ç¤Ë½¾¤Ã¤Æ PAUSE ¥¹¥Æ¡¼¥È¤ò½ªÎ». */
-  /* 2. ZDMA_CH_CTRL0¥ì¥¸¥¹¥¿¤Î POINT_TYPE (¥Ó¥Ã¥È 6) ¤ò 0 ¤ËÀßÄê */
-  /*    ¥Ç¡¼¥¿¥½¡¼¥¹¥Ð¥Ã¥Õ¥¡¤Î¥¢¥É¥ì¥¹¤Î LSB ¤ò ZDMA_CH_SRC_DSCR_WORD0¥ì¥¸¥¹¥¿¤Ë½ñ¤­¹þ¤à */
-  /*    ¥Ç¡¼¥¿¥½¡¼¥¹¥Ð¥Ã¥Õ¥¡¤Î¥¢¥É¥ì¥¹¤Î MSB ¤ò ZDMA_CH_SRC_DSCR_WORD1¥ì¥¸¥¹¥¿¤Ë½ñ¤­¹þ¤à */
-  /* 3. ¥Ç¡¼¥¿¥Ç¥¹¥Æ¥£¥Í¡¼¥·¥ç¥ó¥Ð¥Ã¥Õ¥¡¤Î¥¢¥É¥ì¥¹¤Î LSB ¤ò ZDMA_CH_DST_DSCR_WORD0¥ì¥¸¥¹¥¿¤Ë½ñ¤­¹þ¤à */
-  /*    ¥Ç¡¼¥¿¥Ç¥¹¥Æ¥£¥Í¡¼¥·¥ç¥ó¥Ð¥Ã¥Õ¥¡¤Î¥¢¥É¥ì¥¹¤Î MSB ¤ò ZDMA_CH_DST_DSCR_WORD1¥ì¥¸¥¹¥¿¤Ë½ñ¤­¹þ¤à */
-  /* 4. Simple Mode¤Ç¤Ï¡¢SRC¥È¥é¥ó¥¶¥¯¥·¥ç¥ó¥µ¥¤¥º¤ÈDST¥È¥é¥ó¥¶¥¯¥·¥ç¥ó¥µ¥¤¥º¤ÎÎ¾Êý¤òÀßÄê¤¹¤ëÉ¬Í×¤¬¤¢¤ë */
-  /*    DMA ¤Ï SRC¥È¥é¥ó¥¶¥¯¥·¥ç¥ó¥µ¥¤¥º¤ò»ÈÍÑ¤·¤Þ¤¹¤¬¡¢Î¾Êý¤Î¥ì¥¸¥¹¥¿¤òÀßÄê¤·¤Æ¤ª¤¯É¬Í×¤¬¤¢¤ë */
-  /*    ZDMA_CH_SRC_DSCR_WORD2 ¥ì¥¸¥¹¥¿¤Ë¥½¡¼¥¹¥Ç¡¼¥¿¥µ¥¤¥º¤ò½ñ¤­¹þ¤à */
-  /*    ZDMA_CH_DST_DSCR_WORD2 ¥ì¥¸¥¹¥¿¤Ë¥Ç¥¹¥Æ¥£¥Í¡¼¥·¥ç¥ó¥È¥é¥ó¥¶¥¯¥·¥ç¥ó¥µ¥¤¥º¤ò½ñ¤­¹þ¤à */
-  /*    SRC¥È¥é¥ó¥¶¥¯¥·¥ç¥ó¥µ¥¤¥º¤ÈDST¥È¥é¥ó¥¶¥¯¥·¥ç¥ó¥µ¥¤¥º¤ÏÉ¬¤ºÆ±¤¸ */
-  /* 5. É¬Í×¤Ë±þ¤¸,ZDMA_CH_DST_DSCR_WORD3¤ª¤è¤ÓZDMA_CH_SRC_DSCR_WORD3¥ì¥¸¥¹¥¿¤ÇINTR¤ò1¤Ë¥»¥Ã¥È¤·³ä¤ê¹þ¤ß¤òÍ­¸ú¤Ë¤¹¤ë */
-  /* 6. ¥½¡¼¥¹¤ª¤è¤Ó¥Ç¥¹¥Æ¥£¥Í¡¼¥·¥ç¥ó¥Ð¥Ã¥Õ¥¡¤¬¥­¥ã¥Ã¥·¥å¥³¥Ò¡¼¥ì¥ó¥È¤È¤·¤Æ³ä¤êÅö¤Æ¤é¤ì¤Æ¤¤¤ë¤«¥Õ¥é¥Ã¥·¥å¤µ¤ì¤Æ¤¤¤ë¾ì¹ç, */
-  /*    COHRNT¤ò¥»¥Ã¥È¤¹¤ëÉ¬Í×¤Ï¤Ê¤¤. ¤½¤ì°Ê³°¤Î¾ì¹ç,¥½¡¼¥¹¤ª¤è¤Ó¥Ç¥¹¥Æ¥£¥Í¡¼¥·¥ç¥ó¥Ð¥Ã¥Õ¥¡¤¬¥­¥ã¥Ã¥·¥å¥³¥Ò¡¼¥ì¥ó¥È¤È¤·¤Æ */
-  /*    ³ä¤êÅö¤Æ¤é¤ì¤Æ¤¤¤Ê¤¤¡¢¤Þ¤¿¤Ï¥Õ¥é¥Ã¥·¥å¤µ¤ì¤Æ¤¤¤Ê¤¤¾ì¹ç¡¢ZDMA_CH_SRC_DSCR_WORD3¤ª¤è¤ÓZDMA_CH_DST_DSCR_WORD3¥ì¥¸¥¹¥¿¤Ç */
-  /*    ¤½¤ì¤¾¤ì COHRNT¤ò¥»¥Ã¥È¤¹¤ë. COHRNT¥Ó¥Ã¥È¤Ï LPD-DMA ¤Î¾ì¹ç¤Î¤ßÍ­¸ú. FPD-DMA¤Ï¥³¥Ò¡¼¥ì¥ó¥·¤ò¥µ¥Ý¡¼¥È¤·¤Ê¤¤. */
-  /* 7. ZDMA_CH_CTRL2¥ì¥¸¥¹¥¿¤ÎEN¥Ó¥Ã¥È¤ò¥»¥Ã¥È¤·¤Æ,DMAÅ¾Á÷¤Ë»ÈÍÑ¤¹¤ëDMA¥Á¥ã¥Í¥ë¤òÍ­¸ú¤Ë¤¹¤ë. */
-  /*    DMA¤òÍ­¸ú¤Ë¤·¤¿¸å¡¢¡Ö¥¨¥é¡¼¾ò·ï¡×¤Ë¼¨¤¹¥¨¥é¡¼¾ò·ï¤ò¥Á¥§¥Ã¥¯¤¹¤ë. */
+  /* 1. ZDMA_CH_STATUS ï¿½ì¥¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½É¤ß½Ð¤ï¿½ï¿½ï¿½STATEï¿½ï¿½00ï¿½Þ¤ï¿½ï¿½ï¿½11(DMAï¿½ï¿½IDLEï¿½ï¿½ï¿½Æ¡ï¿½ï¿½ï¿½) ï¿½Ë¤Ê¤ï¿½Þ¤ï¿½ï¿½Ô¤ï¿½. */
+  /*    DMAï¿½ï¿½PAUSEï¿½ï¿½ï¿½Æ¡ï¿½ï¿½È¤Î¾ï¿½ç¡¢ï¿½Ö¥ï¿½ï¿½ï¿½Í¥ï¿½ï¿½ï¿½ï¿½ï¿½ß¡×¤ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë½ï¿½ï¿½Ã¤ï¿½ PAUSE ï¿½ï¿½ï¿½Æ¡ï¿½ï¿½È¤ï¿½Î». */
+  /* 2. ZDMA_CH_CTRL0ï¿½ì¥¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ POINT_TYPE (ï¿½Ó¥Ã¥ï¿½ 6) ï¿½ï¿½ 0 ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
+  /*    ï¿½Ç¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð¥Ã¥Õ¥ï¿½ï¿½Î¥ï¿½ï¿½É¥ì¥¹ï¿½ï¿½ LSB ï¿½ï¿½ ZDMA_CH_SRC_DSCR_WORD0ï¿½ì¥¸ï¿½ï¿½ï¿½ï¿½ï¿½Ë½ñ¤­¹ï¿½ï¿½ï¿½ */
+  /*    ï¿½Ç¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð¥Ã¥Õ¥ï¿½ï¿½Î¥ï¿½ï¿½É¥ì¥¹ï¿½ï¿½ MSB ï¿½ï¿½ ZDMA_CH_SRC_DSCR_WORD1ï¿½ì¥¸ï¿½ï¿½ï¿½ï¿½ï¿½Ë½ñ¤­¹ï¿½ï¿½ï¿½ */
+  /* 3. ï¿½Ç¡ï¿½ï¿½ï¿½ï¿½Ç¥ï¿½ï¿½Æ¥ï¿½ï¿½Í¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð¥Ã¥Õ¥ï¿½ï¿½Î¥ï¿½ï¿½É¥ì¥¹ï¿½ï¿½ LSB ï¿½ï¿½ ZDMA_CH_DST_DSCR_WORD0ï¿½ì¥¸ï¿½ï¿½ï¿½ï¿½ï¿½Ë½ñ¤­¹ï¿½ï¿½ï¿½ */
+  /*    ï¿½Ç¡ï¿½ï¿½ï¿½ï¿½Ç¥ï¿½ï¿½Æ¥ï¿½ï¿½Í¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð¥Ã¥Õ¥ï¿½ï¿½Î¥ï¿½ï¿½É¥ì¥¹ï¿½ï¿½ MSB ï¿½ï¿½ ZDMA_CH_DST_DSCR_WORD1ï¿½ì¥¸ï¿½ï¿½ï¿½ï¿½ï¿½Ë½ñ¤­¹ï¿½ï¿½ï¿½ */
+  /* 4. Simple Modeï¿½Ç¤Ï¡ï¿½SRCï¿½È¥ï¿½ó¥¶¥ï¿½ï¿½ï¿½ï¿½ï¿½ó¥µ¥ï¿½ï¿½ï¿½ï¿½ï¿½DSTï¿½È¥ï¿½ó¥¶¥ï¿½ï¿½ï¿½ï¿½ï¿½ó¥µ¥ï¿½ï¿½ï¿½ï¿½ï¿½Î¾ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ê¤¹ï¿½ï¿½É¬ï¿½×¤ï¿½ï¿½ï¿½ï¿½ï¿½ */
+  /*    DMA ï¿½ï¿½ SRCï¿½È¥ï¿½ó¥¶¥ï¿½ï¿½ï¿½ï¿½ï¿½ó¥µ¥ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ñ¤ï¿½ï¿½Þ¤ï¿½ï¿½ï¿½ï¿½ï¿½Î¾ï¿½ï¿½ï¿½Î¥ì¥¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ê¤·ï¿½Æ¤ï¿½ï¿½ï¿½É¬ï¿½×¤ï¿½ï¿½ï¿½ï¿½ï¿½ */
+  /*    ZDMA_CH_SRC_DSCR_WORD2 ï¿½ì¥¸ï¿½ï¿½ï¿½ï¿½ï¿½Ë¥ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ñ¤­¹ï¿½ï¿½ï¿½ */
+  /*    ZDMA_CH_DST_DSCR_WORD2 ï¿½ì¥¸ï¿½ï¿½ï¿½ï¿½ï¿½Ë¥Ç¥ï¿½ï¿½Æ¥ï¿½ï¿½Í¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È¥ï¿½ó¥¶¥ï¿½ï¿½ï¿½ï¿½ï¿½ó¥µ¥ï¿½ï¿½ï¿½ï¿½ï¿½ñ¤­¹ï¿½ï¿½ï¿½ */
+  /*    SRCï¿½È¥ï¿½ó¥¶¥ï¿½ï¿½ï¿½ï¿½ï¿½ó¥µ¥ï¿½ï¿½ï¿½ï¿½ï¿½DSTï¿½È¥ï¿½ó¥¶¥ï¿½ï¿½ï¿½ï¿½ï¿½ó¥µ¥ï¿½ï¿½ï¿½ï¿½ï¿½É¬ï¿½ï¿½Æ±ï¿½ï¿½ */
+  /* 5. É¬ï¿½×¤Ë±ï¿½ï¿½ï¿½,ZDMA_CH_DST_DSCR_WORD3ï¿½ï¿½ï¿½ï¿½ï¿½ZDMA_CH_SRC_DSCR_WORD3ï¿½ì¥¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½INTRï¿½ï¿½1ï¿½Ë¥ï¿½ï¿½Ã¥È¤ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ß¤ï¿½Í­ï¿½ï¿½ï¿½Ë¤ï¿½ï¿½ï¿½ */
+  /* 6. ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ó¥Ç¥ï¿½ï¿½Æ¥ï¿½ï¿½Í¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð¥Ã¥Õ¥ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã¥ï¿½ï¿½å¥³ï¿½Ò¡ï¿½ï¿½ï¿½ï¿½È¤È¤ï¿½ï¿½Æ³ï¿½ï¿½ï¿½ï¿½ï¿½Æ¤ï¿½ï¿½Æ¤ï¿½ï¿½ë¤«ï¿½Õ¥ï¿½Ã¥ï¿½ï¿½å¤µï¿½ï¿½Æ¤ï¿½ï¿½ï¿½ï¿½ï¿½, */
+  /*    COHRNTï¿½ò¥»¥Ã¥È¤ï¿½ï¿½ï¿½É¬ï¿½×¤Ï¤Ê¤ï¿½. ï¿½ï¿½ï¿½ï¿½Ê³ï¿½ï¿½Î¾ï¿½ï¿½,ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ó¥Ç¥ï¿½ï¿½Æ¥ï¿½ï¿½Í¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð¥Ã¥Õ¥ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã¥ï¿½ï¿½å¥³ï¿½Ò¡ï¿½ï¿½ï¿½ï¿½È¤È¤ï¿½ï¿½ï¿½ */
+  /*    ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ¤ï¿½ï¿½Æ¤ï¿½ï¿½Ê¤ï¿½ï¿½ï¿½ï¿½Þ¤ï¿½ï¿½Ï¥Õ¥ï¿½Ã¥ï¿½ï¿½å¤µï¿½ï¿½Æ¤ï¿½ï¿½Ê¤ï¿½ï¿½ï¿½ç¡¢ZDMA_CH_SRC_DSCR_WORD3ï¿½ï¿½ï¿½ï¿½ï¿½ZDMA_CH_DST_DSCR_WORD3ï¿½ì¥¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
+  /*    ï¿½ï¿½ï¿½ì¤¾ï¿½ï¿½ COHRNTï¿½ò¥»¥Ã¥È¤ï¿½ï¿½ï¿½. COHRNTï¿½Ó¥Ã¥È¤ï¿½ LPD-DMA ï¿½Î¾ï¿½ï¿½Î¤ï¿½Í­ï¿½ï¿½. FPD-DMAï¿½Ï¥ï¿½ï¿½Ò¡ï¿½ï¿½ï¿½ó¥·¤ò¥µ¥Ý¡ï¿½ï¿½È¤ï¿½ï¿½Ê¤ï¿½. */
+  /* 7. ZDMA_CH_CTRL2ï¿½ì¥¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ENï¿½Ó¥Ã¥È¤ò¥»¥Ã¥È¤ï¿½ï¿½ï¿½,DMAÅ¾ï¿½ï¿½ï¿½Ë»ï¿½ï¿½Ñ¤ï¿½ï¿½ï¿½DMAï¿½ï¿½ï¿½ï¿½Í¥ï¿½ï¿½Í­ï¿½ï¿½ï¿½Ë¤ï¿½ï¿½ï¿½. */
+  /*    DMAï¿½ï¿½Í­ï¿½ï¿½ï¿½Ë¤ï¿½ï¿½ï¿½ï¿½å¡¢ï¿½Ö¥ï¿½ï¿½é¡¼ï¿½ï¿½ï¿½×¤Ë¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½é¡¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã¥ï¿½ï¿½ï¿½ï¿½ï¿½. */
 };
 
 /* reg_ctrl */
@@ -198,7 +199,7 @@ struct emax6 { /* host status of EMAX6 */
   Ull   lastdist          : 6; /* lastdist for DYNAMIC_SCON */
   struct lmmi lmmi[EMAX_NCHIP][AMAP_DEPTH][EMAX_WIDTH][2]; /* lmmi for host (len/ofs/top are resolved) */
   Ull   lmmi_bitmap[EMAX_WIDTH];      /* based on lmmi[*][EMAX_WIDTH][2].v */
-  Uchar lmmd[AMAP_DEPTH][EMAX_WIDTH]; /* chip#7,6,..,0:clean, 1:dirty, exec¸åstore²Õ½ê¤Ë1, drainÄ¾¸å0 */
+  Uchar lmmd[AMAP_DEPTH][EMAX_WIDTH]; /* chip#7,6,..,0:clean, 1:dirty, execï¿½ï¿½storeï¿½Õ½ï¿½ï¿½1, drainÄ¾ï¿½ï¿½0 */
 
 #ifndef IGNORE_LMMI_BLKGATHER
   Ull   plist                ; /* pointer-list */
@@ -341,9 +342,9 @@ static int get_reg_size(char *d_name)
 }
 
 emax6_open()
-/* HPM¤ò·ÐÍ³¤¹¤ëÀ©¸æ¥ì¥¸¥¹¥¿¤Ë¥ê¥»¥Ã¥ÈÁ÷½Ð */
-/* HPP¤ò·ÐÍ³¤¹¤ë²èÁü¥á¥â¥ê¤ò²¾ÁÛ¶õ´Ö¤Ë¼ÌÁü */
-/* ACP¤ò·ÐÍ³¤¹¤ëconf/lmmi/regv¶õ´Ö¤ò²¾ÁÛ¶õ´Ö¤Ë¼ÌÁü */
+/* HPMï¿½ï¿½ï¿½Í³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ì¥¸ï¿½ï¿½ï¿½ï¿½ï¿½Ë¥ê¥»ï¿½Ã¥ï¿½ï¿½ï¿½ï¿½ï¿½ */
+/* HPPï¿½ï¿½ï¿½Í³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Û¶ï¿½ï¿½Ö¤Ë¼ï¿½ï¿½ï¿½ */
+/* ACPï¿½ï¿½ï¿½Í³ï¿½ï¿½ï¿½ï¿½conf/lmmi/regvï¿½ï¿½ï¿½Ö¤ï¿½ï¿½Û¶ï¿½ï¿½Ö¤Ë¼ï¿½ï¿½ï¿½ */
 {
   struct dirent **namelist;
   int num_dirs, dir;
@@ -522,14 +523,14 @@ emax6_check_lmmi_and_dma(int mode, int phase, int lastdist, int c, int i, int j)
   /* lastdist */
   /* i      row              */
   /* j      col              */
-  /* lmmi¹¹¿·¸å¤Ë¸Æ¤Ð¤ì¤ë. lmd´ØÏ¢¤Ïlmd°ÌÃÖ¤ò´ð½à¤Ëlmr/lmx¤ò¸¡ºº(+lastdist¤ÎÍýÍ³) */
-  /*                   ¼¡²ólmd    °ÌÃÖ¤Ï,"lmmi[i         ][lmmic]" */
-  /* lastdist=>0¤Î¾ì¹ç,Á°²ólmw/lmx°ÌÃÖ¤Ï,"lmmi[i+lastdist][lmmio]" */
-  /* ½¾Íè,lmd¤Î¾ì¹ç,SCON¤·¤Æ¤â¤·¤Ê¤¯¤Æ¤âEXEC¤ÈÆ±»þ¤ËDRAIN (lastdist=0¤Î¾ì¹ç¤Ïlmm¤ÎÈ¾Ê¬¤òlmd/lmw¤Ë»È¤¤Ê¬¤±¤ëÁ°Äó) */
-  /* lastdist=0¤Î¾ì¹ç,DYNAMIC_SCON¤ÏÌµ°ÕÌ£¤Ê¤Î¤Ç½¾ÍèÄÌ¤ê */
-  /* lastdist>0¤Î¾ì¹ç,DYNAMIC_SCON¤«¤ÄSCONÍ­¤ê¤Ï½¾ÍèÄÌ¤ê */
-  /*                 SCONÌµ»ë¤Î¾ì¹ç,¤½¤â¤½¤âlmd°ÌÃÖ¤¬¹ç¤ï¤Ê¤¤¤Î¤Çlmd»ØÄê¤ÏÌµ»ë¤¹¤Ù¤­.µìlmw/lmx¤ÎEXECÁ°DRAIN¤¬É¬Í× */
-  /*                 ¡ú¡ú¡ú¤¿¤À¤·,lmd¤ò»È¤¦¥±¡¼¥¹¤Ç¤ÏDYNAMIC_SCON¤ò»È¤ï¤Ê¤¤¤Ï¤º¤Ê¤Î¤Ç,ÅöÌÌÂÐ±þ¤·¤Ê¤¤ */
+  /* lmmiï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë¸Æ¤Ð¤ï¿½ï¿½. lmdï¿½ï¿½Ï¢ï¿½ï¿½lmdï¿½ï¿½ï¿½Ö¤ï¿½ï¿½ï¿½ï¿½lmr/lmxï¿½ò¸¡ºï¿½(+lastdistï¿½ï¿½ï¿½ï¿½Í³) */
+  /*                   ï¿½ï¿½ï¿½ï¿½lmd    ï¿½ï¿½ï¿½Ö¤ï¿½,"lmmi[i         ][lmmic]" */
+  /* lastdist=>0ï¿½Î¾ï¿½ï¿½,ï¿½ï¿½ï¿½ï¿½lmw/lmxï¿½ï¿½ï¿½Ö¤ï¿½,"lmmi[i+lastdist][lmmio]" */
+  /* ï¿½ï¿½ï¿½ï¿½,lmdï¿½Î¾ï¿½ï¿½,SCONï¿½ï¿½ï¿½Æ¤â¤·ï¿½Ê¤ï¿½ï¿½Æ¤ï¿½EXECï¿½ï¿½Æ±ï¿½ï¿½ï¿½ï¿½DRAIN (lastdist=0ï¿½Î¾ï¿½ï¿½ï¿½lmmï¿½ï¿½È¾Ê¬ï¿½ï¿½lmd/lmwï¿½Ë»È¤ï¿½Ê¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½) */
+  /* lastdist=0ï¿½Î¾ï¿½ï¿½,DYNAMIC_SCONï¿½ï¿½Ìµï¿½ï¿½Ì£ï¿½Ê¤Î¤Ç½ï¿½ï¿½ï¿½ï¿½Ì¤ï¿½ */
+  /* lastdist>0ï¿½Î¾ï¿½ï¿½,DYNAMIC_SCONï¿½ï¿½ï¿½ï¿½SCONÍ­ï¿½ï¿½Ï½ï¿½ï¿½ï¿½ï¿½Ì¤ï¿½ */
+  /*                 SCONÌµï¿½ï¿½Î¾ï¿½ï¿½,ï¿½ï¿½ï¿½â¤½ï¿½ï¿½lmdï¿½ï¿½ï¿½Ö¤ï¿½ï¿½ï¿½ï¿½Ê¤ï¿½ï¿½Î¤ï¿½lmdï¿½ï¿½ï¿½ï¿½ï¿½Ìµï¿½ë¤¹ï¿½Ù¤ï¿½.ï¿½ï¿½lmw/lmxï¿½ï¿½EXECï¿½ï¿½DRAINï¿½ï¿½É¬ï¿½ï¿½ */
+  /*                 ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½,lmdï¿½ï¿½È¤ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç¤ï¿½DYNAMIC_SCONï¿½ï¿½È¤ï¿½Ê¤ï¿½ï¿½Ï¤ï¿½ï¿½Ê¤Î¤ï¿½,ï¿½ï¿½ï¿½ï¿½ï¿½Ð±ï¿½ï¿½ï¿½ï¿½Ê¤ï¿½ */
   int k, m = (i+lastdist)%EMAX_DEPTH; /* lmmo-index */
   int lmmc_topz;
   int lmmc_ofsz;
@@ -556,30 +557,30 @@ emax6_check_lmmi_and_dma(int mode, int phase, int lastdist, int c, int i, int j)
     lmmc_topz = (lmmicp->top == 0);
     lmmc_ofsz = (lmmicp->ofs == 0);
     lmmo_stat = (lmmiop->v<<3)|(lmmiop->rw<<2)|(lmmiop->f<<1)|(lmmiop->p); /* v|rw|f|p */
-    lmmc_stat =((lmmicp->v & ~lmmicp->hcopy & ~lmmicp->vcopy & ((lmmicp->f&lmmicp->p) | !lmmc_topz))<<3)|(lmmicp->rw<<2)|(lmmicp->f<<1)|(lmmicp->p); /* v= ~copy & (OP_LDDMQ/OP_TR ¤Þ¤¿¤Ï ptop!=NULL) */
+    lmmc_stat =((lmmicp->v & ~lmmicp->hcopy & ~lmmicp->vcopy & ((lmmicp->f&lmmicp->p) | !lmmc_topz))<<3)|(lmmicp->rw<<2)|(lmmicp->f<<1)|(lmmicp->p); /* v= ~copy & (OP_LDDMQ/OP_TR ï¿½Þ¤ï¿½ï¿½ï¿½ ptop!=NULL) */
     lmm_ready = (lmmiop->v && lmmiop->blk == lmmicp->blk && lmmiop->len == lmmicp->len && lmmiop->top == lmmicp->top);
     lmm_readz = (lmmiop->v && lmmiop->blk == lmmicp->blk && lmmiop->len == lmmicp->len &&(lmmiop->top+(Sll)(int)lmmiop->ofs) == lmmicp->top);
   }
 
-  /* lmx: bitmap¤ò¸¡ºº¤·,¸½addr+len¤È¼¡addr¤òÈæ¤Ù,Ï¢Â³¤Ê¤éÏ¢·ë¤·¤¿¼¡addr/len¤òÊÝÂ¸.ºÇ½ª¤Þ¤¿¤ÏÉÔÏ¢Â³¤Ê¤éÊÝÂ¸addr/len¤Þ¤¿¤Ï¸½addr/len¤ò»È¤Ã¤ÆDMA */
+  /* lmx: bitmapï¿½ò¸¡ºï¿½ï¿½ï¿½,ï¿½ï¿½addr+lenï¿½È¼ï¿½addrï¿½ï¿½ï¿½ï¿½ï¿½,Ï¢Â³ï¿½Ê¤ï¿½Ï¢ï¿½ë¤·ï¿½ï¿½ï¿½ï¿½addr/lenï¿½ï¿½ï¿½ï¿½Â¸.ï¿½Ç½ï¿½ï¿½Þ¤ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢Â³ï¿½Ê¤ï¿½ï¿½ï¿½Â¸addr/lenï¿½Þ¤ï¿½ï¿½Ï¸ï¿½addr/lenï¿½ï¿½È¤Ã¤ï¿½DMA */
 
   if      (phase == 1) { /* drain */
-    if      (mode==0 && lmmo_stat==12 && lmmc_stat!=13 && (emax6.lmmd[m][j]&1<<c)) { mark=1;emax6.lmmd[m][j]&=~(1<<c);dmadr=lmmiop->top;dmlen=lmmiop->len;dmnxt=lmmiop1->top;dmrw=1;}/* ¡ü2 lmw&!lmd drain */
-    else if (mode==0 && lmmo_stat==14 && !lmm_ready    && (emax6.lmmd[m][j]&1<<c)) { mark=1;emax6.lmmd[m][j]&=~(1<<c);dmadr=lmmiop->top;dmlen=lmmiop->len;dmnxt=lmmiop1->top;dmrw=1;}/* ¡ü4 lmx      drain */
-    else if (mode==1 &&                                   (emax6.lmmd[i][j]&1<<c)) { mark=1;emax6.lmmd[i][j]&=~(1<<c);dmadr=lmmicp->top;dmlen=lmmicp->len;dmnxt=lmmicp1->top;dmrw=1;}/* ¡ù drain_dirty_lmm */
+    if      (mode==0 && lmmo_stat==12 && lmmc_stat!=13 && (emax6.lmmd[m][j]&1<<c)) { mark=1;emax6.lmmd[m][j]&=~(1<<c);dmadr=lmmiop->top;dmlen=lmmiop->len;dmnxt=lmmiop1->top;dmrw=1;}/* ï¿½ï¿½2 lmw&!lmd drain */
+    else if (mode==0 && lmmo_stat==14 && !lmm_ready    && (emax6.lmmd[m][j]&1<<c)) { mark=1;emax6.lmmd[m][j]&=~(1<<c);dmadr=lmmiop->top;dmlen=lmmiop->len;dmnxt=lmmiop1->top;dmrw=1;}/* ï¿½ï¿½4 lmx      drain */
+    else if (mode==1 &&                                   (emax6.lmmd[i][j]&1<<c)) { mark=1;emax6.lmmd[i][j]&=~(1<<c);dmadr=lmmicp->top;dmlen=lmmicp->len;dmnxt=lmmicp1->top;dmrw=1;}/* ï¿½ï¿½ drain_dirty_lmm */
     else                                                                           { mark=0;                                                                                        }
   }
   else if (phase == 2) { /* load */
-    if     ((lmmc_stat== 8               && !lmm_ready)                                                                                                                              /* ¡ü1 lmr & !ready */
-         || (lmmc_stat== 9 && !lmmc_ofsz && !lmm_readz)                                                                                                                              /* ¡ü7 lmp & !readz */
-         || (lmmc_stat==10                            )                                                                                                                              /* ¡ü3 lmf always load */
-         || (lmmc_stat==14               && !lmm_ready))                           { mark=1;                          dmadr=lmmicp->top;dmlen=lmmicp->len;dmnxt=lmmicp1->top;dmrw=0;}/* ¡ü3 lmx always load */
+    if     ((lmmc_stat== 8               && !lmm_ready)                                                                                                                              /* ï¿½ï¿½1 lmr & !ready */
+         || (lmmc_stat== 9 && !lmmc_ofsz && !lmm_readz)                                                                                                                              /* ï¿½ï¿½7 lmp & !readz */
+         || (lmmc_stat==10                            )                                                                                                                              /* ï¿½ï¿½3 lmf always load */
+         || (lmmc_stat==14               && !lmm_ready))                           { mark=1;                          dmadr=lmmicp->top;dmlen=lmmicp->len;dmnxt=lmmicp1->top;dmrw=0;}/* ï¿½ï¿½3 lmx always load */
     else                                                                           { mark=0;                                                                                        }/* skip load */
   }
   else if (phase == 3) { /* exec */
-    if      (lmmc_stat== 9                    ) { mark=1;                                                             dmadr=lmmicp->top;dmlen=lmmicp->len;dmrw=0;                   }/* ¡ü5 lmp */
-    else if (lmmc_stat==12 || lmmc_stat==14   ) { mark=0;emax6.lmmd[i][j]|=(1<<c);                                                                                                  }/* ¡ü6 lmw/lmx */
-    else if (lmmc_stat==13                    ) { mark=  emax6.lmmd[m][j]& (1<<c); emax6.lmmd[m][j]|=((!lastdist)<<c);dmadr=lmmicp->top;dmlen=lmmicp->len;dmrw=1;                   }/* ¡ü6 lmd & dirty */
+    if      (lmmc_stat== 9                    ) { mark=1;                                                             dmadr=lmmicp->top;dmlen=lmmicp->len;dmrw=0;                   }/* ï¿½ï¿½5 lmp */
+    else if (lmmc_stat==12 || lmmc_stat==14   ) { mark=0;emax6.lmmd[i][j]|=(1<<c);                                                                                                  }/* ï¿½ï¿½6 lmw/lmx */
+    else if (lmmc_stat==13                    ) { mark=  emax6.lmmd[m][j]& (1<<c); emax6.lmmd[m][j]|=((!lastdist)<<c);dmadr=lmmicp->top;dmlen=lmmicp->len;dmrw=1;                   }/* ï¿½ï¿½6 lmd & dirty */
 #ifndef IGNORE_LDDMQ_HANDSHAKE
 //  else if (lmmc_stat==11                    ) { mark=1;                             } /*     LDDMQ */
 //  else if (lmmc_stat==15                    ) { mark=1;                             } /*     TR */
@@ -627,7 +628,7 @@ emax6_check_lmmi_and_dma(int mode, int phase, int lastdist, int c, int i, int j)
       emax6.dmalen  = (concat_adr[c])?concat_len[c]:dmlen; /* length should be # of words */
     }
     else if (phase == 3 && dmrw==1) { /* pdrain */
-      emax6.ddraddr = dmadr+(Sll)(int)lmmicp->ofs; /* ¡ú¡ú¡úPDRAIN address should be 4B-aligned */
+      emax6.ddraddr = dmadr+(Sll)(int)lmmicp->ofs; /* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½PDRAIN address should be 4B-aligned */
       emax6.lmmaddr = emax6.ddraddr;
       emax6.dmalen  = dmlen; /* length should be # of words */
     }
@@ -640,7 +641,7 @@ emax6_check_lmmi_and_dma(int mode, int phase, int lastdist, int c, int i, int j)
 	  emax6.dmalen  = (concat_adr[c])?concat_len[c]:dmlen; /* length should be # of words */
 	}
 	else {
-	  emax6.ddraddr = dmadr+(Sll)(int)lmmicp->ofs; /* ¡ú¡ú¡úPLOAD address should be 4B-aligned */
+	  emax6.ddraddr = dmadr+(Sll)(int)lmmicp->ofs; /* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½PLOAD address should be 4B-aligned */
 	  emax6.lmmaddr = emax6.ddraddr;
 	  emax6.dmalen  = dmlen; /* length should be # of words */
 	}
@@ -653,10 +654,10 @@ emax6_check_lmmi_and_dma(int mode, int phase, int lastdist, int c, int i, int j)
 	if (phase == 2) /* load */
 	  emax6.plist = dmadr+emax6.blkcount*8; /* address should be 4B-aligned */
 	else
-	  emax6.plist = dmadr+emax6.blkcount*8+(Sll)(int)lmmicp->ofs; /* ¡ú¡ú¡úPLOAD address should be 4B-aligned */
+	  emax6.plist = dmadr+emax6.blkcount*8+(Sll)(int)lmmicp->ofs; /* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½PLOAD address should be 4B-aligned */
 	emax6.blksize  = 32<<lmmicp->blk; /* max:10bit */
 	if (emax6.blkcount==0) {
-	  emax6.lmmblktop = 0; /* ¡ú¡ú¡úÌ¤¼ÂÁõ¡ú¡ú¡ú ÀèÆ¬¥¢¥É¥ì¥¹¤¬0¤Ê¤Î¤Ç,addr_range¤Ë¹©É×¤¬É¬Í× */
+	  emax6.lmmblktop = 0; /* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ì¤ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Æ¬ï¿½ï¿½ï¿½É¥ì¥¹ï¿½ï¿½0ï¿½Ê¤Î¤ï¿½,addr_rangeï¿½Ë¹ï¿½ï¿½×¤ï¿½É¬ï¿½ï¿½ */
 	  emax6.lmmblklen = dmlen; /* length should be # of words */
 	}
 	emax6.ddraddr    = emax6.plist; /* address should be 4B-aligned */
@@ -667,7 +668,7 @@ emax6_check_lmmi_and_dma(int mode, int phase, int lastdist, int c, int i, int j)
 	if (emax6.lmmblklen==0)
 	  emax6.blkcount = 0;
 	else
-	  emax6.blkcount++; /* ¡ú¡ú¡úÌ¤¼ÂÁõ¡ú¡ú¡ú continue Ê£¿ô²ó¤ÎDMAµ¯Æ°¤¬É¬Í× */
+	  emax6.blkcount++; /* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ì¤ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ continue Ê£ï¿½ï¿½ï¿½ï¿½ï¿½DMAï¿½ï¿½Æ°ï¿½ï¿½É¬ï¿½ï¿½ */
       }
 #endif
     }
@@ -690,26 +691,26 @@ emax6_kick_dma(int j) /* col */
     return (0);
 
   if (j != emax6.csel_save) {
-    ((struct reg_ctrl*)emax6.reg_ctrl)->i[0].csel = j; /* DMA/LDDMQ/TRANSÍÑ¤ËÂÐ¾Ýcol¥»¥Ã¥È */
+    ((struct reg_ctrl*)emax6.reg_ctrl)->i[0].csel = j; /* DMA/LDDMQ/TRANSï¿½Ñ¤ï¿½ï¿½Ð¾ï¿½colï¿½ï¿½ï¿½Ã¥ï¿½ */
     emax6.csel_save = j;
   }
 #if defined(FPDDMA)
   /* kick dma_ctrl (Simple Mode) */
-  /* 1. ZDMA_CH_STATUS ¥ì¥¸¥¹¥¿¤òÆÉ¤ß½Ð¤·¡¢STATE¤¬00¤Þ¤¿¤Ï11(DMA¤¬IDLE¥¹¥Æ¡¼¥È) ¤Ë¤Ê¤ë¤Þ¤ÇÂÔ¤Ä. */
-  /*    DMA¤¬PAUSE¥¹¥Æ¡¼¥È¤Î¾ì¹ç¡¢¡Ö¥Á¥ã¥Í¥ë°ì»þÄä»ß¡×¤ÇÀâÌÀ¤¹¤ë¼ê½ç¤Ë½¾¤Ã¤Æ PAUSE ¥¹¥Æ¡¼¥È¤ò½ªÎ». */
+  /* 1. ZDMA_CH_STATUS ï¿½ì¥¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½É¤ß½Ð¤ï¿½ï¿½ï¿½STATEï¿½ï¿½00ï¿½Þ¤ï¿½ï¿½ï¿½11(DMAï¿½ï¿½IDLEï¿½ï¿½ï¿½Æ¡ï¿½ï¿½ï¿½) ï¿½Ë¤Ê¤ï¿½Þ¤ï¿½ï¿½Ô¤ï¿½. */
+  /*    DMAï¿½ï¿½PAUSEï¿½ï¿½ï¿½Æ¡ï¿½ï¿½È¤Î¾ï¿½ç¡¢ï¿½Ö¥ï¿½ï¿½ï¿½Í¥ï¿½ï¿½ï¿½ï¿½ï¿½ß¡×¤ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë½ï¿½ï¿½Ã¤ï¿½ PAUSE ï¿½ï¿½ï¿½Æ¡ï¿½ï¿½È¤ï¿½Î». */
 
-  // ºÇ¸å¤Ë°ÜÆ°
+  // ï¿½Ç¸ï¿½Ë°ï¿½Æ°
        
-  /* 2. ZDMA_CH_CTRL0¥ì¥¸¥¹¥¿¤Î POINT_TYPE (¥Ó¥Ã¥È 6) ¤ò 0 ¤ËÀßÄê */
-  /*    ¥Ç¡¼¥¿¥½¡¼¥¹¥Ð¥Ã¥Õ¥¡¤Î¥¢¥É¥ì¥¹¤Î LSB ¤ò ZDMA_CH_SRC_DSCR_WORD0¥ì¥¸¥¹¥¿¤Ë½ñ¤­¹þ¤à */
-  /*    ¥Ç¡¼¥¿¥½¡¼¥¹¥Ð¥Ã¥Õ¥¡¤Î¥¢¥É¥ì¥¹¤Î MSB ¤ò ZDMA_CH_SRC_DSCR_WORD1¥ì¥¸¥¹¥¿¤Ë½ñ¤­¹þ¤à */
-  /* 3. ¥Ç¡¼¥¿¥Ç¥¹¥Æ¥£¥Í¡¼¥·¥ç¥ó¥Ð¥Ã¥Õ¥¡¤Î¥¢¥É¥ì¥¹¤Î LSB ¤ò ZDMA_CH_DST_DSCR_WORD0¥ì¥¸¥¹¥¿¤Ë½ñ¤­¹þ¤à */
-  /*    ¥Ç¡¼¥¿¥Ç¥¹¥Æ¥£¥Í¡¼¥·¥ç¥ó¥Ð¥Ã¥Õ¥¡¤Î¥¢¥É¥ì¥¹¤Î MSB ¤ò ZDMA_CH_DST_DSCR_WORD1¥ì¥¸¥¹¥¿¤Ë½ñ¤­¹þ¤à */
-  /* 4. Simple Mode¤Ç¤Ï¡¢SRC¥È¥é¥ó¥¶¥¯¥·¥ç¥ó¥µ¥¤¥º¤ÈDST¥È¥é¥ó¥¶¥¯¥·¥ç¥ó¥µ¥¤¥º¤ÎÎ¾Êý¤òÀßÄê¤¹¤ëÉ¬Í×¤¬¤¢¤ë */
-  /*    DMA ¤Ï SRC¥È¥é¥ó¥¶¥¯¥·¥ç¥ó¥µ¥¤¥º¤ò»ÈÍÑ¤·¤Þ¤¹¤¬¡¢Î¾Êý¤Î¥ì¥¸¥¹¥¿¤òÀßÄê¤·¤Æ¤ª¤¯É¬Í×¤¬¤¢¤ë */
-  /*    ZDMA_CH_SRC_DSCR_WORD2 ¥ì¥¸¥¹¥¿¤Ë¥½¡¼¥¹¥Ç¡¼¥¿¥µ¥¤¥º¤ò½ñ¤­¹þ¤à */
-  /*    ZDMA_CH_DST_DSCR_WORD2 ¥ì¥¸¥¹¥¿¤Ë¥Ç¥¹¥Æ¥£¥Í¡¼¥·¥ç¥ó¥È¥é¥ó¥¶¥¯¥·¥ç¥ó¥µ¥¤¥º¤ò½ñ¤­¹þ¤à */
-  /*    SRC¥È¥é¥ó¥¶¥¯¥·¥ç¥ó¥µ¥¤¥º¤ÈDST¥È¥é¥ó¥¶¥¯¥·¥ç¥ó¥µ¥¤¥º¤ÏÉ¬¤ºÆ±¤¸ */
+  /* 2. ZDMA_CH_CTRL0ï¿½ì¥¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ POINT_TYPE (ï¿½Ó¥Ã¥ï¿½ 6) ï¿½ï¿½ 0 ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
+  /*    ï¿½Ç¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð¥Ã¥Õ¥ï¿½ï¿½Î¥ï¿½ï¿½É¥ì¥¹ï¿½ï¿½ LSB ï¿½ï¿½ ZDMA_CH_SRC_DSCR_WORD0ï¿½ì¥¸ï¿½ï¿½ï¿½ï¿½ï¿½Ë½ñ¤­¹ï¿½ï¿½ï¿½ */
+  /*    ï¿½Ç¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð¥Ã¥Õ¥ï¿½ï¿½Î¥ï¿½ï¿½É¥ì¥¹ï¿½ï¿½ MSB ï¿½ï¿½ ZDMA_CH_SRC_DSCR_WORD1ï¿½ì¥¸ï¿½ï¿½ï¿½ï¿½ï¿½Ë½ñ¤­¹ï¿½ï¿½ï¿½ */
+  /* 3. ï¿½Ç¡ï¿½ï¿½ï¿½ï¿½Ç¥ï¿½ï¿½Æ¥ï¿½ï¿½Í¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð¥Ã¥Õ¥ï¿½ï¿½Î¥ï¿½ï¿½É¥ì¥¹ï¿½ï¿½ LSB ï¿½ï¿½ ZDMA_CH_DST_DSCR_WORD0ï¿½ì¥¸ï¿½ï¿½ï¿½ï¿½ï¿½Ë½ñ¤­¹ï¿½ï¿½ï¿½ */
+  /*    ï¿½Ç¡ï¿½ï¿½ï¿½ï¿½Ç¥ï¿½ï¿½Æ¥ï¿½ï¿½Í¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð¥Ã¥Õ¥ï¿½ï¿½Î¥ï¿½ï¿½É¥ì¥¹ï¿½ï¿½ MSB ï¿½ï¿½ ZDMA_CH_DST_DSCR_WORD1ï¿½ì¥¸ï¿½ï¿½ï¿½ï¿½ï¿½Ë½ñ¤­¹ï¿½ï¿½ï¿½ */
+  /* 4. Simple Modeï¿½Ç¤Ï¡ï¿½SRCï¿½È¥ï¿½ó¥¶¥ï¿½ï¿½ï¿½ï¿½ï¿½ó¥µ¥ï¿½ï¿½ï¿½ï¿½ï¿½DSTï¿½È¥ï¿½ó¥¶¥ï¿½ï¿½ï¿½ï¿½ï¿½ó¥µ¥ï¿½ï¿½ï¿½ï¿½ï¿½Î¾ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ê¤¹ï¿½ï¿½É¬ï¿½×¤ï¿½ï¿½ï¿½ï¿½ï¿½ */
+  /*    DMA ï¿½ï¿½ SRCï¿½È¥ï¿½ó¥¶¥ï¿½ï¿½ï¿½ï¿½ï¿½ó¥µ¥ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ñ¤ï¿½ï¿½Þ¤ï¿½ï¿½ï¿½ï¿½ï¿½Î¾ï¿½ï¿½ï¿½Î¥ì¥¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ê¤·ï¿½Æ¤ï¿½ï¿½ï¿½É¬ï¿½×¤ï¿½ï¿½ï¿½ï¿½ï¿½ */
+  /*    ZDMA_CH_SRC_DSCR_WORD2 ï¿½ì¥¸ï¿½ï¿½ï¿½ï¿½ï¿½Ë¥ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ñ¤­¹ï¿½ï¿½ï¿½ */
+  /*    ZDMA_CH_DST_DSCR_WORD2 ï¿½ì¥¸ï¿½ï¿½ï¿½ï¿½ï¿½Ë¥Ç¥ï¿½ï¿½Æ¥ï¿½ï¿½Í¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È¥ï¿½ó¥¶¥ï¿½ï¿½ï¿½ï¿½ï¿½ó¥µ¥ï¿½ï¿½ï¿½ï¿½ï¿½ñ¤­¹ï¿½ï¿½ï¿½ */
+  /*    SRCï¿½È¥ï¿½ó¥¶¥ï¿½ï¿½ï¿½ï¿½ï¿½ó¥µ¥ï¿½ï¿½ï¿½ï¿½ï¿½DSTï¿½È¥ï¿½ó¥¶¥ï¿½ï¿½ï¿½ï¿½ï¿½ó¥µ¥ï¿½ï¿½ï¿½ï¿½ï¿½É¬ï¿½ï¿½Æ±ï¿½ï¿½ */
   if (emax6.dmalen > 0) {
     if (emax6.rw == 0) { /* mem->lmm */
       do {
@@ -725,12 +726,12 @@ emax6_kick_dma(int j) /* col */
       } while (status != 0 && status != 3);
     }
     else { /* lmm->mem */
-      /* ZCU102¤¬AXI3¸ß´¹¤Î¤¿¤á8beat/256bitÊ¬³ä¤¹¤ë¤Î¤òIMAX#0¤Ç128beat/256bitËè¤Ë¤Þ¤È¤áprefetch¤·¤Æ¤ª¤¯ */
-      /* prefetch³«»Ï¸å,¸åÂ³DMAREAD¤Ïblock¤µ¤ì,prefetch´°Î»¸å¤ËBUF¤«¤éREAD+response */
+      /* ZCU102ï¿½ï¿½AXI3ï¿½ß´ï¿½ï¿½Î¤ï¿½ï¿½ï¿½8beat/256bitÊ¬ï¿½ä¤¹ï¿½ï¿½Î¤ï¿½IMAX#0ï¿½ï¿½128beat/256bitï¿½ï¿½Ë¤Þ¤È¤ï¿½prefetchï¿½ï¿½ï¿½Æ¤ï¿½ï¿½ï¿½ */
+      /* prefetchï¿½ï¿½ï¿½Ï¸ï¿½,ï¿½ï¿½Â³DMAREADï¿½ï¿½blockï¿½ï¿½ï¿½ï¿½,prefetchï¿½ï¿½Î»ï¿½ï¿½ï¿½BUFï¿½ï¿½ï¿½ï¿½READ+response */
       /* start of DMAREADBUF */
       /*#define LMM_BASE2_PHYS 	         0x60000000  */
-      /*#define LMM_BASE_PHYS	 0x0000000480000000LL ... DMAREADBUF¤Îvsim¤Î¤¿¤á, dmrp_top¤Ëº¹¤Î0x20000000¤ò²Ã»» */
-      /*                                            tb_top.conv¤Ç¤âLMM¥¢¥É¥ì¥¹¤Ë0x20000000¤ò²Ã»»¤¹¤ë¤Î¤Ë¹ç¤ï¤»¤ë */
+      /*#define LMM_BASE_PHYS	 0x0000000480000000LL ... DMAREADBUFï¿½ï¿½vsimï¿½Î¤ï¿½ï¿½ï¿½, dmrp_topï¿½Ëºï¿½ï¿½ï¿½0x20000000ï¿½ï¿½Ã»ï¿½ */
+      /*                                            tb_top.convï¿½Ç¤ï¿½LMMï¿½ï¿½ï¿½É¥ì¥¹ï¿½ï¿½0x20000000ï¿½ï¿½Ã»ï¿½ï¿½ï¿½ï¿½ï¿½Î¤Ë¹ï¿½ï¤»ï¿½ï¿½ */
       do {
 	status = ((struct dma_ctrl*)emax6.dma_ctrl)->ZDMA_CH_STATUS & 3;
       } while (status != 0 && status != 3);
@@ -747,13 +748,13 @@ emax6_kick_dma(int j) /* col */
       /* end of DMAREADBUF */
       ((struct reg_ctrl*)emax6.reg_ctrl)->i[0].dmrp = (0LL<<63); /* off */
     }
-  /* 5. É¬Í×¤Ë±þ¤¸,ZDMA_CH_DST_DSCR_WORD3¤ª¤è¤ÓZDMA_CH_SRC_DSCR_WORD3¥ì¥¸¥¹¥¿¤ÇINTR¤ò1¤Ë¥»¥Ã¥È¤·³ä¤ê¹þ¤ß¤òÍ­¸ú¤Ë¤¹¤ë */
-  /* 6. ¥½¡¼¥¹¤ª¤è¤Ó¥Ç¥¹¥Æ¥£¥Í¡¼¥·¥ç¥ó¥Ð¥Ã¥Õ¥¡¤¬¥­¥ã¥Ã¥·¥å¥³¥Ò¡¼¥ì¥ó¥È¤È¤·¤Æ³ä¤êÅö¤Æ¤é¤ì¤Æ¤¤¤ë¤«¥Õ¥é¥Ã¥·¥å¤µ¤ì¤Æ¤¤¤ë¾ì¹ç, */
-  /*    COHRNT¤ò¥»¥Ã¥È¤¹¤ëÉ¬Í×¤Ï¤Ê¤¤. ¤½¤ì°Ê³°¤Î¾ì¹ç,¥½¡¼¥¹¤ª¤è¤Ó¥Ç¥¹¥Æ¥£¥Í¡¼¥·¥ç¥ó¥Ð¥Ã¥Õ¥¡¤¬¥­¥ã¥Ã¥·¥å¥³¥Ò¡¼¥ì¥ó¥È¤È¤·¤Æ */
-  /*    ³ä¤êÅö¤Æ¤é¤ì¤Æ¤¤¤Ê¤¤¡¢¤Þ¤¿¤Ï¥Õ¥é¥Ã¥·¥å¤µ¤ì¤Æ¤¤¤Ê¤¤¾ì¹ç¡¢ZDMA_CH_SRC_DSCR_WORD3¤ª¤è¤ÓZDMA_CH_DST_DSCR_WORD3¥ì¥¸¥¹¥¿¤Ç */
-  /*    ¤½¤ì¤¾¤ì COHRNT¤ò¥»¥Ã¥È¤¹¤ë. COHRNT¥Ó¥Ã¥È¤Ï LPD-DMA ¤Î¾ì¹ç¤Î¤ßÍ­¸ú. FPD-DMA¤Ï¥³¥Ò¡¼¥ì¥ó¥·¤ò¥µ¥Ý¡¼¥È¤·¤Ê¤¤. */
-  /* 7. ZDMA_CH_CTRL2¥ì¥¸¥¹¥¿¤ÎEN¥Ó¥Ã¥È¤ò¥»¥Ã¥È¤·¤Æ,DMAÅ¾Á÷¤Ë»ÈÍÑ¤¹¤ëDMA¥Á¥ã¥Í¥ë¤òÍ­¸ú¤Ë¤¹¤ë. */
-  /*    DMA¤òÍ­¸ú¤Ë¤·¤¿¸å¡¢¡Ö¥¨¥é¡¼¾ò·ï¡×¤Ë¼¨¤¹¥¨¥é¡¼¾ò·ï¤ò¥Á¥§¥Ã¥¯¤¹¤ë. */
+  /* 5. É¬ï¿½×¤Ë±ï¿½ï¿½ï¿½,ZDMA_CH_DST_DSCR_WORD3ï¿½ï¿½ï¿½ï¿½ï¿½ZDMA_CH_SRC_DSCR_WORD3ï¿½ì¥¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½INTRï¿½ï¿½1ï¿½Ë¥ï¿½ï¿½Ã¥È¤ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ß¤ï¿½Í­ï¿½ï¿½ï¿½Ë¤ï¿½ï¿½ï¿½ */
+  /* 6. ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ó¥Ç¥ï¿½ï¿½Æ¥ï¿½ï¿½Í¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð¥Ã¥Õ¥ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã¥ï¿½ï¿½å¥³ï¿½Ò¡ï¿½ï¿½ï¿½ï¿½È¤È¤ï¿½ï¿½Æ³ï¿½ï¿½ï¿½ï¿½ï¿½Æ¤ï¿½ï¿½Æ¤ï¿½ï¿½ë¤«ï¿½Õ¥ï¿½Ã¥ï¿½ï¿½å¤µï¿½ï¿½Æ¤ï¿½ï¿½ï¿½ï¿½ï¿½, */
+  /*    COHRNTï¿½ò¥»¥Ã¥È¤ï¿½ï¿½ï¿½É¬ï¿½×¤Ï¤Ê¤ï¿½. ï¿½ï¿½ï¿½ï¿½Ê³ï¿½ï¿½Î¾ï¿½ï¿½,ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ó¥Ç¥ï¿½ï¿½Æ¥ï¿½ï¿½Í¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð¥Ã¥Õ¥ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã¥ï¿½ï¿½å¥³ï¿½Ò¡ï¿½ï¿½ï¿½ï¿½È¤È¤ï¿½ï¿½ï¿½ */
+  /*    ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ¤ï¿½ï¿½Æ¤ï¿½ï¿½Ê¤ï¿½ï¿½ï¿½ï¿½Þ¤ï¿½ï¿½Ï¥Õ¥ï¿½Ã¥ï¿½ï¿½å¤µï¿½ï¿½Æ¤ï¿½ï¿½Ê¤ï¿½ï¿½ï¿½ç¡¢ZDMA_CH_SRC_DSCR_WORD3ï¿½ï¿½ï¿½ï¿½ï¿½ZDMA_CH_DST_DSCR_WORD3ï¿½ì¥¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
+  /*    ï¿½ï¿½ï¿½ì¤¾ï¿½ï¿½ COHRNTï¿½ò¥»¥Ã¥È¤ï¿½ï¿½ï¿½. COHRNTï¿½Ó¥Ã¥È¤ï¿½ LPD-DMA ï¿½Î¾ï¿½ï¿½Î¤ï¿½Í­ï¿½ï¿½. FPD-DMAï¿½Ï¥ï¿½ï¿½Ò¡ï¿½ï¿½ï¿½ó¥·¤ò¥µ¥Ý¡ï¿½ï¿½È¤ï¿½ï¿½Ê¤ï¿½. */
+  /* 7. ZDMA_CH_CTRL2ï¿½ì¥¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ENï¿½Ó¥Ã¥È¤ò¥»¥Ã¥È¤ï¿½ï¿½ï¿½,DMAÅ¾ï¿½ï¿½ï¿½Ë»ï¿½ï¿½Ñ¤ï¿½ï¿½ï¿½DMAï¿½ï¿½ï¿½ï¿½Í¥ï¿½ï¿½Í­ï¿½ï¿½ï¿½Ë¤ï¿½ï¿½ï¿½. */
+  /*    DMAï¿½ï¿½Í­ï¿½ï¿½ï¿½Ë¤ï¿½ï¿½ï¿½ï¿½å¡¢ï¿½Ö¥ï¿½ï¿½é¡¼ï¿½ï¿½ï¿½×¤Ë¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½é¡¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã¥ï¿½ï¿½ï¿½ï¿½ï¿½. */
     switch (status) {
     case 0:
       break;
@@ -762,7 +763,7 @@ emax6_kick_dma(int j) /* col */
       return (0);
     }
   }
-  else { /* ¡úÅêµ¡¼Â¹Ô¤Ë¤è¤êcache-fill¤òµ¯Æ°¤·¤Æ¤·¤Þ¤¦.Åêµ¡¼ºÇÔ¸å¤ËDMA¤¬Æ°¤­,cache-fill¤â¤µ¤ì¤ë¤Î¤Çmismatch¤È¤Ê¤ë¡ú */
+  else { /* ï¿½ï¿½ï¿½êµ¡ï¿½Â¹Ô¤Ë¤ï¿½ï¿½cache-fillï¿½ï¿½Æ°ï¿½ï¿½ï¿½Æ¤ï¿½ï¿½Þ¤ï¿½.ï¿½êµ¡ï¿½ï¿½ï¿½Ô¸ï¿½ï¿½DMAï¿½ï¿½Æ°ï¿½ï¿½,cache-fillï¿½â¤µï¿½ï¿½ï¿½Î¤ï¿½mismatchï¿½È¤Ê¤ï¿½ï¿½ */
     if (emax6.rw == 0) { /* mem->lmm */
       dst = emax6.lmmaddr-emax_info.ddr_mmap+emax_info.lmm_mmap;
       src = emax6.ddraddr;
@@ -789,7 +790,7 @@ emax6_kick_dma(int j) /* col */
            (Uint)((Ull)((Ull*)emax6.lmmaddr + pio_loop)>>32), (Uint)(Ull)((Ull*)emax6.lmmaddr + pio_loop),
            (Uint)((Ull)((Ull*)emax6.ddraddr + pio_loop)>>32), (Uint)(Ull)((Ull*)emax6.ddraddr + pio_loop));*/
   }
-  /* src¤Èdst¤Ï32B¥¢¥é¥¤¥ó¤µ¤ì¤Æ¤ª¤ê,ÊÒÂ¦¤Î¤ßÈó¥¢¥é¥¤¥ó¤Ë¤Ê¤ë¤³¤È¤Ï¤Ê¤¤ */
+  /* srcï¿½ï¿½dstï¿½ï¿½32Bï¿½ï¿½ï¿½é¥¤ï¿½ó¤µ¤ï¿½Æ¤ï¿½ï¿½ï¿½,ï¿½ï¿½Â¦ï¿½Î¤ï¿½ï¿½ó¥¢¥é¥¤ï¿½ï¿½Ë¤Ê¤ë¤³ï¿½È¤Ï¤Ê¤ï¿½ */
   pio_words = emax6.dmalen+1;
   if (src & (sizeof(Ull)-1) & sizeof(Uint)) { /* 4B-access 0,4 */
     *(Uint*)dst = *(Uint*)src;
@@ -953,7 +954,7 @@ int convf32tou7(u7bit *out, float in)
   out->b = 0;
 
   in = abs(in);
-  if  (in >= 1.0) out->e = 63;    /* ¾è»»»þ¤Ï6bitÉ½¸½(-1.0+1.0) */
+  if  (in >= 1.0) out->e = 63;    /* ï¿½è»»ï¿½ï¿½ï¿½ï¿½6bitÉ½ï¿½ï¿½(-1.0+1.0) */
   else            out->e = in*64; /* number of 1 */    
 
 //printf("%7.4f -> %02.2x\n", *(float*)&in_f32, *(Uchar*)out);
@@ -968,7 +969,7 @@ int convf32tou8(u8bit *out, float in)
   out->s = in_f32.s;
 
   in = abs(in);
-  if  (in >= 2.0) out->e = 127;   /* ¾è»»»þ¤Ï6bitÉ½¸½(-1.0+1.0) */
+  if  (in >= 2.0) out->e = 127;   /* ï¿½è»»ï¿½ï¿½ï¿½ï¿½6bitÉ½ï¿½ï¿½(-1.0+1.0) */
   else            out->e = in*64; /* number of 1 */    
 
 //printf("%7.4f -> %02.2x\n", *(float*)&in_f32, *(Uchar*)out);
@@ -978,7 +979,7 @@ int convu8tof32(float *out, u8bit in)
 {
   f32bit out_f32;
 
-  *(float*)&out_f32 = (float)in.e/64; /* 6bitÉ½¸½(-2.0+2.0) */
+  *(float*)&out_f32 = (float)in.e/64; /* 6bitÉ½ï¿½ï¿½(-2.0+2.0) */
   out_f32.s = in.s;
   *out = *(float*)&out_f32;
 
@@ -1036,7 +1037,7 @@ void x11_softu64_dist(float, float);
 int softu64(int stage, Ull *o1, Ull *o2, Ull *o3, Ull r1, Ull r2, Ull r3, Ull r4) /* o <- s1 + s2 * s3 */
      /* stage:1 stage_2 in EXEC:  r2*r3 64bit*2  -> *o1 32bit*8 b mult     */
      /* stage:2 stage_3 in EXEC:  *o1,r4 32bit*8 -> *o2 8bit+8bit count up */
-     /* stage:3 stage_4 in EXEC:  r1 + *o2¦²     -> *o3 8bit               */
+     /* stage:3 stage_4 in EXEC:  r1 + *o2ï¿½ï¿½     -> *o3 8bit               */
 {
   int i, j;
   Ull u[8];
@@ -1061,31 +1062,31 @@ int softu64(int stage, Ull *o1, Ull *o2, Ull *o3, Ull r1, Ull r2, Ull r3, Ull r4
   int s2e   = (r2>>(i*8))&0x7f; s2e = s2e<SPU_DATA_BITS?s2e:SPU_DATA_BITS;
   int s3e   = (r3>>(i*8))&0x7f; s3e = s3e<SPU_DATA_BITS?s3e:SPU_DATA_BITS;
 #if 0
-      s2[i] = (Ull)0x7fffffffffffffffLL>>(63-s2e); //¾è»»¤Ï6bit*6bit->6bit
-      s3[i] = (Ull)0x7fffffffffffffffLL>>(63-s3e); //¾è»»¤Ï6bit*6bit->6bit
-      // ²¼°Ì64bitÆâ¤Ç¥·¥ã¥Ã¥Õ¥ë
+      s2[i] = (Ull)0x7fffffffffffffffLL>>(63-s2e); //ï¿½è»»ï¿½ï¿½6bit*6bit->6bit
+      s3[i] = (Ull)0x7fffffffffffffffLL>>(63-s3e); //ï¿½è»»ï¿½ï¿½6bit*6bit->6bit
+      // ï¿½ï¿½ï¿½ï¿½64bitï¿½ï¿½Ç¥ï¿½ï¿½ï¿½Ã¥Õ¥ï¿½
       s2[i] = shfl(s2[i], u[2]);
       s3[i] = shfl(s3[i], u[3]);
 #else
-      // Íð¿ô¤òSPU_DATA_WIDTH bitËè¤Ë»ÈÍÑ.ÆþÎÏÃÍ¤Î6bit¤¬¤Û¤È¤ó¤É15°Ê²¼¤Ç¤¢¤ë¤³¤È¤òÍøÍÑ(63¶á¤¯¤Ê¤ë¤È¸íº¹¤¬½Ð¤ë¤Ï¤º)
+      // ï¿½ï¿½ï¿½ï¿½ï¿½SPU_DATA_WIDTH bitï¿½ï¿½Ë»ï¿½ï¿½ï¿½.ï¿½ï¿½ï¿½ï¿½ï¿½Í¤ï¿½6bitï¿½ï¿½ï¿½Û¤È¤ï¿½ï¿½15ï¿½Ê²ï¿½ï¿½Ç¤ï¿½ï¿½ë¤³ï¿½È¤ï¿½ï¿½ï¿½ï¿½ï¿½(63ï¿½á¤¯ï¿½Ê¤ï¿½È¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð¤ï¿½Ï¤ï¿½)
       s2[i] = 0LL;
       s3[i] = 0LL;
       for (j=0; j<SPU_COUT_BITS; j++) {
-	int k = j * SPU_DATA_DIST; /* SPU_DATA_BITS=15¤Ê¤é4bitËè */
+	int k = j * SPU_DATA_DIST; /* SPU_DATA_BITS=15ï¿½Ê¤ï¿½4bitï¿½ï¿½ */
 	s2[i] |= ((u[(i+0)%8]>>k&SPU_DATA_BITS)<=s2e)<<j;
 	s3[i] |= ((u[(i+1)%8]>>k&SPU_DATA_BITS)<=s3e)<<j;
       }
       //printf("%08.8x_%08.8x %08.8x_%08.8x %d:%08.8x %d:%08.8x\n", (Uint)(u2>>32), (Uint)u2, (Uint)(u3>>32), (Uint)u3, s2e, (Uint)s2[i], s3e, (Uint)s3[i]);
 #endif
-      // s2*s3 ³ÆÍ×ÁÇ¤Îstochastic¾è»»
-      o1[i] = s2[i] & s3[i];                         // 1*1=1¤Ë¤Ê¤ë ¼ÂºÝ¤Ï¾å°ÌSPU_DATA_BITS¤Î¤ßAND
-      o1[i] = ss[i]<<63|(o1[i]&0x7fffffffffffffffLL);// stage2¤Î½ÐÎÏ¤Ï(ÀèÆ¬Éä¹æbit|SPU_DATA_BITS bit) * 8
+      // s2*s3 ï¿½ï¿½ï¿½ï¿½ï¿½Ç¤ï¿½stochasticï¿½è»»
+      o1[i] = s2[i] & s3[i];                         // 1*1=1ï¿½Ë¤Ê¤ï¿½ ï¿½ÂºÝ¤Ï¾ï¿½ï¿½SPU_DATA_BITSï¿½Î¤ï¿½AND
+      o1[i] = ss[i]<<63|(o1[i]&0x7fffffffffffffffLL);// stage2ï¿½Î½ï¿½ï¿½Ï¤ï¿½(ï¿½ï¿½Æ¬ï¿½ï¿½ï¿½bit|SPU_DATA_BITS bit) * 8
     }
     break;
   case 2: /* stage3 */
     pc = 0;
     nc = 0;
-    // Àµ¿ô/Éé¿ô¥°¥ë¡¼¥×¤´¤È¤Ë¡¤²¼°ÌÉôÊ¬¤ò¥¹¥Ê¥Ã¥×¥·¥ç¥Ã¥È
+    // ï¿½ï¿½ï¿½ï¿½/ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ë¡¼ï¿½×¤ï¿½ï¿½È¤Ë¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê¬ï¿½ò¥¹¥Ê¥Ã¥×¥ï¿½ï¿½ï¿½Ã¥ï¿½
     for (j=0; j<SPU_COUT_BITS; j++) {
       for (i=0; i<8; i++) { /* s2 * s3 -> ad2 */
 	if (!(o1[i]>>63)) pc += (o1[i] & (1LL<<j))!=0;
@@ -1099,10 +1100,10 @@ int softu64(int stage, Ull *o1, Ull *o2, Ull *o3, Ull r1, Ull r2, Ull r3, Ull r4
   case 3: /* stage4 */
     pc = *o2>>32&0xffff; /* high */
     nc = *o2    &0xffff; /* low */
-    // s1¤ò¤µ¤é¤Ë²Ã»»
-    if (!(r1&0x80)) pc += (r1&0x7f); /* merge pos s1 s1.e¤ÏºÇÂç7bit */
-    else            nc += (r1&0x7f); /* merge neg s1 s1.e¤ÏºÇÂç7bit */
-    // Àµ¿ô¤ÈÉé¿ô¤Î²Ã»»(s1:7bit + s2*s3:6bit->7bit)
+    // s1ï¿½ò¤µ¤ï¿½Ë²Ã»ï¿½
+    if (!(r1&0x80)) pc += (r1&0x7f); /* merge pos s1 s1.eï¿½Ïºï¿½ï¿½ï¿½7bit */
+    else            nc += (r1&0x7f); /* merge neg s1 s1.eï¿½Ïºï¿½ï¿½ï¿½7bit */
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Î²Ã»ï¿½(s1:7bit + s2*s3:6bit->7bit)
     if (pc >= nc) {
       os = 0x00; /* pos */
       oc = pc-nc; /* # of 1 */
@@ -1174,13 +1175,13 @@ exe(Uint op_ex1, Ull *d, Ull s1, Uint exp1, Ull s2, Uint exp2, Ull s3, Uint exp3
   case OP_NOP:
     ex1_outd = r1;
     break;
-  case OP_WHILE: /* emax6nc¤Îlib¤È¤·¤Æ¤Ï»ÈÍÑ¤»¤º,bsim/emax6.c¤¬siml¤Ë»ÈÍÑ */
+  case OP_WHILE: /* emax6ncï¿½ï¿½libï¿½È¤ï¿½ï¿½Æ¤Ï»ï¿½ï¿½Ñ¤ï¿½ï¿½ï¿½,bsim/emax6.cï¿½ï¿½simlï¿½Ë»ï¿½ï¿½ï¿½ */
     t0 = (r1&0x00000000ffffffffLL)+(r2&0x00000000ffffffffLL);
     t0 &= 0x00000000ffffffffLL;
     ex1_outd = t0;
     if (t0==0) retval = 1;
     break;
-  case OP_FOR: /* emax6nc¤Îlib¤È¤·¤Æ¤Ï»ÈÍÑ¤»¤º,bsim/emax6.c¤¬siml¤Ë»ÈÍÑ */
+  case OP_FOR: /* emax6ncï¿½ï¿½libï¿½È¤ï¿½ï¿½Æ¤Ï»ï¿½ï¿½Ñ¤ï¿½ï¿½ï¿½,bsim/emax6.cï¿½ï¿½simlï¿½Ë»ï¿½ï¿½ï¿½ */
     t0 = (r1&0x00000000ffffffffLL)+(r2&0x00000000ffffffffLL);
     t0 &= 0x00000000ffffffffLL;
     ex1_outd = t0;
@@ -1629,7 +1630,7 @@ mex(Uint op_mx, Uchar **d, Uchar *base, Ull ofs, Ull s2, Ull s1)
   case OP_NOP:
     *d = base;
     break;
-  case OP_ALWAYS: /* base++ ÂÐ±þ */
+  case OP_ALWAYS: /* base++ ï¿½Ð±ï¿½ */
     *d = base + ofs;
     break;
   case OP_CMPA_LE:
@@ -1691,8 +1692,8 @@ mo4(Uint op_mm, Ull ex, Ull *d, Ull base, Ull offset, Uchar msk, Ull top, Uint l
   mmp(op_mm, ex, d, adr, top, len, blk);
 }
 
-int emax6_unaligned_load_valid; /* mop(BR[][][1]adr+8); mop(BR[][][0]adr);Ï¢Â³»ØÄê¤òÁÛÄê¤·,1¤Î¾ì¹çhigh¤¬Í­¸ú,0¤Î¾ì¹çÌµ¸ú  */
-Ull emax6_unaligned_load_high;  /* mop(BR[][][1]adr+8); mop(BR[][][0]adr);Ï¢Â³»ØÄê¤òÁÛÄê¤·,highÂ¦¤ò°ì¼¡ÊÝÂ¸¤·lowÂ¦¤Ëmerge */
+int emax6_unaligned_load_valid; /* mop(BR[][][1]adr+8); mop(BR[][][0]adr);Ï¢Â³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ê¤·,1ï¿½Î¾ï¿½ï¿½highï¿½ï¿½Í­ï¿½ï¿½,0ï¿½Î¾ï¿½ï¿½Ìµï¿½ï¿½  */
+Ull emax6_unaligned_load_high;  /* mop(BR[][][1]adr+8); mop(BR[][][0]adr);Ï¢Â³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ê¤·,highÂ¦ï¿½ï¿½ì¼¡ï¿½ï¿½Â¸ï¿½ï¿½lowÂ¦ï¿½ï¿½merge */
 
 void /*__attribute__((always_inline))*/
 mmp(Uint op_mm, Ull ex, Ull *d, Ull adr, Ull top, Uint len, Uint blk)
@@ -1805,7 +1806,7 @@ mmp(Uint op_mm, Ull ex, Ull *d, Ull adr, Ull top, Uint len, Uint blk)
     *((Ull*)(adr&~31LL)+3) = *(d+3);
     break;
   case OP_TR: /* 64bit*4 exec Send transaction */
-    /* addr¤òtransaction()»ØÄê¤Ë»ÈÍÑ */
+    /* addrï¿½ï¿½transaction()ï¿½ï¿½ï¿½ï¿½Ë»ï¿½ï¿½ï¿½ */
     if (c0) {
       Ull (*trans)() = top;
       (trans)(*(d+0), *(d+1), *(d+2), *(d+3));

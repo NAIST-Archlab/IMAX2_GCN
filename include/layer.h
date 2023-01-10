@@ -1,8 +1,6 @@
 #ifndef __LAYER_H__
 #define __LAYER_H__
 #include "../include/emax6.h"
-#include "../include/emax6_sparselib.h"
-#include "../include/kernel_lib.h"
 #include "../include/sparse.h"
 
 typedef struct sparse_graph {

@@ -30,5 +30,23 @@ float* make_weight(int dim_in, int dim_out) {
 }
 
 HiddenLayer* propagation(GCNNetwork *network) {
-    return NULL;
+    GCNLayer *p = network->layers;
+    HiddenLayer *result;
+
+    while (p != NULL) {
+        Uint *tmp = (Uint *)malloc(sizeof(Uint) * network->graph.matrix.row_size * p->latent_vectors.dim_out);
+        int out_size = p->latent_vectors.dim_out * p->hidden_layer.dim_out;
+        Uint *tmp2 = (Uint *)malloc(sizeof(Uint) * out_size);
+        spmm(tmp, &network->graph.matrix, &network->graph.params, p->hidden_layer.weight, network->graph.matrix.row_size, p->latent_vectors.dim_out);
+        mm(tmp2, tmp, p->hidden_layer.weight, p->latent_vectors.dim_in, p->hidden_layer.dim_in, p->hidden_layer.dim_out);
+        if (p->next != NULL) {
+            relu(&p->next->latent_vectors.weight, tmp2, out_size);
+        } else {
+            result = (Uint*) malloc(sizeof(Uint) * out_size);
+            relu(result, tmp2, out_size);
+        }
+        p = p->next;
+    }
+
+    return result;
 }
