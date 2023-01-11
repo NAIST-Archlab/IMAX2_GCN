@@ -2,13 +2,10 @@
 ##   Copyright (C) 2023 by NAIST UNIV. ##
 ##              Primary writer: D.Kim  ##
 ##          kim.dohyun.kg7@is.naist.jp ##
-
-SUFFIX   := .o.c
-
 PROGRAM := imax_gcn
 SRC_DIR := src
-OBJS := $(SRC_DIR)/main.o $(SRC_DIR)/sparse_kernel/sparse.o $(SRC_DIR)/layer.o
-INCLUDE := $(wildcard ./include/*.h) 
+OBJS := main.o sparse.o layer.o
+INCLUDE := ./include/
 ifeq ($(MACHTYPE),x86_64)
 	X64 ?= 1
 	ARCH ?= X64
@@ -39,8 +36,10 @@ HOMEBREW_DIR := /opt/homebrew
 
 CPP     := cpp -P
 CC      := gcc
-CFLAGS  := -g3 -O0 -Wall -msse3 -Wno-unknown-pragmas -I$(INCLUDE) -DCBLAS_GEMM -DEMAX6 -DDEBUG
-LDFLAGS := -L/usr/lib64 -L/usr/local/lib -L$(STATIC_LIB_X64) -lm
+CFLAGS  := -g3 -O0 -Wall -msse3 -Wno-unknown-pragmas -I$(INCLUDE) 
+#-DCBLAS_GEMM -DEMAX6 -DDEBUG
+LDFLAGS := -L/usr/lib64 -L/usr/local/lib -lm
+#LDFLAGS := -L/usr/lib64 -L/usr/local/lib -L$(STATIC_LIB_X64) -lm
 
 ifeq ($(ARM),1)
 LDFLAGS := -L/usr/lib64 -L/usr/local/lib -L$(STATIC_LIB_ARM) -lm
@@ -56,11 +55,13 @@ LDFLAGS := -L/usr/lib64 -L/usr/local/lib -L$(STATIC_LIB_ARM_CROSS) -lm
 endif
 DEVICE_DEBUG := 0
 
+.SUFFIXES   := .c .o
 $(PROGRAM): $(OBJS)
-	$(CC) -o $(PROGRAM) $^
+	$(CC) -o $(PROGRAM) $(LDFLAGS) $^
 
-.o.c:
-	$(CC) $(CFLAGS) $<
+%.o: $(SRC_DIR)/%.c
+	$(CC) $(CFLAGS) -c -o $@ $<
 
+.PHONY: clean
 clean:
-	$(RM) *.o *.a *.so
+	$(RM) *.o *.a *.so *.gch

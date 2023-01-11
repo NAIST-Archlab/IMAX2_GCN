@@ -1,4 +1,4 @@
-#include "../../include/sparse.h"
+#include "../include/sparse.h"
 #ifdef USE_MP
 #include <omp.h>
 #endif

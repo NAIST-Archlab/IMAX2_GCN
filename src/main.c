@@ -1,6 +1,7 @@
 #include "../include/layer.h"
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
 #ifdef USE_MP
 #include <omp.h>
 #endif
