@@ -1,26 +1,24 @@
 #include "../include/sparse.h"
+#include <stdio.h>
 #ifdef USE_MP
 #include <omp.h>
 #endif
 
-void spmm(Uint *result, SparseMatrix *sp_matrix, SparseMatrixParams *sp_params, Uint *matrix, int row, int col) {
+void spmm(Uint *result, SparseMatrix *sp_matrix, SparseMatrixParams *sp_params, Uint *matrix, int mm_col) {
     int i, j, k;
 
     #ifdef USE_MP
     #pragma omp parallel for
     #endif
-
-    for (i = 0; i < sp_matrix->row_size; i++) {
-        int col_index_at_row = sp_matrix->row_p[i];
-        int col_size = sp_matrix->row_p[i+1] - sp_matrix->row_p[i];
-
-        for (j = col_index_at_row; j < sp_matrix->row_p[i+1]; j++) {
-            int col_index = sp_matrix->col_p[j];
-            float sum = 0; 
-            for (k = 0; k < col_size; k++) {
-                sum += *(float*)&sp_matrix->val[i*sp_matrix->row_size+k] * *(float*)&matrix[k*sp_matrix->col_size+j];
+    for (k = 0; k < mm_col; k++) {
+        for (i = 0; i < sp_matrix->row_size; i++) {
+            int col_index_of_index = sp_matrix->row_p[i];
+            float sum = 0;
+            for (j = col_index_of_index; j < sp_matrix->row_p[i + 1]; j++) {
+                int col_index = sp_matrix->col_p[j];
+                sum += *(float *)&sp_matrix->val[j] * *(float *)&matrix[col_index * mm_col + k];
             }
-            result[i*sp_matrix->row_size+j] = (Uint*)&sum;
+            result[i * mm_col + k] = (Uint *)&sum;
         }
     }
 }
@@ -35,9 +33,9 @@ void mm(Uint *result, Uint *a, Uint *b, int row_a, int col_a, int col_b) {
         for (j = 0; j < col_a; j++) {
             float sum = 0; 
             for (k = 0; k < col_b; k++) {
-                sum += *(float*)&a[i*row_a+k] * *(float*)&b[k*col_a+j];
+                sum += *(float*)&a[i*col_a+k] * *(float*)&b[k*col_b+j];
             }
-            result[i*row_a+j] = (Uint*)&sum;
+            result[i*col_b+j] = (Uint*)&sum;
         }
     }
 }

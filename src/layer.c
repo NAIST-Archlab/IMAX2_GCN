@@ -1,5 +1,6 @@
 #include "../include/layer.h"
 #include <stdlib.h>
+#include <stdio.h>
 
 void add_gcn_layer(GCNNetwork *network, float *weight, float *vectors, int dim_in, int dim_out) {
     int i;
@@ -20,9 +21,9 @@ void add_gcn_layer(GCNNetwork *network, float *weight, float *vectors, int dim_i
     layer->hidden_layer.dim_in = dim_in;
     layer->hidden_layer.dim_out = dim_out;
     layer->hidden_layer.weight = weight;
-    layer->latent_vectors.dim_in = network->graph.matrix.row_size;
+    layer->latent_vectors.dim_in = network->graph->matrix.col_size;
     layer->latent_vectors.dim_out = dim_in;
-    layer->hidden_layer.weight = vectors;
+    layer->latent_vectors.weight = vectors;
 }
 
 float* make_weight(int dim_in, int dim_out) {
@@ -31,13 +32,13 @@ float* make_weight(int dim_in, int dim_out) {
 
 HiddenLayer* propagation(GCNNetwork *network) {
     GCNLayer *p = network->layers;
-    HiddenLayer *result;
+    HiddenLayer *result = NULL;
 
     while (p != NULL) {
-        Uint *tmp = (Uint *)malloc(sizeof(Uint) * network->graph.matrix.row_size * p->latent_vectors.dim_out);
-        int out_size = p->latent_vectors.dim_out * p->hidden_layer.dim_out;
+        Uint *tmp = (Uint *)malloc(sizeof(Uint) * network->graph->matrix.row_size * p->latent_vectors.dim_out);
+        int out_size = p->latent_vectors.dim_in * p->hidden_layer.dim_out;
         Uint *tmp2 = (Uint *)malloc(sizeof(Uint) * out_size);
-        spmm(tmp, &network->graph.matrix, &network->graph.params, p->hidden_layer.weight, network->graph.matrix.row_size, p->latent_vectors.dim_out);
+        spmm(tmp, &network->graph->matrix, &network->graph->params, p->latent_vectors.weight, p->latent_vectors.dim_out);
         mm(tmp2, tmp, p->hidden_layer.weight, p->latent_vectors.dim_in, p->hidden_layer.dim_in, p->hidden_layer.dim_out);
         if (p->next != NULL) {
             relu(&p->next->latent_vectors.weight, tmp2, out_size);
@@ -45,6 +46,8 @@ HiddenLayer* propagation(GCNNetwork *network) {
             result = (Uint*) malloc(sizeof(Uint) * out_size);
             relu(result, tmp2, out_size);
         }
+        free(tmp);
+        free(tmp2);
         p = p->next;
     }
 

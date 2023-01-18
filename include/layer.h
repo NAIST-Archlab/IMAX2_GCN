@@ -1,7 +1,8 @@
 #ifndef __LAYER_H__
 #define __LAYER_H__
-#include "../include/emax6.h"
-#include "../include/sparse.h"
+#include "options.h"
+#include "emax6.h"
+#include "sparse.h"
 
 typedef struct sparse_graph {
     SparseMatrix matrix;
@@ -23,7 +24,7 @@ typedef struct gcn_layer {
 
 typedef struct gcn_network {
     int num_layers;
-    SparseGraph graph;
+    SparseGraph *graph;
     GCNLayer *layers;
 } GCNNetwork;
 

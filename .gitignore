@@ -1,2 +1,4 @@
 *.o
 *.gch
+imax_gcn
+data/

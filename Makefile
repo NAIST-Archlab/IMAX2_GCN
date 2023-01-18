@@ -18,10 +18,8 @@ ifeq ($(MACHTYPE),aarch64)
 endif
 
 ifeq ($(shell uname), Darwin)
-	ifeq ($(ARM), 1)
-		ARM := 0
-		ARM_MACOS := 1
-	endif
+	ARM := 0
+	ARM_MACOS := 1
 endif
 
 LINK_FORMAT := static
@@ -38,20 +36,21 @@ CPP     := cpp -P
 CC      := gcc
 CFLAGS  := -g3 -O0 -Wall -msse3 -Wno-unknown-pragmas -I$(INCLUDE) 
 #-DCBLAS_GEMM -DEMAX6 -DDEBUG
-LDFLAGS := -L/usr/lib64 -L/usr/local/lib -lm
+LDFLAGS := -L/usr/lib64 -L/usr/local/lib -lm -fopenmp
 #LDFLAGS := -L/usr/lib64 -L/usr/local/lib -L$(STATIC_LIB_X64) -lm
 
 ifeq ($(ARM),1)
-LDFLAGS := -L/usr/lib64 -L/usr/local/lib -L$(STATIC_LIB_ARM) -lm
+LDFLAGS := -L/usr/lib64 -L/usr/local/lib -L$(STATIC_LIB_ARM) -lm -fopenmp
 endif
 
 ifeq ($(ARM_MACOS),1)
-CFLAGS := -g3 -O0 -Wall -msse3 -Wno-unknown-pragmas -I$(HOMEBREW_DIR)/include -I$(INCLUDE) -DCBLAS_GEMM -DEMAX6 -DDEBUG
-LDFLAGS := -L/usr/lib -L/usr/local/lib -L$(HOMEBREW_DIR)/lib -L$(STATIC_LIB_ARM_MACOS) -lm 
+CFLAGS := -g3 -O0 -Wall -msse3 -Wno-unknown-pragmas -I$(HOMEBREW_DIR)/opt/libomp/include -Xpreprocessor -fopenmp -I$(INCLUDE) -DCBLAS_GEMM -DEMAX6 -DDEBUG
+LDFLAGS := -L/usr/lib -L/usr/local/lib -L$(HOMEBREW_DIR)/opt/libomp/lib -lm -lomp
+#-L$(STATIC_LIB_ARM_MACOS) 
 endif
 
 ifeq ($(ARM_CROSS),1)
-LDFLAGS := -L/usr/lib64 -L/usr/local/lib -L$(STATIC_LIB_ARM_CROSS) -lm
+LDFLAGS := -L/usr/lib64 -L/usr/local/lib -L$(STATIC_LIB_ARM_CROSS) -lm -fopenmp
 endif
 DEVICE_DEBUG := 0
 

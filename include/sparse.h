@@ -1,7 +1,6 @@
 #ifndef __SPARSE_H__
 #define __SPARSE_H__
-//#include "emax6.h"
-//#include "emax6lib.c"
+#include "options.h"
 #ifndef UTYPEDEF
 #define UTYPEDEF
 typedef unsigned char      Uchar;
@@ -21,7 +20,7 @@ typedef struct sparse_matrix {
     int row_size; //row size
     int *row_p; //row pointer
     int *col_p; //col pointer
-    Uint *val; //value of each index
+    Uint *val; //value of each index/Floating
 } SparseMatrix;
 
 typedef struct sparse_matrix_params {
@@ -29,8 +28,8 @@ typedef struct sparse_matrix_params {
     int padding; //pading option
 } SparseMatrixParams;
 
-void spmm(Uint* result, SparseMatrix *sp_matrix, SparseMatrixParams *sp_params, Uint* matrix, int row, int col);
-void mm(Uint *result, Uint *a, Uint *b, int row_a, int col_a, int col_b);
+void spmm(Uint* result, SparseMatrix *sp_matrix, SparseMatrixParams *sp_params, Uint* matrix, int mm_col);
+void mm(Uint *result, Uint *a, Uint *b, int col_a, int row_a, int row_b);
 void relu(Uint *result, Uint *a, int size);
 
 #endif
