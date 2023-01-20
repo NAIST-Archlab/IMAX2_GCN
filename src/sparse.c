@@ -49,6 +49,6 @@ void relu(Uint *result, Uint *a, int size) {
     #endif
     for (i = 0; i < size; i++) {
         float val = *(float*)&a[i];
-        result = (val > 0) ? *(Uint*)&val : *(Uint*)&zero;
+        result[i] = (val > 0) ? a[i] : *(Uint*)&zero;
     }
 }

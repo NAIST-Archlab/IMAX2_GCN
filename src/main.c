@@ -7,14 +7,27 @@
 #include <omp.h>
 #endif
 
+void print_weight(HiddenLayer *result) {
+    Ull i, j;
+
+    for(i = 0; i < result->dim_in; i++) {
+        for(j = 0; j < result->dim_out; j++) {
+            printf("%f ", result->weight[i*result->dim_out + j]);
+        }
+        printf("\n");
+    }
+}
+
 int main(int argc, char **argv) {
     GCNNetwork network;
     SparseGraph graph;
     HiddenLayer *result;
-    FILE *fp_weight, *fp_graph;
+    FILE *fp_weight, *fp_graph, *fp_feats, *fp_dims;
     int num_layers, dim_in, dim_out;
     float *tmp_weight, *tmp_vectors;
-    Ull version, sizeEdgeTy, nv, i, j;
+    char tmp_filename[100];
+    Ull version, sizeEdgeTy, nv, i, j, f_dim_in;
+    Uint f_dim_out;
     Ull *vertices;
     Uint *edges, *vertices_int;
     Uint *edges_val;
@@ -27,10 +40,29 @@ int main(int argc, char **argv) {
     if (!(fp_weight = fopen(argv[1], "rb"))) {
         return 1;
     }
-
-    if (!(fp_graph = fopen(argv[2], "rb"))) {
+    
+    memset(tmp_filename, 0, 100);
+    strcat(tmp_filename, argv[2]);
+    strcat(tmp_filename, ".csgr");
+    if (!(fp_graph = fopen(tmp_filename, "rb"))) {
         return 1;
     }
+
+    memset(tmp_filename, 0, 100);
+    strcat(tmp_filename, argv[2]);
+    strcat(tmp_filename, "-feats.bin");
+    if (!(fp_feats = fopen(tmp_filename, "rb"))) {
+        return 1;
+    }
+
+    memset(tmp_filename, 0, 100);
+    strcat(tmp_filename, argv[2]);
+    strcat(tmp_filename, "-dims.txt");
+    if (!(fp_dims = fopen(tmp_filename, "r"))) {
+        return 1;
+    }
+
+    fscanf(fp_dims, "%ld %d\n", &f_dim_in, &f_dim_out);
 
     printf("Reading Graph now...\n");
     fread(&version, sizeof(Ull), 1, fp_graph);
@@ -85,9 +117,15 @@ int main(int argc, char **argv) {
         tmp_vectors = make_weight(nv, dim_in);
         add_gcn_layer(&network, tmp_weight, tmp_vectors, dim_in, dim_out);
     }
+    print_layers(&network);
+
+    printf("Reading Features now...\n");
+    fread(network.layers->latent_vectors.weight, sizeof(Uint), f_dim_in*f_dim_out, fp_feats);
 
     printf("Propagation...\n");
     result = propagation(&network);
+    printf("Result\n");
+    print_weight(result);
     printf("Propagation Done\n");
 
     fclose(fp_graph);

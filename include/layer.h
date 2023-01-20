@@ -28,6 +28,7 @@ typedef struct gcn_network {
     GCNLayer *layers;
 } GCNNetwork;
 
+void print_layers(GCNNetwork *network);
 void add_gcn_layer(GCNNetwork *network, float *weight, float *vectors, int dim_in, int dim_out);
 float* make_weight(int dim_in, int dim_out);
 HiddenLayer* propagation(GCNNetwork *network);

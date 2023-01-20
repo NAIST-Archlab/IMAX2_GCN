@@ -2,8 +2,17 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+void print_layers(GCNNetwork *network) {
+    GCNLayer *p = network->layers;
+
+    while (p != NULL) {
+        printf("Vectors: %d * %d\n", p->latent_vectors.dim_in, p->latent_vectors.dim_out);
+        printf("Weight: %d * %d\n", p->hidden_layer.dim_in, p->hidden_layer.dim_out);
+        p = p->next;
+    }
+}
+
 void add_gcn_layer(GCNNetwork *network, float *weight, float *vectors, int dim_in, int dim_out) {
-    int i;
     GCNLayer *p = network->layers;
     GCNLayer *layer = (GCNLayer*) malloc(sizeof(GCNLayer));
 
@@ -36,15 +45,18 @@ HiddenLayer* propagation(GCNNetwork *network) {
 
     while (p != NULL) {
         Uint *tmp = (Uint *)malloc(sizeof(Uint) * network->graph->matrix.row_size * p->latent_vectors.dim_out);
-        int out_size = p->latent_vectors.dim_in * p->hidden_layer.dim_out;
+        int out_size = network->graph->matrix.row_size * p->hidden_layer.dim_out;
         Uint *tmp2 = (Uint *)malloc(sizeof(Uint) * out_size);
-        spmm(tmp, &network->graph->matrix, &network->graph->params, p->latent_vectors.weight, p->latent_vectors.dim_out);
-        mm(tmp2, tmp, p->hidden_layer.weight, p->latent_vectors.dim_in, p->hidden_layer.dim_in, p->hidden_layer.dim_out);
+        spmm(tmp, &network->graph->matrix, &network->graph->params, (Uint*)p->latent_vectors.weight, p->latent_vectors.dim_out);
+        mm(tmp2, tmp, (Uint*)p->hidden_layer.weight, network->graph->matrix.row_size, p->hidden_layer.dim_in, p->hidden_layer.dim_out);
         if (p->next != NULL) {
-            relu(&p->next->latent_vectors.weight, tmp2, out_size);
+            relu((Uint*)p->next->latent_vectors.weight, tmp2, out_size);
         } else {
-            result = (Uint*) malloc(sizeof(Uint) * out_size);
-            relu(result, tmp2, out_size);
+            result = (HiddenLayer*) malloc(sizeof(HiddenLayer));
+            result->dim_in = network->graph->matrix.row_size;
+            result->dim_out = p->hidden_layer.dim_out;
+            result->weight = make_weight(network->graph->matrix.row_size, p->hidden_layer.dim_out);
+            relu((Uint*)result->weight, tmp2, out_size);
         }
         free(tmp);
         free(tmp2);
