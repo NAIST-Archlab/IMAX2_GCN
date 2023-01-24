@@ -12,25 +12,26 @@ void print_weight(HiddenLayer *result) {
 
     for(i = 0; i < result->dim_in; i++) {
         for(j = 0; j < result->dim_out; j++) {
-            printf("%f ", result->weight[i*result->dim_out + j]);
+            if (result->weight[i*result->dim_out + j] != 0)
+                printf("%f ", result->weight[i*result->dim_out + j]);
         }
-        printf("\n");
     }
+    printf("\n");
 }
 
 int main(int argc, char **argv) {
     GCNNetwork network;
     SparseGraph graph;
+    SparseGraph *new_graph;
     HiddenLayer *result;
     FILE *fp_weight, *fp_graph, *fp_feats, *fp_dims;
     int num_layers, dim_in, dim_out;
-    float *tmp_weight, *tmp_vectors;
+    float *tmp_weight, *tmp_vectors, *edges_val;
     char tmp_filename[100];
     Ull version, sizeEdgeTy, nv, i, j, f_dim_in;
     Uint f_dim_out;
     Ull *vertices;
     Uint *edges, *vertices_int;
-    Uint *edges_val;
 
     if (argc < 3) {
         printf("Usage: %s weight graph\n", argv[0]);
@@ -62,7 +63,7 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    fscanf(fp_dims, "%ld %d\n", &f_dim_in, &f_dim_out);
+    fscanf(fp_dims, "%lld %d\n", &f_dim_in, &f_dim_out);
 
     printf("Reading Graph now...\n");
     fread(&version, sizeof(Ull), 1, fp_graph);
@@ -78,32 +79,34 @@ int main(int argc, char **argv) {
         vertices_int[i] = (Uint) vertices[i];
     }
     edges = (Uint*) malloc(sizeof(Uint)*vertices[nv]);
-    edges_val = (Uint*) malloc(sizeof(Uint)*vertices[nv]);
+    edges_val = (float*) malloc(sizeof(float)*vertices[nv]);
+    memset(edges_val, 0, sizeof(float)*vertices[nv]);
     fread(edges, sizeof(Uint), vertices[nv], fp_graph);
+    graph.matrix.nnz = vertices[nv];
+    graph.matrix.col_size = nv;
+    graph.matrix.row_size = nv;
+    graph.matrix.row_p = (int*)vertices_int;
+    graph.matrix.col_p = (int*)edges;
+    graph.matrix.val = edges_val;
+
+    printf("Caculating A + I\n");
+    new_graph = spia(&graph);
 
     // D^-1*A*D^-1
     printf("Calculating D^-1AD^-1\n");
     #ifdef USE_MP
     #pragma omp parallel for
     #endif
-    for(i = 0; i < nv; i++) {
-        for (j = vertices[i]; j < vertices[i+1]; j++) {
-            int col = edges[j];
-            float d_row = 1/sqrt(vertices[i+1] - vertices[i]);
-            float d_col = 1/sqrt(vertices[col+1] - vertices[col]);
-            float d_row_col = d_row * d_col;
-            edges_val[j] = *(Uint*)&d_row_col;
+    for(i = 0; i < new_graph->matrix.nnz; i++) {
+        for (j = new_graph->matrix.col_p[i]; j < new_graph->matrix.col_p[i+1]; j++) {
+            int col = new_graph->matrix.col_p[j];
+            float d_row = 1/sqrt(vertices[i+1] - vertices[i] + 1);
+            float d_col = 1/sqrt(vertices[col+1] - vertices[col] + 1);
+            new_graph->matrix.val[j] *= d_row * d_col;
         }
     }
 
-    graph.matrix.nnz = vertices[nv];
-    graph.matrix.col_size = nv;
-    graph.matrix.row_size = nv;
-    graph.matrix.row_p = (int*)vertices_int;
-    graph.matrix.col_p = (int*) edges;
-    graph.matrix.val = edges_val;
-
-    network.graph = &graph;
+    network.graph = new_graph;
     network.layers = NULL;
 
     printf("Reading Weight now...\n");
@@ -120,7 +123,7 @@ int main(int argc, char **argv) {
     print_layers(&network);
 
     printf("Reading Features now...\n");
-    fread(network.layers->latent_vectors.weight, sizeof(Uint), f_dim_in*f_dim_out, fp_feats);
+    fread(network.layers->latent_vectors.weight, sizeof(float), f_dim_in*f_dim_out, fp_feats);
 
     printf("Propagation...\n");
     result = propagation(&network);

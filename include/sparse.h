@@ -20,7 +20,7 @@ typedef struct sparse_matrix {
     int row_size; //row size
     int *row_p; //row pointer
     int *col_p; //col pointer
-    Uint *val; //value of each index/Floating
+    float *val; //value of each index/Floating
 } SparseMatrix;
 
 typedef struct sparse_matrix_params {
@@ -28,8 +28,8 @@ typedef struct sparse_matrix_params {
     int padding; //pading option
 } SparseMatrixParams;
 
-void spmm(Uint* result, SparseMatrix *sp_matrix, SparseMatrixParams *sp_params, Uint* matrix, int mm_col);
-void mm(Uint *result, Uint *a, Uint *b, int col_a, int row_a, int row_b);
-void relu(Uint *result, Uint *a, int size);
+void spmm(float* result, SparseMatrix *sp_matrix, SparseMatrixParams *sp_params, float* matrix, int mm_col);
+void mm(float *result, float *a, float *b, int col_a, int row_a, int row_b);
+void relu(float *result, float *a, int size);
 
 #endif
