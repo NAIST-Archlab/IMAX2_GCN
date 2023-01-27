@@ -28,10 +28,13 @@ typedef struct gcn_network {
     GCNLayer *layers;
 } GCNNetwork;
 
+void print_weight(HiddenLayer *result);
 SparseGraph* spia(SparseGraph *graph);
 void print_layers(GCNNetwork *network);
 void add_gcn_layer(GCNNetwork *network, float *weight, float *vectors, int dim_in, int dim_out);
 float* make_weight(int dim_in, int dim_out);
 HiddenLayer* propagation(GCNNetwork *network);
+HiddenLayer* softmax(HiddenLayer *end_vectors);
+float max_in_array(float *array, int size);
 
 #endif

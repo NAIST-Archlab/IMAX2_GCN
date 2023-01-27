@@ -1,6 +1,37 @@
 #include "../include/layer.h"
+#include "../include/utils.h"
 #include <stdlib.h>
 #include <stdio.h>
+#include <math.h>
+
+void print_weight(HiddenLayer *result) {
+    Ull i, j;
+    char ry_row=0;
+
+    printf("[\n");
+    for(i = 0; i < result->dim_in; i++) {
+        if (i > 100 && (i < result->dim_in - 50) && ry_row != 1) {
+            printf("\t.\n\t.\n\t.\n");
+            ry_row = 1;
+        } else if (i > (result->dim_in - 30) || ry_row == 0) {
+            char ry_col = 0;
+            printf("\t[ ");
+            for(j = 0; j < result->dim_out; j++) {
+                if (j > 2 && j < (result->dim_out - 3) && ry_col != 1) {
+                    printf("... ");
+                    ry_col = 1;
+                } else if (j > (result->dim_out - 3) || ry_col == 0) {
+                    if (result->weight[i*result->dim_out+j] != 0)
+                        printf("%f ", result->weight[i*result->dim_out + j]);
+                    else
+                        printf("0 ");
+                }
+            }
+            printf("]\n");
+        }
+    }
+    printf("]\n");
+}
 
 SparseGraph* spia(SparseGraph *graph) {
     SparseMatrix *sp_matrix = &graph->matrix;
@@ -9,15 +40,15 @@ SparseGraph* spia(SparseGraph *graph) {
     int nnz = sp_matrix->nnz;
     float *new_val;
     int *new_col_p, *new_row_p;
-    int i, j, k = 0;
+    int k = 0;
     char is_added = 0;
 
     #ifdef USE_MP
     #pragma omp parallel for
     #endif
-    for (i = 0; i < sp_matrix->row_size; i++) {
+    for (int i = 0; i < sp_matrix->row_size; i++) {
         int col_index_of_index = sp_matrix->row_p[i];
-        for (j = col_index_of_index; j < sp_matrix->row_p[i + 1]; j++) {
+        for (int j = col_index_of_index; j < sp_matrix->row_p[i + 1]; j++) {
             int col_index = sp_matrix->col_p[j];
             if (col_index < i && (j+1) >= sp_matrix->row_p[i+1]) {
                 nnz++;
@@ -44,10 +75,7 @@ SparseGraph* spia(SparseGraph *graph) {
     result->matrix.val = new_val;
     if (nnz != 0) new_row_p[0] = 0;
 
-    #ifdef USE_MP
-    #pragma omp parallel for
-    #endif
-    for (i = 0; i <= sp_matrix->row_size; i++) {
+    for (int i = 0; i <= sp_matrix->row_size; i++) {
         int col_index_of_index = sp_matrix->row_p[i];
         int sub = sp_matrix->row_p[i] - sp_matrix->row_p[i-1];
         if (i > 0) {
@@ -57,7 +85,7 @@ SparseGraph* spia(SparseGraph *graph) {
                 new_row_p[i] = new_row_p[i-1] + sub;
             is_added = 0;
         }
-       for (j = col_index_of_index; j < sp_matrix->row_p[i + 1]; j++) {
+       for (int j = col_index_of_index; j < sp_matrix->row_p[i + 1]; j++) {
             int col_index = sp_matrix->col_p[j];
             if (col_index < i && (j+1) >= sp_matrix->row_p[i+1]) {
                 new_col_p[k] = col_index;
@@ -130,27 +158,85 @@ float* make_weight(int dim_in, int dim_out) {
 
 HiddenLayer* propagation(GCNNetwork *network) {
     GCNLayer *p = network->layers;
-    HiddenLayer *result = NULL;
-
+    HiddenLayer *result = NULL, *end_vectors = NULL;
+    double spmm_time = 0, mm_time = 0, relu_time = 0;
+    struct timespec t1, t2;
+    
     while (p != NULL) {
         float *tmp = (float *)malloc(sizeof(float) * network->graph->matrix.row_size * p->latent_vectors.dim_out);
         int out_size = network->graph->matrix.row_size * p->hidden_layer.dim_out;
         float *tmp2 = (float *)malloc(sizeof(float) * out_size);
+
+        timespec_get(&t1, TIME_UTC);
         spmm(tmp, &network->graph->matrix, &network->graph->params, p->latent_vectors.weight, p->latent_vectors.dim_out);
+        timespec_get(&t2, TIME_UTC);
+        spmm_time += cal_time(&t2, &t1);
+
+        timespec_get(&t1, TIME_UTC);
         mm(tmp2, tmp, p->hidden_layer.weight, network->graph->matrix.row_size, p->hidden_layer.dim_in, p->hidden_layer.dim_out);
+        timespec_get(&t2, TIME_UTC);
+        mm_time += cal_time(&t2, &t1);
+
         if (p->next != NULL) {
+            timespec_get(&t1, TIME_UTC);
             relu(p->next->latent_vectors.weight, tmp2, out_size);
+            timespec_get(&t2, TIME_UTC);
+            relu_time += cal_time(&t2, &t1);
         } else {
-            result = (HiddenLayer*) malloc(sizeof(HiddenLayer));
-            result->dim_in = network->graph->matrix.row_size;
-            result->dim_out = p->hidden_layer.dim_out;
-            result->weight = make_weight(network->graph->matrix.row_size, p->hidden_layer.dim_out);
-            relu(result->weight, tmp2, out_size);
+            end_vectors = (HiddenLayer*) malloc(sizeof(HiddenLayer));
+            end_vectors->dim_in = network->graph->matrix.row_size;
+            end_vectors->dim_out = p->hidden_layer.dim_out;
+            end_vectors->weight = make_weight(network->graph->matrix.row_size, p->hidden_layer.dim_out);
+            timespec_get(&t1, TIME_UTC);
+            relu(end_vectors->weight, tmp2, out_size);
+            timespec_get(&t2, TIME_UTC);
+            relu_time += cal_time(&t2, &t1);
         }
         free(tmp);
         free(tmp2);
         p = p->next;
     }
 
+    timespec_get(&t1, TIME_UTC);
+    result = softmax(end_vectors);
+    timespec_get(&t2, TIME_UTC);
+    double softmax_time = cal_time(&t2, &t1);
+
+    printf("SpMM: %lf, MM: %lf, ReLu: %lf, Softmax: %lf sec.\n", spmm_time, mm_time, relu_time, softmax_time);
     return result;
+}
+
+HiddenLayer* softmax(HiddenLayer *end_vectors) {
+    HiddenLayer *result;
+    result = (HiddenLayer*) malloc(sizeof(HiddenLayer));
+    result->weight = (float*) malloc(sizeof(float) * end_vectors->dim_in * end_vectors->dim_out);
+    result->dim_in = end_vectors->dim_in;
+    result->dim_out = end_vectors->dim_out;
+
+    #ifdef USE_MP
+    #pragma omp parallel
+    #endif
+    for (int i = 0; i < end_vectors->dim_in; i++) {
+        float log_max = log(max_in_array(&end_vectors->weight[i], end_vectors->dim_out));
+        float sum = 0;
+        for (int j = 0; j < end_vectors->dim_out; j++) { 
+            sum += exp(end_vectors->weight[i*end_vectors->dim_out + j]+log_max);
+        }
+        for (int j = 0; j < end_vectors->dim_out; j++) { 
+            result->weight[i*end_vectors->dim_out+j] = exp(end_vectors->weight[i*end_vectors->dim_out + j]+log_max) / sum; 
+        }
+    }
+
+    return result;
+}
+
+float max_in_array(float *array, int size) {
+    int i;
+    float max = -1;
+
+    for (i = 0; i < size; i++) {
+        if (max < array[i]) max = array[i];
+    }
+
+    return max;
 }

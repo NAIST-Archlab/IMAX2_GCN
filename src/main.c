@@ -1,28 +1,18 @@
 #include "../include/layer.h"
+#include "../include/utils.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <math.h>
+#include <time.h>
 #ifdef USE_MP
 #include <omp.h>
 #endif
 
-void print_weight(HiddenLayer *result) {
-    Ull i, j;
-
-    for(i = 0; i < result->dim_in; i++) {
-        for(j = 0; j < result->dim_out; j++) {
-            if (result->weight[i*result->dim_out + j] != 0)
-                printf("%f ", result->weight[i*result->dim_out + j]);
-        }
-    }
-    printf("\n");
-}
-
 int main(int argc, char **argv) {
     GCNNetwork network;
     SparseGraph graph;
-    SparseGraph *new_graph;
+    SparseGraph *new_graph = &graph;
     HiddenLayer *result;
     FILE *fp_weight, *fp_graph, *fp_feats, *fp_dims;
     int num_layers, dim_in, dim_out;
@@ -32,6 +22,8 @@ int main(int argc, char **argv) {
     Uint f_dim_out;
     Ull *vertices;
     Uint *edges, *vertices_int;
+
+    struct timespec t1, t2;
 
     if (argc < 3) {
         printf("Usage: %s weight graph\n", argv[0]);
@@ -89,22 +81,25 @@ int main(int argc, char **argv) {
     graph.matrix.col_p = (int*)edges;
     graph.matrix.val = edges_val;
 
-    printf("Caculating A + I\n");
-    new_graph = spia(&graph);
+    //printf("Caculating A + I\n");
+    //new_graph = spia(&graph);
 
     // D^-1*A*D^-1
     printf("Calculating D^-1AD^-1\n");
+    timespec_get(&t1, TIME_UTC);
     #ifdef USE_MP
     #pragma omp parallel for
     #endif
-    for(i = 0; i < new_graph->matrix.nnz; i++) {
-        for (j = new_graph->matrix.col_p[i]; j < new_graph->matrix.col_p[i+1]; j++) {
+    for(i = 0; i <= new_graph->matrix.row_size; i++) {
+        for (j = new_graph->matrix.row_p[i]; j < new_graph->matrix.row_p[i+1]; j++) {
             int col = new_graph->matrix.col_p[j];
-            float d_row = 1/sqrt(vertices[i+1] - vertices[i] + 1);
-            float d_col = 1/sqrt(vertices[col+1] - vertices[col] + 1);
-            new_graph->matrix.val[j] *= d_row * d_col;
+            float d_row = 1/sqrt(new_graph->matrix.row_p[i+1] - new_graph->matrix.row_p[i] + 1);
+            float d_col = 1/sqrt(new_graph->matrix.row_p[col+1] - new_graph->matrix.row_p[col] + 1);
+            new_graph->matrix.val[j] = d_row * d_col;
         }
     }
+    timespec_get(&t2, TIME_UTC);
+    printf("Preprocessing: %lf sec.\n", cal_time(&t2, &t1));
 
     network.graph = new_graph;
     network.layers = NULL;
@@ -126,7 +121,10 @@ int main(int argc, char **argv) {
     fread(network.layers->latent_vectors.weight, sizeof(float), f_dim_in*f_dim_out, fp_feats);
 
     printf("Propagation...\n");
+    timespec_get(&t1, TIME_UTC);
     result = propagation(&network);
+    timespec_get(&t2, TIME_UTC);
+    printf("Propagation: %lf sec.\n", cal_time(&t2, &t1));
     printf("Result\n");
     print_weight(result);
     printf("Propagation Done\n");
