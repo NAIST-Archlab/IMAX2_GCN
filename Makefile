@@ -34,23 +34,24 @@ HOMEBREW_DIR := /opt/homebrew
 
 CPP     := cpp -P
 CC      := gcc
-CFLAGS  := -g3 -O0 -Wall -msse3 -Wno-unknown-pragmas -I$(INCLUDE) 
-#-DCBLAS_GEMM -DEMAX6 -DDEBUG
-LDFLAGS := -L/usr/lib64 -L/usr/local/lib -lm -fopenmp -lrt
+CFLAGS  := -g3 -O0 -Wall -msse3 -Wno-unknown-pragmas -fcommon -I$(INCLUDE) -DCBLAS_GEMM -DEMAX6 -DDEBUG
+LDFLAGS := -L/usr/lib64 -L/usr/local/lib -lm -fopenmp -fcommon
 #LDFLAGS := -L/usr/lib64 -L/usr/local/lib -L$(STATIC_LIB_X64) -lm
 
 ifeq ($(ARM),1)
-LDFLAGS := -L/usr/lib64 -L/usr/local/lib -L$(STATIC_LIB_ARM) -lm -fopenmp
+LDFLAGS := -L/usr/lib64 -L/usr/local/lib -lm -fopenmp -fcommon
+# -L$(STATIC_LIB_ARM)
 endif
 
 ifeq ($(ARM_MACOS),1)
-CFLAGS := -g3 -O3 -Wall -msse3 -Wno-unknown-pragmas -I$(HOMEBREW_DIR)/opt/libomp/include -Xpreprocessor -fopenmp -I$(INCLUDE) -DCBLAS_GEMM -DEMAX6 -DDEBUG
+CFLAGS := -g3 -O3 -Wall -Wno-unknown-pragmas -I$(HOMEBREW_DIR)/opt/libomp/include -Xpreprocessor -fopenmp -I$(INCLUDE) -DCBLAS_GEMM -DEMAX6 -DDEBUG
 LDFLAGS := -L/usr/lib -L/usr/local/lib -L$(HOMEBREW_DIR)/opt/libomp/lib -lm -lomp
-#-L$(STATIC_LIB_ARM_MACOS)
+# -L$(STATIC_LIB_ARM_MACOS)
 endif
 
 ifeq ($(ARM_CROSS),1)
-LDFLAGS := -L/usr/lib64 -L/usr/local/lib -L$(STATIC_LIB_ARM_CROSS) -lm -fopenmp
+LDFLAGS := -L/usr/lib64 -L/usr/local/lib -lm -fopenmp -fcommon
+# -L$(STATIC_LIB_ARM_CROSS)
 endif
 DEVICE_DEBUG := 0
 
