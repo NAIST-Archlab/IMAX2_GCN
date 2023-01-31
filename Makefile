@@ -34,7 +34,7 @@ HOMEBREW_DIR := /opt/homebrew
 
 CPP     := cpp -P
 CC      := gcc
-CFLAGS  := -g3 -O0 -Wall -msse3 -Wno-unknown-pragmas -fcommon -I$(INCLUDE) -DCBLAS_GEMM -DEMAX6 -DDEBUG
+CFLAGS  := -g3 -O3 -Wall -msse3 -Wno-unknown-pragmas -fcommon -I$(INCLUDE) -DCBLAS_GEMM -DEMAX6 -DDEBUG
 LDFLAGS := -L/usr/lib64 -L/usr/local/lib -lm -fopenmp -fcommon
 #LDFLAGS := -L/usr/lib64 -L/usr/local/lib -L$(STATIC_LIB_X64) -lm
 
