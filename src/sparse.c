@@ -1,4 +1,5 @@
 #include "../include/sparse.h"
+#ifndef USE_IMAX2
 #include <stdio.h>
 #ifdef USE_MP
 #include <omp.h>
@@ -44,3 +45,5 @@ void relu(float *result, float *a, int size) {
         result[i] = (a[i] > 0) ? a[i] : 0;
     }
 }
+
+#endif
