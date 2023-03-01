@@ -4,7 +4,7 @@
 ##          kim.dohyun.kg7@is.naist.jp ##
 PROGRAM := imax_gcn
 SRC_DIR := src
-OBJS := main.o sparse.o layer.o utils.o
+OBJS := main.o sparse_imax.o layer.o utils.o
 INCLUDE := ./include/
 ifeq ($(MACHTYPE),x86_64)
 	X64 ?= 1

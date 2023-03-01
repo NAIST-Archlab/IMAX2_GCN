@@ -4,38 +4,45 @@
 #ifdef USE_IMAX2
 #include <stdio.h>
 
-#define M1 100
-#define M2 100
-#define NCHIP 4
-#define RMGRP 4
-#define H 10
-#define L 10
-#define C1 10
-#define W 10
-#define A_ROW 10
-
 void spmm(float *result, SparseMatrix *sp_matrix, SparseMatrixParams *sp_params, float *matrix, int mm_col) {
     Ull CHIP; Ull LOOP1, LOOP0; Ull INIT1, INIT0;
-    Ull top, blk;
+    Ull top, blk, blk_iter;
     Ull AR[64][4]; /* output of EX in each unit */
     Ull BR[64][4][4]; /* output registers in each unit */
     Ull r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15;
     Ull r16, r17, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27, r28, r29, r30, r31;
     Ull cc0, cc1, cc2, cc3, ex0, ex1; Ull cofs, rofs, oofs, k, row_p, cofs1;
 
-    size_t A_row_size;
-    size_t A_col_size;
-    size_t B_row_size;
-    size_t B_col_size;
-    size_t B_col_blk;
+    #define NCHIP 4
+    Ull *A_margin;
+    Ull A_margin_tmp;
+    Uint W = 8;
+    Uint H = 46;
 
-    for (top=0; top < M1/NCHIP; top+=B_col_blk) {
-        for (blk = 0; blk < A_col_size; blk +=H) {
-            typedef struct {Uint i[8]} Ui8;
-            Uint *a_col_index[H], *a[H];
-            Ui8 *b[NCHIP], *b0[NCHIP], *b1[NCHIP], *b2[NCHIP], *b3[NCHIP];
-            Ui8 *c0[NCHIP];
-            Ui8 *c00[NCHIP], *c01[NCHIP], *c02[NCHIP], *c03[NCHIP];
+    size_t A_row_size = sp_matrix->row_size;
+    size_t A_col_size = sp_matrix->col_size;
+    size_t B_row_size = sp_matrix->col_size;
+    size_t B_col_size = mm_col;
+    size_t B_col_blk;
+    size_t cofs_init = (0-W*4*2*A_row_size)<<32|((0-W*4*1*B_row_size)&0xffffffff);
+    size_t rofs_init = (0-1*8LL)<<32|((0-1*4LL)*0xffffffff);
+
+    size_t B_col_blk_mul_B_row_size = B_col_blk*B_row_size;
+    size_t A_row_size_mul_B_col_blk = A_row_size*B_col_blk;
+    size_t A_row_size_mul_2_4_2 = A_row_size*2*4*2;
+    size_t A_row_size_mul_8 = A_row_size*8;
+    size_t A_row_size_mul_W_4_2 = (W*4*2*A_row_size)<<32|(W*4*2*B_row_size);
+
+    typedef struct {Uint i[8]} Ui8;
+    Uint *a_col_index[H], *a[H];
+    Ui8 *b[NCHIP], *b0[NCHIP], *b1[NCHIP], *b2[NCHIP], *b3[NCHIP];
+    Ui8 *c0[NCHIP];
+    Ui8 *c00[NCHIP], *c01[NCHIP], *c02[NCHIP], *c03[NCHIP];
+
+    for (top=0; top < B_col_size/NCHIP; top+=B_col_blk) {
+        for (blk=0, blk_iter=0; blk < A_col_size; blk+=H,blk_iter+=1) {
+            if((A_margin_tmp=A_margin[blk_iter])==0) break;
+
             for (CHIP=0; CHIP<NCHIP; CHIP++) {
                 b[CHIP] = matrix+(CHIP*B_col_size/NCHIP + top)*B_row_size; 
                 b0[CHIP] = (Uint*)b[CHIP];
@@ -58,88 +65,88 @@ void spmm(float *result, SparseMatrix *sp_matrix, SparseMatrixParams *sp_params,
                         exe(OP_FMA, &AR[r][1], AR[rm1][1], EXP_H3210, BR[rm1][2][1], EXP_H1010, BR[rm1][0][0], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);\
                         exe(OP_FMA, &AR[r][2], AR[rm1][2], EXP_H3210, BR[rm1][2][1], EXP_H1010, BR[rm1][1][1], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);\
                         exe(OP_FMA, &AR[r][3], AR[rm1][3], EXP_H3210, BR[rm1][2][1], EXP_H1010, BR[rm1][1][0], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);\
-                        mop(OP_LDR,  3, &BR[r][0][1], (Ull)b0[CHIP], (Ull)offset,   msk, (Ull)b[0], M2,    0, 0, (Ull)NULL, M2);\
-                        mop(OP_LDR,  3, &BR[r][0][0], (Ull)b1[CHIP], (Ull)offset,   msk, (Ull)b[0], M2,    0, 0, (Ull)NULL, M2);\
-                        mop(OP_LDR,  3, &BR[r][1][1], (Ull)b2[CHIP], (Ull)offset,   msk, (Ull)b[0], M2,    0, 0, (Ull)NULL, M2);\
-                        mop(OP_LDR,  3, &BR[r][1][0], (Ull)b3[CHIP], (Ull)offset,   msk, (Ull)b[0], M2,    0, 0, (Ull)NULL, M2);\
-                        mop(OP_LDWR, 1, &BR[r][2][1], (Ull)a[a_row],  (Ull)rofs, MSK_W0, (Ull)a[0], A_ROW, 0, 0, (Ull)NULL, A_ROW)
+                        mop(OP_LDR,  3, &BR[r][0][1], (Ull)b0[CHIP], (Ull)offset,   msk, (Ull)b[0], B_col_blk_mul_B_row_size,    0, 0, (Ull)NULL, B_col_blk_mul_B_row_size);\
+                        mop(OP_LDR,  3, &BR[r][0][0], (Ull)b1[CHIP], (Ull)offset,   msk, (Ull)b[0], B_col_blk_mul_B_row_size,    0, 0, (Ull)NULL, B_col_blk_mul_B_row_size);\
+                        mop(OP_LDR,  3, &BR[r][1][1], (Ull)b2[CHIP], (Ull)offset,   msk, (Ull)b[0], B_col_blk_mul_B_row_size,    0, 0, (Ull)NULL, B_col_blk_mul_B_row_size);\
+                        mop(OP_LDR,  3, &BR[r][1][0], (Ull)b3[CHIP], (Ull)offset,   msk, (Ull)b[0], B_col_blk_mul_B_row_size,    0, 0, (Ull)NULL, B_col_blk_mul_B_row_size);\
+                        mop(OP_LDWR, 1, &BR[r][2][1], (Ull)a[a_row],  (Ull)rofs, MSK_W0, (Ull)a[a_row], A_row_size, 0, 0, (Ull)NULL, A_row_size)
 
             #define spmm_core1_end(r, rm1, idx0, idx1, idx2, idx3, idx_base) \
                         exe(OP_FMA, &AR[r][0], AR[rm1][0], EXP_H3210, BR[rm1][2][1], EXP_H1010, BR[rm1][0][1], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);\
                         exe(OP_FMA, &AR[r][1], AR[rm1][1], EXP_H3210, BR[rm1][2][1], EXP_H1010, BR[rm1][0][0], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);\
                         exe(OP_FMA, &AR[r][2], AR[rm1][2], EXP_H3210, BR[rm1][2][1], EXP_H1010, BR[rm1][1][1], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);\
                         exe(OP_FMA, &AR[r][3], AR[rm1][3], EXP_H3210, BR[rm1][2][1], EXP_H1010, BR[rm1][1][0], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);\
-                        mop(OP_LDR,  3, &BR[r][1][1], (Ull)a_col_index[idx0], (Ull)rofs,   MSK_W1, (Ull)a_col_index[0], M2,    0, 0, (Ull)NULL, M2);\
-                        mop(OP_LDR,  3, &BR[r][1][0], (Ull)a_col_index[idx1], (Ull)rofs,   MSK_W1, (Ull)a_col_index[0], M2,    0, 0, (Ull)NULL, M2);\
-                        mop(OP_LDR,  3, &BR[r][2][1], (Ull)a_col_index[idx2], (Ull)rofs,   MSK_W1, (Ull)a_col_index[0], M2,    0, 0, (Ull)NULL, M2);\
-                        mop(OP_LDR,  3, &BR[r][2][0], (Ull)a_col_index[idx3], (Ull)rofs,   MSK_W1, (Ull)a_col_index[idx_base], M2,    0, 0, (Ull)NULL, M2)
+                        mop(OP_LDR,  3, &BR[r][1][1], (Ull)a_col_index[idx0], (Ull)rofs,   MSK_W1, (Ull)a_col_index[idx_base], A_row_size_mul_2_4_2,    0, 0, (Ull)NULL, A_row_size_mul_2_4_2);\
+                        mop(OP_LDR,  3, &BR[r][1][0], (Ull)a_col_index[idx1], (Ull)rofs,   MSK_W1, (Ull)a_col_index[idx_base], A_row_size_mul_2_4_2,    0, 0, (Ull)NULL, A_row_size_mul_2_4_2);\
+                        mop(OP_LDR,  3, &BR[r][2][1], (Ull)a_col_index[idx2], (Ull)rofs,   MSK_W1, (Ull)a_col_index[idx_base], A_row_size_mul_2_4_2,    0, 0, (Ull)NULL, A_row_size_mul_2_4_2);\
+                        mop(OP_LDR,  3, &BR[r][2][0], (Ull)a_col_index[idx3], (Ull)rofs,   MSK_W1, (Ull)a_col_index[idx_base], A_row_size_mul_2_4_2,    0, 0, (Ull)NULL, A_row_size_mul_2_4_2)
 
             #define spmm_core1_start(rp2, rp1, r, rm1, a_rowp1, a_row) \
                         exe(OP_ADD, &r0, BR[rm1][1][1], EXP_H3210, cofs1, EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);\
                         exe(OP_ADD, &r1, BR[rm1][1][0], EXP_H3210, cofs1, EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);\
                         exe(OP_ADD, &r2, BR[rm1][2][1], EXP_H3210, cofs1, EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);\
                         exe(OP_ADD, &r3, BR[rm1][2][0], EXP_H3210, cofs1, EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);\
-                        mop(OP_LDR,  3, &BR[rp1][0][1], (Ull)b0[CHIP], (Ull)r0,   MSK_W0, (Ull)b[CHIP], M2,    0, 0, (Ull)NULL, M2);\
-                        mop(OP_LDR,  3, &BR[rp1][0][0], (Ull)b1[CHIP], (Ull)r0,   MSK_W0, (Ull)b[CHIP], M2,    0, 0, (Ull)NULL, M2);\
-                        mop(OP_LDR,  3, &BR[rp1][1][1], (Ull)b2[CHIP], (Ull)r0,   MSK_W0, (Ull)b[CHIP], M2,    0, 0, (Ull)NULL, M2);\
-                        mop(OP_LDR,  3, &BR[rp1][1][0], (Ull)b3[CHIP], (Ull)r0,   MSK_W0, (Ull)b[CHIP], M2,    0, 0, (Ull)NULL, M2);\
-                        mop(OP_LDWR, 1, &BR[rp1][2][1], (Ull)a[a_row],  (Ull)rofs, MSK_W0, (Ull)a[a_row], A_ROW, 0, 0, (Ull)NULL, A_ROW);\
+                        mop(OP_LDR,  3, &BR[rp1][0][1], (Ull)b0[CHIP], (Ull)r0,   MSK_W0, (Ull)b[CHIP], B_col_blk_mul_B_row_size,    0, 0, (Ull)NULL, B_col_blk_mul_B_row_size);\
+                        mop(OP_LDR,  3, &BR[rp1][0][0], (Ull)b1[CHIP], (Ull)r0,   MSK_W0, (Ull)b[CHIP], B_col_blk_mul_B_row_size,    0, 0, (Ull)NULL, B_col_blk_mul_B_row_size);\
+                        mop(OP_LDR,  3, &BR[rp1][1][1], (Ull)b2[CHIP], (Ull)r0,   MSK_W0, (Ull)b[CHIP], B_col_blk_mul_B_row_size,    0, 0, (Ull)NULL, B_col_blk_mul_B_row_size);\
+                        mop(OP_LDR,  3, &BR[rp1][1][0], (Ull)b3[CHIP], (Ull)r0,   MSK_W0, (Ull)b[CHIP], B_col_blk_mul_B_row_size,    0, 0, (Ull)NULL, B_col_blk_mul_B_row_size);\
+                        mop(OP_LDWR, 1, &BR[rp1][2][1], (Ull)a[a_row],  (Ull)rofs, MSK_W0, (Ull)a[a_row], A_row_size, 0, 0, (Ull)NULL, A_row_size);\
                         exe(OP_FMA, &AR[rp2][0], AR[rm1][0], EXP_H3210, BR[rp1][2][1], EXP_H1010, BR[r][0][1], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);\
                         exe(OP_FMA, &AR[rp2][1], AR[rm1][1], EXP_H3210, BR[rp1][2][1], EXP_H1010, BR[r][0][0], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);\
                         exe(OP_FMA, &AR[rp2][2], AR[rm1][2], EXP_H3210, BR[rp1][2][1], EXP_H1010, BR[r][1][1], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);\
                         exe(OP_FMA, &AR[rp2][3], AR[rm1][3], EXP_H3210, BR[rp1][2][1], EXP_H1010, BR[r][1][0], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);\
-                        mop(OP_LDR,  3, &BR[rp2][0][1], (Ull)b0[CHIP], (Ull)r0,   MSK_W1, (Ull)b[CHIP], M2,    0, 0, (Ull)NULL, M2);\
-                        mop(OP_LDR,  3, &BR[rp2][0][0], (Ull)b1[CHIP], (Ull)r0,   MSK_W1, (Ull)b[CHIP], M2,    0, 0, (Ull)NULL, M2);\
-                        mop(OP_LDR,  3, &BR[rp2][1][1], (Ull)b2[CHIP], (Ull)r0,   MSK_W1, (Ull)b[CHIP], M2,    0, 0, (Ull)NULL, M2);\
-                        mop(OP_LDR,  3, &BR[rp2][1][0], (Ull)b3[CHIP], (Ull)r0,   MSK_W1, (Ull)b[CHIP], M2,    0, 0, (Ull)NULL, M2);\
-                        mop(OP_LDWR, 1, &BR[rp2][2][1], (Ull)a[a_rowp1],  (Ull)rofs, MSK_W0, (Ull)a[a_rowp1], A_ROW, 0, 0, (Ull)NULL, A_ROW)
+                        mop(OP_LDR,  3, &BR[rp2][0][1], (Ull)b0[CHIP], (Ull)r0,   MSK_W1, (Ull)b[CHIP], B_col_blk_mul_B_row_size,    0, 0, (Ull)NULL, B_col_blk_mul_B_row_size);\
+                        mop(OP_LDR,  3, &BR[rp2][0][0], (Ull)b1[CHIP], (Ull)r0,   MSK_W1, (Ull)b[CHIP], B_col_blk_mul_B_row_size,    0, 0, (Ull)NULL, B_col_blk_mul_B_row_size);\
+                        mop(OP_LDR,  3, &BR[rp2][1][1], (Ull)b2[CHIP], (Ull)r0,   MSK_W1, (Ull)b[CHIP], B_col_blk_mul_B_row_size,    0, 0, (Ull)NULL, B_col_blk_mul_B_row_size);\
+                        mop(OP_LDR,  3, &BR[rp2][1][0], (Ull)b3[CHIP], (Ull)r0,   MSK_W1, (Ull)b[CHIP], B_col_blk_mul_B_row_size,    0, 0, (Ull)NULL, B_col_blk_mul_B_row_size);\
+                        mop(OP_LDWR, 1, &BR[rp2][2][1], (Ull)a[a_rowp1],  (Ull)rofs, MSK_W0, (Ull)a[a_rowp1], A_row_size, 0, 0, (Ull)NULL, A_row_size)
 
             #define spmm_final(r, rm1) \
-                        mop(OP_LDR, 3, &BR[r][0][1], (Ull)c00[CHIP], (Ull)r0, MSK_W0, (Ull)c0[CHIP], M2*RMGRP, 0, 1, (Ull)NULL, M2*RMGRP);\
-                        mop(OP_LDR, 3, &BR[r][1][1], (Ull)c01[CHIP], (Ull)r0, MSK_W0, (Ull)c0[CHIP], M2*RMGRP, 0, 1, (Ull)NULL, M2*RMGRP);\
-                        mop(OP_LDR, 3, &BR[r][2][1], (Ull)c02[CHIP], (Ull)r0, MSK_W0, (Ull)c0[CHIP], M2*RMGRP, 0, 1, (Ull)NULL, M2*RMGRP);\
-                        mop(OP_LDR, 3, &BR[r][3][1], (Ull)c03[CHIP], (Ull)r0, MSK_W0, (Ull)c0[CHIP], M2*RMGRP, 0, 1, (Ull)NULL, M2*RMGRP);\
+                        mop(OP_LDR, 3, &BR[r][0][1], (Ull)c00[CHIP], (Ull)r0, MSK_W0, (Ull)c0[CHIP], A_row_size_mul_B_col_blk, 0, 1, (Ull)NULL, A_row_size_mul_B_col_blk);\
+                        mop(OP_LDR, 3, &BR[r][1][1], (Ull)c01[CHIP], (Ull)r0, MSK_W0, (Ull)c0[CHIP], A_row_size_mul_B_col_blk, 0, 1, (Ull)NULL, A_row_size_mul_B_col_blk);\
+                        mop(OP_LDR, 3, &BR[r][2][1], (Ull)c02[CHIP], (Ull)r0, MSK_W0, (Ull)c0[CHIP], A_row_size_mul_B_col_blk, 0, 1, (Ull)NULL, A_row_size_mul_B_col_blk);\
+                        mop(OP_LDR, 3, &BR[r][3][1], (Ull)c03[CHIP], (Ull)r0, MSK_W0, (Ull)c0[CHIP], A_row_size_mul_B_col_blk, 0, 1, (Ull)NULL, A_row_size_mul_B_col_blk);\
                         exe(OP_FAD, &AR[r][0], AR[rm1][0], EXP_H3210, BR[r][0][1], EXP_H1010, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);\
                         exe(OP_FAD, &AR[r][1], AR[rm1][1], EXP_H3210, BR[r][1][1], EXP_H1010, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);\
                         exe(OP_FAD, &AR[r][2], AR[rm1][2], EXP_H3210, BR[r][2][1], EXP_H1010, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);\
                         exe(OP_FAD, &AR[r][3], AR[rm1][3], EXP_H3210, BR[r][3][1], EXP_H1010, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);\
-                        mop(OP_STR, 3, &AR[r][0], (Ull)r0, (Ull)c00[CHIP], MSK_D0, (Ull)c0[CHIP], M2*RMGRP, 0, 1, (Ull)NULL, M2*RMGRP);\
-                        mop(OP_STR, 3, &AR[r][1], (Ull)r0, (Ull)c01[CHIP], MSK_D0, (Ull)c0[CHIP], M2*RMGRP, 0, 1, (Ull)NULL, M2*RMGRP);\
-                        mop(OP_STR, 3, &AR[r][2], (Ull)r0, (Ull)c02[CHIP], MSK_D0, (Ull)c0[CHIP], M2*RMGRP, 0, 1, (Ull)NULL, M2*RMGRP);\
-                        mop(OP_STR, 3, &AR[r][3], (Ull)r0, (Ull)c03[CHIP], MSK_D0, (Ull)c0[CHIP], M2*RMGRP, 0, 1, (Ull)NULL, M2*RMGRP)
+                        mop(OP_STR, 3, &AR[r][0], (Ull)r0, (Ull)c00[CHIP], MSK_D0, (Ull)c0[CHIP], A_row_size_mul_B_col_blk, 0, 1, (Ull)NULL, A_row_size_mul_B_col_blk);\
+                        mop(OP_STR, 3, &AR[r][1], (Ull)r0, (Ull)c01[CHIP], MSK_D0, (Ull)c0[CHIP], A_row_size_mul_B_col_blk, 0, 1, (Ull)NULL, A_row_size_mul_B_col_blk);\
+                        mop(OP_STR, 3, &AR[r][2], (Ull)r0, (Ull)c02[CHIP], MSK_D0, (Ull)c0[CHIP], A_row_size_mul_B_col_blk, 0, 1, (Ull)NULL, A_row_size_mul_B_col_blk);\
+                        mop(OP_STR, 3, &AR[r][3], (Ull)r0, (Ull)c03[CHIP], MSK_D0, (Ull)c0[CHIP], A_row_size_mul_B_col_blk, 0, 1, (Ull)NULL, A_row_size_mul_B_col_blk)
 
-        //EMAX5A begin mm mapdist=0
-            for (CHIP=0; CHIP<NCHIP; CHIP++) {
-                for (INIT1=1,LOOP1=RMGRP,rofs=(0-L*4)<<32|((0-M2*4)&0xffffffff); LOOP1--; INIT1=0) {
-                    for (INIT0=1,LOOP0=M2/W/2,cofs=(0-W*4)<<32|((0-W*8)&0xffffffff); LOOP0--; INIT0=0) {
-                        exe(OP_ADD, &cofs,  cofs,            EXP_H3210, INIT0?(W*8)<<32||(W*8):0,         EXP_H3210, 0LL,    EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
+        //EMAX5A begin spmm1 mapdist=0
+            for (CHIP=0; CHIP<NCHIP; CHIP++) { /* will be parallelized by multi-chip (M/#chip) */
+                for (INIT1=1,LOOP1=B_col_blk/(W*2),cofs=cofs_init; LOOP1--; INIT1=0) {
+                    for (INIT0=1,LOOP0=A_margin_tmp,rofs=rofs_init; LOOP0--; INIT0=0) {
+                        exe(OP_ADD, &cofs,  cofs,            EXP_H3210, INIT0?A_row_size_mul_W_4_2:0,     EXP_H3210, 0LL,    EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
                         exe(OP_ADD, &rofs,  INIT0?rofs:rofs, EXP_H3210, (1*8LL)<<32|((1*4LL)&0xffffffff), EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0xffffffffffffffffLL, OP_NOP, 0LL);
                         exe(OP_ADD, &cofs1, cofs,            EXP_H1010, 0,                                EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL,                  OP_NOP, 0LL);
                         exe(OP_ADD, &oofs,  cofs,            EXP_H3232, 0,                                EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL,                  OP_NOP, 0LL);
-                        mop(OP_LDR,  3, &BR[1][1][1], (Ull)a_col_index[0], (Ull)rofs, MSK_W1, (Ull)a_col_index[0], M2, 0, 0, (Ull)NULL, M2);
-                        mop(OP_LDR,  3, &BR[1][1][0], (Ull)a_col_index[1], (Ull)rofs, MSK_W1, (Ull)a_col_index[0], M2, 0, 0, (Ull)NULL, M2);
-                        mop(OP_LDR,  3, &BR[1][2][1], (Ull)a_col_index[2], (Ull)rofs, MSK_W1, (Ull)a_col_index[0], M2, 0, 0, (Ull)NULL, M2);
-                        mop(OP_LDR,  3, &BR[1][2][0], (Ull)a_col_index[3], (Ull)rofs, MSK_W1, (Ull)a_col_index[0], M2, 0, 0, (Ull)NULL, M2);
+                        mop(OP_LDR,  3, &BR[1][1][1], (Ull)a_col_index[0], (Ull)rofs, MSK_W1, (Ull)a_col_index[0], A_row_size_mul_2_4_2, 0, 0, (Ull)NULL, A_row_size_mul_2_4_2);
+                        mop(OP_LDR,  3, &BR[1][1][0], (Ull)a_col_index[1], (Ull)rofs, MSK_W1, (Ull)a_col_index[0], A_row_size_mul_2_4_2, 0, 0, (Ull)NULL, A_row_size_mul_2_4_2);
+                        mop(OP_LDR,  3, &BR[1][2][1], (Ull)a_col_index[2], (Ull)rofs, MSK_W1, (Ull)a_col_index[0], A_row_size_mul_2_4_2, 0, 0, (Ull)NULL, A_row_size_mul_2_4_2);
+                        mop(OP_LDR,  3, &BR[1][2][0], (Ull)a_col_index[3], (Ull)rofs, MSK_W1, (Ull)a_col_index[0], A_row_size_mul_2_4_2, 0, 0, (Ull)NULL, A_row_size_mul_2_4_2);
 
                         exe(OP_ADD, &r0, BR[1][1][1], EXP_H3210, cofs1, EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
                         exe(OP_ADD, &r1, BR[1][1][0], EXP_H3210, cofs1, EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
                         exe(OP_ADD, &r2, BR[1][2][1], EXP_H3210, cofs1, EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
                         exe(OP_ADD, &r3, BR[1][2][0], EXP_H3210, cofs1, EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
-                        mop(OP_LDR,  3, &BR[3][0][1], (Ull)b0[CHIP], (Ull)r0,   MSK_W0, (Ull)b[0], M2,    0, 0, (Ull)NULL, M2);
-                        mop(OP_LDR,  3, &BR[3][0][0], (Ull)b1[CHIP], (Ull)r0,   MSK_W0, (Ull)b[0], M2,    0, 0, (Ull)NULL, M2);
-                        mop(OP_LDR,  3, &BR[3][1][1], (Ull)b2[CHIP], (Ull)r0,   MSK_W0, (Ull)b[0], M2,    0, 0, (Ull)NULL, M2);
-                        mop(OP_LDR,  3, &BR[3][1][0], (Ull)b3[CHIP], (Ull)r0,   MSK_W0, (Ull)b[0], M2,    0, 0, (Ull)NULL, M2);
-                        mop(OP_LDWR, 1, &BR[3][2][1], (Ull)a[0],  (Ull)rofs, MSK_W0, (Ull)a[0], A_ROW, 0, 0, (Ull)NULL, A_ROW);
+                        mop(OP_LDR,  3, &BR[3][0][1], (Ull)b0[CHIP], (Ull)r0,   MSK_W0, (Ull)b[0], B_col_blk_mul_B_row_size,    0, 0, (Ull)NULL, B_col_blk_mul_B_row_size);
+                        mop(OP_LDR,  3, &BR[3][0][0], (Ull)b1[CHIP], (Ull)r0,   MSK_W0, (Ull)b[0], B_col_blk_mul_B_row_size,    0, 0, (Ull)NULL, B_col_blk_mul_B_row_size);
+                        mop(OP_LDR,  3, &BR[3][1][1], (Ull)b2[CHIP], (Ull)r0,   MSK_W0, (Ull)b[0], B_col_blk_mul_B_row_size,    0, 0, (Ull)NULL, B_col_blk_mul_B_row_size);
+                        mop(OP_LDR,  3, &BR[3][1][0], (Ull)b3[CHIP], (Ull)r0,   MSK_W0, (Ull)b[0], B_col_blk_mul_B_row_size,    0, 0, (Ull)NULL, B_col_blk_mul_B_row_size);
+                        mop(OP_LDWR, 1, &BR[3][2][1], (Ull)a[0],  (Ull)rofs, MSK_W0, (Ull)a[0], A_row_size, 0, 0, (Ull)NULL, A_row_size);
 
                         exe(OP_FML, &AR[4][0], BR[3][0][1], EXP_H3210, BR[3][2][1], EXP_H1010, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
                         exe(OP_FML, &AR[4][1], BR[3][0][0], EXP_H3210, BR[3][2][1], EXP_H1010, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
                         exe(OP_FML, &AR[4][2], BR[3][1][1], EXP_H3210, BR[3][2][1], EXP_H1010, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
                         exe(OP_FML, &AR[4][3], BR[3][1][0], EXP_H3210, BR[3][2][1], EXP_H1010, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
-                        mop(OP_LDR,  3, &BR[4][0][1], (Ull)b0[CHIP], (Ull)r0,   MSK_W1, (Ull)b[0], M2,    0, 0, (Ull)NULL, M2);
-                        mop(OP_LDR,  3, &BR[4][0][0], (Ull)b1[CHIP], (Ull)r0,   MSK_W1, (Ull)b[0], M2,    0, 0, (Ull)NULL, M2);
-                        mop(OP_LDR,  3, &BR[4][1][1], (Ull)b2[CHIP], (Ull)r0,   MSK_W1, (Ull)b[0], M2,    0, 0, (Ull)NULL, M2);
-                        mop(OP_LDR,  3, &BR[4][1][0], (Ull)b3[CHIP], (Ull)r0,   MSK_W1, (Ull)b[0], M2,    0, 0, (Ull)NULL, M2);
-                        mop(OP_LDWR, 1, &BR[4][2][1], (Ull)a[1],  (Ull)rofs, MSK_W0, (Ull)a[0], A_ROW, 0, 0, (Ull)NULL, A_ROW);
+                        mop(OP_LDR,  3, &BR[4][0][1], (Ull)b0[CHIP], (Ull)r0,   MSK_W1, (Ull)b[0], B_col_blk_mul_B_row_size,    0, 0, (Ull)NULL, B_col_blk_mul_B_row_size);
+                        mop(OP_LDR,  3, &BR[4][0][0], (Ull)b1[CHIP], (Ull)r0,   MSK_W1, (Ull)b[0], B_col_blk_mul_B_row_size,    0, 0, (Ull)NULL, B_col_blk_mul_B_row_size);
+                        mop(OP_LDR,  3, &BR[4][1][1], (Ull)b2[CHIP], (Ull)r0,   MSK_W1, (Ull)b[0], B_col_blk_mul_B_row_size,    0, 0, (Ull)NULL, B_col_blk_mul_B_row_size);
+                        mop(OP_LDR,  3, &BR[4][1][0], (Ull)b3[CHIP], (Ull)r0,   MSK_W1, (Ull)b[0], B_col_blk_mul_B_row_size,    0, 0, (Ull)NULL, B_col_blk_mul_B_row_size);
+                        mop(OP_LDWR, 1, &BR[4][2][1], (Ull)a[1],  (Ull)rofs, MSK_W0, (Ull)a[1], A_row_size, 0, 0, (Ull)NULL, A_row_size);
 
                         spmm_core1(5,  4, 2, r1, MSK_W0);
                         spmm_core1(6,  5, 3, r1, MSK_W1);
@@ -186,16 +193,16 @@ void spmm(float *result, SparseMatrix *sp_matrix, SparseMatrixParams *sp_params,
                         spmm_core1_end(51, 50, 20, 21, 22, 23, 16);
 
                         spmm_core1_start(54, 53, 52, 51, 41, 40);
-                        spmm_core1(55, 54, 52, r1, MSK_W0);
-                        spmm_core1(56, 55, 53, r1, MSK_W1);
-                        spmm_core1(57, 56, 54, r2, MSK_W0);
-                        spmm_core1(58, 57, 55, r2, MSK_W1);
+                        spmm_core1(55, 54, 42, r1, MSK_W0);
+                        spmm_core1(56, 55, 43, r1, MSK_W1);
+                        spmm_core1(57, 56, 44, r2, MSK_W0);
+                        spmm_core1(58, 57, 45, r2, MSK_W1);
 
                         exe(OP_FMA, &AR[59][0], AR[58][0], EXP_H3210, BR[58][2][1], EXP_H1010, BR[58][0][1], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
                         exe(OP_FMA, &AR[59][1], AR[58][1], EXP_H3210, BR[58][2][1], EXP_H1010, BR[58][0][0], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
                         exe(OP_FMA, &AR[59][2], AR[58][2], EXP_H3210, BR[58][2][1], EXP_H1010, BR[58][1][1], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
                         exe(OP_FMA, &AR[59][3], AR[58][3], EXP_H3210, BR[58][2][1], EXP_H1010, BR[58][1][0], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
-                        mop(OP_LDWR, 1, &BR[59][0][1], (Ull)a_col_index, (Ull)rofs, MSK_W1, (Ull)a_col_index, M2,    0, 0, (Ull)NULL, M2);
+                        mop(OP_LDWR, 1, &BR[59][0][1], (Ull)a_col_index, (Ull)rofs, MSK_W1, (Ull)a_col_index, B_col_blk_mul_B_row_size,    0, 0, (Ull)NULL, B_col_blk_mul_B_row_size);
 
                         exe(OP_ADD, &r0, BR[59][0][1], EXP_H3210, oofs, EXP_H3210, 0LL, EXP_H3210, OP_AND, 0xfffffffLL, OP_NOP, 0LL);
                         spmm_final(62, 59);
@@ -206,20 +213,6 @@ void spmm(float *result, SparseMatrix *sp_matrix, SparseMatrixParams *sp_params,
         }
         //EMAX5A drain_dirty_lmm
     }
-
-    /*
-    for (int k = 0; k < mm_col; k++) {
-        for (int i = 0; i < sp_matrix->row_size; i++) {
-            int col_index_of_index = sp_matrix->row_p[i];
-            float sum = 0;
-            for (int j = col_index_of_index; j < sp_matrix->row_p[i + 1]; j++) {
-                int col_index = sp_matrix->col_p[j];
-                sum += sp_matrix->val[j] * matrix[col_index * mm_col + k];
-            }
-            result[i * mm_col + k] = sum;
-        }
-    }
-    */
 }
 
 void mm(float *result, float *a, float *b, int row_a, int col_a, int col_b) {
