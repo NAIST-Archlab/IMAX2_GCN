@@ -7,6 +7,9 @@
 typedef struct sparse_graph {
     SparseMatrix matrix;
     SparseMatrixParams params;
+    #ifdef USE_IMAX2
+    IMAXSparseMatrix imax_matrix;
+    #endif
 } SparseGraph;
 
 typedef struct hidden_layer {

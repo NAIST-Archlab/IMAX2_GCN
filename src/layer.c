@@ -168,7 +168,11 @@ HiddenLayer* propagation(GCNNetwork *network) {
         float *tmp2 = (float *)malloc(sizeof(float) * out_size);
 
         timespec_get(&t1, TIME_UTC);
+        #ifdef USE_IMAX2
+        spmm(tmp, &network->graph->imax_matrix,  p->latent_vectors.weight, p->latent_vectors.dim_out);
+        #else
         spmm(tmp, &network->graph->matrix, &network->graph->params, p->latent_vectors.weight, p->latent_vectors.dim_out);
+        #endif
         timespec_get(&t2, TIME_UTC);
         spmm_time += cal_time(&t2, &t1);
 

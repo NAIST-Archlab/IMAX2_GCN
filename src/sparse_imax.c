@@ -4,7 +4,111 @@
 #ifdef USE_IMAX2
 #include <stdio.h>
 
-void spmm(float *result, SparseMatrix *sp_matrix, SparseMatrixParams *sp_params, float *matrix, int mm_col) {
+void merge(Uint *b_num, int *b_value, Uint *a_num, int *a_value, Ull left, Ull mid, Ull right) {
+    int i = left;
+    int j = mid;
+    int k = 0;
+    int l;
+
+    while (i < mid && j < right) {
+        if (a_value[i] >= a_value[j]) {
+            b_value[k] = a_value[i];
+            b_num[k++] = a_num[i++];
+        } else {
+            b_value[k] = a_value[j];
+            b_num[k++] = a_num[j++];
+        }
+    }
+
+    if (i == mid) {
+        while (j < right) {
+            b_value[k] = a_value[j];
+            b_num[k++] = a_num[j++];
+        }
+    } else {
+        while (i < mid) {
+            b_value[k] = a_value[i];
+            b_num[k++] = a_num[i++];
+        }
+    }
+
+    for (l=0; l < k; l++) {
+        a_value[left + l] = b_value[l];
+        a_num[left + l] = b_num[l];
+    }
+}
+
+void merge_sort(Uint *num_buffer, int *value_buffer, Uint *num, int *value, Ull left, Ull right) {
+    if (left == right || left == right-1) return;
+    Ull mid = (left + right) / 2;
+    merge_sort(num_buffer, value_buffer, num, value, left, mid);
+    merge_sort(num_buffer, value_buffer, num, value, mid, right);
+    merge(num_buffer, value_buffer, num, value, left, mid, right);
+}
+
+void trans_imax_format(IMAXSparseMatrix *imax_sp, SparseMatrix *sp) {
+    imax_sp->row_size = sp->row_size;
+    imax_sp->col_size = sp->col_size;
+    imax_sp->row_num = (Uint*) malloc(sizeof(Uint)*sp->row_size);
+    imax_sp->row_nnz = (int*) malloc(sizeof(int)*sp->row_size);
+
+    #ifdef USE_MP
+    #pragma omp parallel for
+    #endif
+    for (int i=0; i < imax_sp->row_size; i++) {
+        imax_sp->row_num[i] = i;
+        imax_sp->row_nnz[i] = sp->row_p[i+1] - sp->row_p[i];
+    }
+
+    Uint *num_buffer = (Uint*) malloc(sizeof(Uint)*sp->row_size);
+    int *value_buffer = (int*) malloc(sizeof(int)*sp->row_size);
+
+    merge_sort(num_buffer, value_buffer, imax_sp->row_num, imax_sp->row_nnz, 0, sp->row_size);
+
+    free(num_buffer);
+    free(value_buffer);
+
+    int row_p_blk = 32;
+    int blk_num = sp->row_size / row_p_blk;
+    Ull new_nnz = 0;
+    num_buffer = (Uint*) malloc(sizeof(Uint)*blk_num);
+    imax_sp->blk_size = row_p_blk;
+
+    #ifdef USE_MP
+    #pragma omp parallel for
+    #endif
+    for (int i=0; i < blk_num; i++) {
+        Ull max_nnz = imax_sp->row_nnz[i*row_p_blk];
+        num_buffer[i] = max_nnz;
+        new_nnz += max_nnz*row_p_blk;
+    }
+
+    imax_sp->val = (Uint*) malloc(sizeof(Uint)*(Ull)new_nnz);
+    imax_sp->col_num = (Uint*) malloc(sizeof(Uint)*(Ull)new_nnz);
+    imax_sp->nnz = new_nnz;
+
+    Ull p = 0;
+    float zero = 0;
+    for (Uint i=0; i < blk_num; i++) {
+        for (Uint j=0; j < imax_sp->row_size / blk_num; j++) {
+            int real_nnz = imax_sp->row_nnz[i*row_p_blk+j];
+            imax_sp->row_nnz[i*row_p_blk+j] = num_buffer[i];
+            for (Uint k=0; k < num_buffer[i]; k++) {
+                if (real_nnz <= k) {
+                    imax_sp->val[p] = *(Uint*)&zero;
+                    imax_sp->col_num[p++] = 0;
+                } else {
+                    imax_sp->val[p] = sp->val[sp->row_p[imax_sp->row_num[i*row_p_blk+j]]+k];
+                    imax_sp->col_num[p++] = sp->col_p[sp->row_p[imax_sp->row_num[i*row_p_blk+j]]+k];
+                }
+            }
+        }
+    }
+
+    free(num_buffer);
+}
+
+void spmm(float* result, IMAXSparseMatrix *imax_sp_matrix, float* matrix, int mm_col) {
     Ull CHIP; Ull LOOP1, LOOP0; Ull INIT1, INIT0;
     Ull top, blk, blk_iter;
     Ull AR[64][4]; /* output of EX in each unit */
@@ -19,11 +123,11 @@ void spmm(float *result, SparseMatrix *sp_matrix, SparseMatrixParams *sp_params,
     Uint W = 8;
     Uint H = 46;
 
-    size_t A_row_size = sp_matrix->row_size;
-    size_t A_col_size = sp_matrix->col_size;
-    size_t B_row_size = sp_matrix->col_size;
+    size_t A_row_size = imax_sp_matrix->row_size;
+    size_t A_col_size = imax_sp_matrix->col_size;
+    size_t B_row_size = imax_sp_matrix->col_size;
     size_t B_col_size = mm_col;
-    size_t B_col_blk;
+    size_t B_col_blk = 2;
     size_t cofs_init = (0-W*4*2*A_row_size)<<32|((0-W*4*1*B_row_size)&0xffffffff);
     size_t rofs_init = (0-1*8LL)<<32|((0-1*4LL)*0xffffffff);
 
@@ -41,10 +145,10 @@ void spmm(float *result, SparseMatrix *sp_matrix, SparseMatrixParams *sp_params,
 
     for (top=0; top < B_col_size/NCHIP; top+=B_col_blk) {
         for (blk=0, blk_iter=0; blk < A_col_size; blk+=H,blk_iter+=1) {
-            if((A_margin_tmp=A_margin[blk_iter])==0) break;
+            if((A_margin_tmp=imax_sp_matrix->row_nnz[blk_iter])==0) break;
 
             for (CHIP=0; CHIP<NCHIP; CHIP++) {
-                b[CHIP] = matrix+(CHIP*B_col_size/NCHIP + top)*B_row_size; 
+                b[CHIP] = matrix + (CHIP*B_col_size/NCHIP + top)*B_row_size; 
                 b0[CHIP] = (Uint*)b[CHIP];
                 b1[CHIP] = (Uint*)b[CHIP] + B_row_size*2;
                 b2[CHIP] = (Uint*)b[CHIP] + B_row_size*4;
@@ -57,8 +161,8 @@ void spmm(float *result, SparseMatrix *sp_matrix, SparseMatrixParams *sp_params,
                 c03[CHIP]= (Uint*)c0[CHIP] + A_row_size*6;
             }
 
-            for (k=0; k < H; k++) a[k] = (Uint*)sp_matrix->val + (blk+k)*A_row_size;
-            for (k=0; k < H/2; k++) a_col_index[k] = (Uint*)sp_matrix->col_p + blk/2*A_row_size*2 + k*A_row_size*2 + A_col_size*A_row_size;
+            for (k=0; k < H; k++) a[k] = (Uint*)imax_sp_matrix->val + (blk+k)*A_row_size;
+            for (k=0; k < H/2; k++) a_col_index[k] = (Uint*)imax_sp_matrix->row_num + blk/2*A_row_size*2 + k*A_row_size*2 + A_col_size*A_row_size;
 
             #define spmm_core1(r, rm1, a_row, offset, msk) \
                         exe(OP_FMA, &AR[r][0], AR[rm1][0], EXP_H3210, BR[rm1][2][1], EXP_H1010, BR[rm1][0][1], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);\

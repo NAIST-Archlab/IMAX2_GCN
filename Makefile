@@ -4,8 +4,12 @@
 ##          kim.dohyun.kg7@is.naist.jp ##
 PROGRAM := imax_gcn
 SRC_DIR := src
-OBJS := main.o sparse_imax.o layer.o utils.o
+TEST_DIR := test
 INCLUDE := ./include/
+SRCS := $(wildcard $(SRC_DIR)/*.c)
+OBJS := $(SRCS:.c=.o)
+HEADERS := $(INCLUDE)/emax6.h $(INCLUDE)/layer.h $(INCLUDE)/options.h $(INCLUDE)/sparse.h $(INCLUDE)/utils.h
+
 ifeq ($(MACHTYPE),x86_64)
 	X64 ?= 1
 	ARCH ?= X64
@@ -34,7 +38,7 @@ HOMEBREW_DIR := /opt/homebrew
 
 CPP     := cpp -P
 CC      := gcc
-CFLAGS  := -g3 -O3 -Wall -msse3 -Wno-unknown-pragmas -fcommon -I$(INCLUDE) -DCBLAS_GEMM -DEMAX6 -DDEBUG
+CFLAGS  := -g3 -O3 -Wall -msse3 -Wno-unknown-pragmas -funroll-loops -fcommon -I$(INCLUDE) -DCBLAS_GEMM -DEMAX6 -DDEBUG
 LDFLAGS := -L/usr/lib64 -L/usr/local/lib -lm -fopenmp -fcommon
 #LDFLAGS := -L/usr/lib64 -L/usr/local/lib -L$(STATIC_LIB_X64) -lm
 
@@ -55,16 +59,17 @@ LDFLAGS := -L/usr/lib64 -L/usr/local/lib -lm -fopenmp -fcommon
 endif
 DEVICE_DEBUG := 0
 
-.SUFFIXES   := .c .o
+all: $(PROGRAM)
+
 $(PROGRAM): $(OBJS)
-	$(CC) -o $(PROGRAM) $(LDFLAGS) $^
+	$(CC) $(OBJS) -o $(PROGRAM) $(LDFLAGS) $(CFLAGS)
 
 test_sparse: test_sparse.o sparse.o layer.o
 	$(CC) -o test_sparse $(LDFLAGS) $^
 
-%.o: $(SRC_DIR)/%.c
-	$(CC) $(CFLAGS) -c -o $@ $<
+.c.o: $(HEADERS)
+	@[ -d $(SRC_DIR) ]
+	$(CC) $(CFLAGS) -o $@ -c $<
 
-.PHONY: clean
 clean:
-	$(RM) *.o *.a *.so *.gch
+	$(RM) *.o *.a *.so *.gch $(SRC_DIR)/*.o
