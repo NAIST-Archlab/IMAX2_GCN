@@ -110,7 +110,7 @@ void trans_imax_format(IMAXSparseMatrix *imax_sp, SparseMatrix *sp) {
 
 void spmm(float* result, IMAXSparseMatrix *imax_sp_matrix, float* matrix, int mm_col) {
     Ull CHIP; Ull LOOP1, LOOP0; Ull INIT1, INIT0;
-    Ull top, blk, blk_iter;
+    Ull top, blk, blk_iter, end_sum;
     Ull AR[64][4]; /* output of EX in each unit */
     Ull BR[64][4][4]; /* output registers in each unit */
     Ull r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15;
@@ -126,6 +126,7 @@ void spmm(float* result, IMAXSparseMatrix *imax_sp_matrix, float* matrix, int mm
     size_t A_row_size = imax_sp_matrix->row_size;
     size_t A_col_size = imax_sp_matrix->col_size;
     size_t B_row_size = imax_sp_matrix->col_size;
+    size_t A_nnz_size;
     size_t B_col_size = mm_col;
     size_t B_col_blk = 2;
     size_t cofs_init = (0-W*4*2*A_row_size)<<32|((0-W*4*1*B_row_size)&0xffffffff);
@@ -138,14 +139,14 @@ void spmm(float* result, IMAXSparseMatrix *imax_sp_matrix, float* matrix, int mm
     size_t A_row_size_mul_W_4_2 = (W*4*2*A_row_size)<<32|(W*4*2*B_row_size);
 
     typedef struct {Uint i[8]} Ui8;
-    Uint *a_col_index[H], *a[H];
+    Uint *a_row_index[H], *a_col_index[H], *a[H];
     Ui8 *b[NCHIP], *b0[NCHIP], *b1[NCHIP], *b2[NCHIP], *b3[NCHIP];
     Ui8 *c0[NCHIP];
     Ui8 *c00[NCHIP], *c01[NCHIP], *c02[NCHIP], *c03[NCHIP];
 
     for (top=0; top < B_col_size/NCHIP; top+=B_col_blk) {
-        for (blk=0, blk_iter=0; blk < A_col_size; blk+=H,blk_iter+=1) {
-            if((A_margin_tmp=imax_sp_matrix->row_nnz[blk_iter])==0) break;
+        for (blk=0, blk_iter=0, end_sum=0; blk < A_col_size; blk+=H,blk_iter+=1,end_sum+imax_sp_matrix->row_nnz[blk_iter]*imax_sp_matrix->blk_size) {
+            if((A_nnz_size=imax_sp_matrix->row_nnz[blk_iter])==0) break;
 
             for (CHIP=0; CHIP<NCHIP; CHIP++) {
                 b[CHIP] = matrix + (CHIP*B_col_size/NCHIP + top)*B_row_size; 
@@ -153,16 +154,19 @@ void spmm(float* result, IMAXSparseMatrix *imax_sp_matrix, float* matrix, int mm
                 b1[CHIP] = (Uint*)b[CHIP] + B_row_size*2;
                 b2[CHIP] = (Uint*)b[CHIP] + B_row_size*4;
                 b3[CHIP] = (Uint*)b[CHIP] + B_row_size*6;
+            }
 
+            for (k=0; k < H; k++) a[k] = (Uint*)imax_sp_matrix->val + end_sum + imax_sp_matrix->row_nnz[blk_iter]*k;
+            for (k=0; k < H/2; k++) a_row_index[k] = (Uint*)imax_sp_matrix->row_num + blk/2 + k;
+            for (k=0; k < H/2; k++) a_col_index[k] = (Uint*)imax_sp_matrix->col_num + end_sum + imax_sp_matrix->row_nnz[blk_iter]*k;
+
+            for (CHIP=0; CHIP<NCHIP; CHIP++) {
                 c0[CHIP] = result + (CHIP*B_col_size/NCHIP+top)*A_row_size;
                 c00[CHIP]= (Uint*)c0[CHIP] + 0;
                 c01[CHIP]= (Uint*)c0[CHIP] + A_row_size*2;
                 c02[CHIP]= (Uint*)c0[CHIP] + A_row_size*4;
                 c03[CHIP]= (Uint*)c0[CHIP] + A_row_size*6;
             }
-
-            for (k=0; k < H; k++) a[k] = (Uint*)imax_sp_matrix->val + (blk+k)*A_row_size;
-            for (k=0; k < H/2; k++) a_col_index[k] = (Uint*)imax_sp_matrix->row_num + blk/2*A_row_size*2 + k*A_row_size*2 + A_col_size*A_row_size;
 
             #define spmm_core1(r, rm1, a_row, offset, msk) \
                         exe(OP_FMA, &AR[r][0], AR[rm1][0], EXP_H3210, BR[rm1][2][1], EXP_H1010, BR[rm1][0][1], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);\
@@ -222,7 +226,7 @@ void spmm(float* result, IMAXSparseMatrix *imax_sp_matrix, float* matrix, int mm
         //EMAX5A begin spmm1 mapdist=0
             for (CHIP=0; CHIP<NCHIP; CHIP++) { /* will be parallelized by multi-chip (M/#chip) */
                 for (INIT1=1,LOOP1=B_col_blk/(W*2),cofs=cofs_init; LOOP1--; INIT1=0) {
-                    for (INIT0=1,LOOP0=A_margin_tmp,rofs=rofs_init; LOOP0--; INIT0=0) {
+                    for (INIT0=1,LOOP0=A_nnz_size,rofs=rofs_init; LOOP0--; INIT0=0) {
                         exe(OP_ADD, &cofs,  cofs,            EXP_H3210, INIT0?A_row_size_mul_W_4_2:0,     EXP_H3210, 0LL,    EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
                         exe(OP_ADD, &rofs,  INIT0?rofs:rofs, EXP_H3210, (1*8LL)<<32|((1*4LL)&0xffffffff), EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0xffffffffffffffffLL, OP_NOP, 0LL);
                         exe(OP_ADD, &cofs1, cofs,            EXP_H1010, 0,                                EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL,                  OP_NOP, 0LL);
