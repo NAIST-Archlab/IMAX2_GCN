@@ -1,6 +1,9 @@
 #ifndef __SPARSE_H__
 #define __SPARSE_H__
 #include "options.h"
+#ifdef USE_IMAX2
+#include "emax6.h"
+#else
 #ifndef UTYPEDEF
 #define UTYPEDEF
 typedef unsigned char      Uchar;
@@ -12,6 +15,7 @@ typedef long long int      Sll;
 typedef long double Dll;
 #else
 typedef struct {Ull u[2];} Dll;
+#endif
 #endif
 #endif
 
@@ -37,7 +41,8 @@ typedef struct sparse_matrix_imax2 {
     int nnz;
     int col_size;
     int row_size;
-    int blk_size;
+    int row_blk_size;
+    int col_blk_size;
     int *padding;
     int *row_nnz;
     Uint *row_num;

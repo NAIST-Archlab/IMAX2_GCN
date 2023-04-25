@@ -69,7 +69,7 @@ SparseGraph* spia(SparseGraph *graph) {
     new_val = (float*) malloc(sizeof(float) * nnz);
     result->matrix.nnz = nnz;
     result->matrix.col_p = new_col_p;
-    result->matrix.col_size = nnz;
+    result->matrix.col_size = sp_matrix->col_size;
     result->matrix.row_p = new_row_p;
     result->matrix.row_size = sp_matrix->row_size;
     result->matrix.val = new_val;

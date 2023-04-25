@@ -7,7 +7,11 @@ SRC_DIR := src
 TEST_DIR := test
 INCLUDE := ./include/
 SRCS := $(wildcard $(SRC_DIR)/*.c)
+MAIN := main.c
+TEST_SRCS := $(wildcard $(TEST_DIR)/*.c)
 OBJS := $(SRCS:.c=.o)
+MAIN_OBJS := main.o
+TEST_OBJS := $(TEST_SRCS:.c=.o)
 HEADERS := $(INCLUDE)/emax6.h $(INCLUDE)/layer.h $(INCLUDE)/options.h $(INCLUDE)/sparse.h $(INCLUDE)/utils.h
 
 ifeq ($(MACHTYPE),x86_64)
@@ -38,12 +42,12 @@ HOMEBREW_DIR := /opt/homebrew
 
 CPP     := cpp -P
 CC      := gcc
-CFLAGS  := -g3 -O3 -Wall -msse3 -Wno-unknown-pragmas -funroll-loops -fcommon -I$(INCLUDE) -DCBLAS_GEMM -DEMAX6 -DDEBUG
+CFLAGS  := -g3 -O3 -Wall -msse3 -Wno-unknown-pragmas -fopenmp -funroll-loops -fcommon -I$(INCLUDE) -DCBLAS_GEMM -DEMAX6 -DDEBUG
 LDFLAGS := -L/usr/lib64 -L/usr/local/lib -lm -fopenmp -fcommon
 #LDFLAGS := -L/usr/lib64 -L/usr/local/lib -L$(STATIC_LIB_X64) -lm
 
 ifeq ($(ARM),1)
-LDFLAGS := -L/usr/lib64 -L/usr/local/lib -lm -fopenmp -fcommon
+LDFLAGS := --g3 -O3 -Wall -msse3 -Wno-unknown-pragmas -funroll-loops -fcommon -I$(INCLUDE) -DCBLAS_GEMM -DEMAX6 -DDEBUG
 # -L$(STATIC_LIB_ARM)
 endif
 
@@ -61,15 +65,16 @@ DEVICE_DEBUG := 0
 
 all: $(PROGRAM)
 
-$(PROGRAM): $(OBJS)
-	$(CC) $(OBJS) -o $(PROGRAM) $(LDFLAGS) $(CFLAGS)
+$(PROGRAM): $(OBJS) $(MAIN_OBJS)
+	$(CC) $(OBJS) $(MAIN_OBJS) -o $(PROGRAM) $(LDFLAGS) $(CFLAGS)
 
-test_sparse: test_sparse.o sparse.o layer.o
-	$(CC) -o test_sparse $(LDFLAGS) $^
+test_sparse: $(OBJS) $(TEST_OBJS)
+	$(CC) $(OBJS) $(TEST_OBJS) -o test_sparse $(LDFLAGS) $(CFLAGS)
 
 .c.o: $(HEADERS)
 	@[ -d $(SRC_DIR) ]
+	@[ -d $(TEST_DIR) ]
 	$(CC) $(CFLAGS) -o $@ -c $<
 
 clean:
-	$(RM) *.o *.a *.so *.gch $(SRC_DIR)/*.o
+	$(RM) *.o *.a *.so *.gch $(SRC_DIR)/*.o $(TEST_DIR)/*.o

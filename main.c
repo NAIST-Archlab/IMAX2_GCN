@@ -1,5 +1,5 @@
-#include "../include/layer.h"
-#include "../include/utils.h"
+#include "./include/layer.h"
+#include "./include/utils.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -69,9 +69,7 @@ int main(int argc, char **argv) {
     #ifdef USE_MP
     #pragma omp parallel for
     #endif
-    for(int i = 0; i <= nv; i++) {
-        vertices_int[i] = (Uint) vertices[i];
-    }
+    for(int i = 0; i <= nv; i++) vertices_int[i] = (Uint) vertices[i];
 
     edges = (Uint*) malloc(sizeof(Uint)*vertices[nv]);
     edges_val = (float*) malloc(sizeof(float)*vertices[nv]);
@@ -84,12 +82,12 @@ int main(int argc, char **argv) {
     graph.matrix.col_p = (int*)edges;
     graph.matrix.val = edges_val;
 
-    //printf("Caculating A + I\n");
-    //new_graph = spia(&graph);
+    printf("Caculating A + I\n");
+    timespec_get(&t1, TIME_UTC);
+    new_graph = spia(&graph);
 
     // D^-1*A*D^-1
     printf("Calculating D^-1AD^-1\n");
-    timespec_get(&t1, TIME_UTC);
     #ifdef USE_MP
     #pragma omp parallel for
     #endif
@@ -121,11 +119,25 @@ int main(int argc, char **argv) {
     print_layers(&network);
 
     printf("Reading Features now...\n");
+    #ifdef USE_IMAX2
+    float *tmp_feats = (float*)malloc(f_dim_in*f_dim_out*sizeof(float));
+    fread(tmp_feats, sizeof(float), f_dim_in*f_dim_out, fp_feats);
+    #else
     fread(network.layers->latent_vectors.weight, sizeof(float), f_dim_in*f_dim_out, fp_feats);
+    #endif
 
     #ifdef USE_IMAX2
     printf("Transform to IMAX Format..\n");
     timespec_get(&t1, TIME_UTC);
+    #ifdef USE_MP
+    #pragma omp parallel for
+    #endif
+    for (int i = 0; i < f_dim_in/2; i++) {
+        for (int j = 0; j < f_dim_out/2; j++) {
+            ((Ull*)(network.layers[0].latent_vectors.weight))[j*dim_in + i] = ((Ull*)(tmp_feats))[i*dim_out + j];
+        }
+    }
+    free(tmp_feats);
     trans_imax_format(&network.graph->imax_matrix, &network.graph->matrix);
     timespec_get(&t2, TIME_UTC);
     printf("Transform %lf sec.\n", cal_time(&t2, &t1));

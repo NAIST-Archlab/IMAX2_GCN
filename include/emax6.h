@@ -23,7 +23,7 @@ void /*__attribute__((always_inline))*/ cex(Uint, Ull*,    Ull, Ull, Ull, Ull, U
 void /*__attribute__((always_inline))*/ ex4(Uint, Ull*,    Ull*, Uint, Ull*, Uint, Ull*, Uint, Uint, Ull*, Uint, Ull*);
 Ull    __attribute__((always_inline))   exm(Ull,  Uchar);
 int  /*__attribute__((always_inline))*/ exe(Uint, Ull*,    Ull, Uint, Ull, Uint, Ull, Uint, Uint, Ull, Uint, Ull);
-void /*__attribute__((always_inline))*/ mex(Uint, Uchar**, Uchar*, Ull, Ull, Ull);
+void /*__attribute__((always_inline))*/ mex(Uint, Uchar**, Uchar*, Ull, Uint, Uchar**, Uchar*, Ull, Ull, Ull, Ull);
 void /*__attribute__((always_inline))*/ mo4(Uint, Ull,     Ull*, Ull, Ull, Uchar, Ull, Uint, Uint, Uchar, Ull, Uint);
 void /*__attribute__((always_inline))*/ mop(Uint, Ull,     Ull*, Ull, Ull, Uchar, Ull, Uint, Uint, Uchar, Ull, Uint);
 /* internal use only */
@@ -104,6 +104,8 @@ int     EMAX_DEPTH;
 #define OP_MMIN3        0x2e
 #define OP_MMAX         0x2f
 #define OP_MMIN         0x30
+#define OP_MAJ          0x31
+#define OP_CH           0x32
 
 #define OP_AND          0x01
 #define OP_OR           0x02
@@ -111,6 +113,7 @@ int     EMAX_DEPTH;
 #define OP_SUMHH        0x04
 #define OP_SUMHL        0x05
 //#define OP_WSWAP      0x06
+#define OP_ROTS         0x07
 
 #define OP_SLL          0x01
 #define OP_SRL          0x02
@@ -241,25 +244,39 @@ struct insn { /* EMAX6 instruction format */
     char exeds     ; /* suffix for var[s], alr[][s], bdr[][][s] */
   } iexe;
   struct mex {
-    char op        ; /* mex(sparse matrix) conditional 0:NOP, 1:AL, 2:OP_CMPA_LE, 3:GE */
+    char op0       ; /* mex(sparse matrix) conditional 0:NOP, 1:AL, 2:OP_CMPA_LE, 3:GE */
+    char op1       ; /* mex(sparse matrix) conditional 0:NOP, 1:AL, 2:OP_CMPA_LE, 3:GE */
     Ull  init   : 1; /* mex(sparse matrix) 0:none, 1:INIT0? */
+    char adr1v     ; /* id.type */
+    int  adr1h     ; /* hash val */
+    char adr1s     ; /* suffix for bdr[][][s] */
+    char adr2v     ; /* id.type */
+    int  adr2h     ; /* hash val */
+    char adr2s     ; /* suffix for bdr[][][s] */
+    char dist1v    ; /* id.type */
+    int  dist1h    ; /* hash val */
+    char adr3v     ; /* id.type */
+    int  adr3h     ; /* hash val */
+    char adr3s     ; /* suffix for bdr[][][s] */
+    char adr4v     ; /* id.type */
+    int  adr4h     ; /* hash val */
+    char adr4s     ; /* suffix for bdr[][][s] */
+    char dist2v    ; /* id.type */
+    int  dist2h    ; /* hash val */
+    char limitv    ; /* id.type */
+    int  limith    ; /* hash val */
     char src1v     ; /* id.type */
     int  src1h     ; /* hash val */
-    char src1s     ; /* suffix for bdr[][][s] */
+    char src1s     ; /* suffix for var[s], bdr[][][s] */
     char src2v     ; /* id.type */
     int  src2h     ; /* hash val */
-    char src2s     ; /* suffix for bdr[][][s] */
-    char distv     ; /* id.type */
-    int  disth     ; /* hash val */
-    char src3v     ; /* id.type */
-    int  src3h     ; /* hash val */
-    char src3s     ; /* suffix for var[s], bdr[][][s] */
-    char src4v     ; /* id.type */
-    int  src4h     ; /* hash val */
-    char src4s     ; /* suffix for var[s], bdr[][][s] */
-    char mexdv     ; /* id.type */
-    int  mexdh     ; /* hash val */
-    char mexds     ; /* suffix for var[s] */
+    char src2s     ; /* suffix for var[s], bdr[][][s] */
+    char mexd0v    ; /* id.type */
+    int  mexd0h    ; /* hash val */
+    char mexd0s    ; /* suffix for var[s] */
+    char mexd1v    ; /* id.type */
+    int  mexd1h    ; /* hash val */
+    char mexd1s    ; /* suffix for var[s] */
   } imex;
   struct mop {
     char op        ; /* mop1:load, mop0:store/tr/load2/lddmq */
@@ -337,8 +354,7 @@ struct dec { /* EMAX6 instruction analysis */
     int  exdh      ; /* hash val */
     char exds      ; /* suffix for var[s], bdr[][][s] */
   } dexu;
-  struct mex dmex0; /* mex(sparse matrix) conditional 0:NOP, 1:AL, 2:OP_CMPA_LE, 3:GE */
-  struct mex dmex1; /* mex(sparse matrix) conditional 0:NOP, 1:AL, 2:OP_CMPA_LE, 3:GE */
+  struct mex dmex;  /* mex(sparse matrix) conditional 0:NOP, 1:AL, 2:OP_CMPA_LE, 3:GE */
   struct mop dmop0; /* mop0:store/load, load_single is assigned to BR[r][c][0] */
   struct mop dmop1; /* mop1:load only,  load_single is assigned to BR[r][c][1] */
 } dec[AMAP_DEPTH][EMAX_WIDTH];
@@ -359,6 +375,8 @@ struct bus {
   int  ea0orh  ;
   char ea0drv  ;
   int  ea0drh  ;
+  char ea0woofsv; //MEX+sort
+  int  ea0woofsh; //MEX+sort
   /* EA1 regs */
   char ea1brv  ;
   int  ea1brh  ;
@@ -366,6 +384,8 @@ struct bus {
   int  ea1orh  ;
   char ea1drv  ;
   int  ea1drh  ;
+  char ea1woofsv; //MEX+sort
+  int  ea1woofsh; //MEX+sort
   /* axibusmap */
   struct {
     char v  ;
@@ -413,13 +433,14 @@ struct conf { /* final configuration info. for EMAX6-CGRA */
     Ull  init   :  2; /* bit0:activate s1+INIT0 bit1:activate s2+INIT0 */
     Ull  fold   :  1; /* 0:normal, 1:load-exe-store folding */
     /* sparse matrix */
-    Ull  mex0op :  2; /* mex(sparse matrix) conditional 0:NOP, 1:AL, 2:OP_CMPA_LE, 3:GE */
+    Ull  mex0op :  2; /* mex(sparse matrix) conditional 0:NOP, 1:AL, 2:OP_CMPA_LE, 3:OP_CMPA_GE */
     Ull  mex0init: 1; /* mex(sparse matrix) 0:none, 1:INIT0? */
     Ull  mex0dist: 3; /* distance 0:0, 1:1, 2:2, 3:4, 4:8, 5:16, 6:32, 7:64byte */
-    Ull  mex1op :  2; /* mex(sparse matrix) conditional 0:NOP, 1:AL, 2:OP_CMPA_LE, 3:GE */
+    Ull  mex1op :  2; /* mex(sparse matrix) conditional 0:NOP, 1:AL, 2:OP_CMPA_LE, 3:OP_CMPA_GE */
     Ull  mex1init: 1; /* mex(sparse matrix) 0:none, 1:INIT0? */
     Ull  mex1dist: 3; /* distance 0:0, 1:1, 2:2, 3:4, 4:8, 5:16, 6:32, 7:64byte */
-    Ull  dmy00  :  5;
+    Ull  mexlimit: 4; /* limit 0:0, 1:8, 2:16, .... 10:4096, 11:8192, 12:16384, 13:32768 */
+    Ull  dmy00  :  1;
   } cdw0;
 
   struct cdw1 { /* select CEX-in and EAG-in */
@@ -457,8 +478,8 @@ struct conf { /* final configuration info. for EMAX6-CGRA */
     Ull  mws3   :  2; /* 0:lmwd3, 1:exdr, 2:ts3 */
     Ull  brs0   :  2; /* 0:off, 1:mr10, 2:tr0, 3:mr0  */
     Ull  brs1   :  2; /* 0:off, 1:mr11, 2:tr1, 3:mr1  */
-    Ull  brs2   :  2; /* 0:off, 1:mr12, 2:tr2, 3:exdr */
-    Ull  brs3   :  2; /* 0:off, 1:mr13, 2:tr3         */
+    Ull  brs2   :  2; /* 0:off, 1:mr12, 2:tr2, 3:exdr(brs3=3の場合,ea0woofsに接続) */
+    Ull  brs3   :  2; /* 0:off, 1:mr13, 2:tr3  3:ea1woofs */
     Ull  mapdist:  6; /* 論理UNIT毎にあるが,本来は物理UNITに1つでよい */
     Ull  lmm_mode: 2; /* 論理LMM毎にセット 0:無効, 1:分割無, 2:2分割, 3:4分割 */
     Ull  lmm_axiw: 1; /* AXI->LMM write対象(lmp/lmr/lmf/lmxの場合1) */
