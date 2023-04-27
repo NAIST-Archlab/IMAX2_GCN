@@ -14,15 +14,20 @@ void trans_matrix(float *dst, float *org, int row, int col) {
     }
 }
 
-int main() {
+int main(int argc, char **argv) {
     SparseMatrix sp;
     SparseMatrixParams sp_params;
     HiddenLayer result;
+    struct timespec t1, t2;
     float *m, *tm;
     int i, j;
 
-    //int row_nnz = (int) round(ROW * 0.05);
-    int row_nnz = 100;
+    if (argc < 2) {
+        printf("Usage: %s row_nnz\n");
+        return 1;
+    }
+    
+    int row_nnz = atoi(argv[1]);
     sp.nnz = row_nnz * ROW / 2;
     sp.row_size = ROW;
     sp.row_p = (int*) malloc(sizeof(int) * (ROW + 1));
@@ -65,12 +70,16 @@ int main() {
     #ifdef USE_IMAX2
     IMAXSparseMatrix imax_sp;
     trans_imax_format(&imax_sp, &sp);
+    timespec_get(&t1, TIME_UTC);
     spmm(result.weight, &imax_sp, m, ROW);
+    timespec_get(&t2, TIME_UTC);
     trans_matrix(tm, result.weight, ROW, ROW);
     free(result.weight);
     result.weight = tm;
     #else
+    timespec_get(&t1, TIME_UTC);
     spmm(result.weight, &sp, &sp_params, m, ROW); 
+    timespec_get(&t2, TIME_UTC);
     #endif
 
     int nonzero = 0;
@@ -83,6 +92,7 @@ int main() {
 
     print_weight(&result);
     printf("%d\n", row_nnz*3);
+    printf("SpMM: %lf sec.\n", cal_time(&t2, &t1));
 
     return 0;
 }

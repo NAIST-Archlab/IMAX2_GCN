@@ -1,7 +1,10 @@
 *.o
+*-*.c
 *.gch
 imax_gcn
 test_sparse
+*.emax6
 data/
 data_backup/
 .DS_Store
+.vscode

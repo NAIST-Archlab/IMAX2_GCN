@@ -1,5 +1,5 @@
 
-static char RcsHeader[] = "$Header: /usr/home/nakashim/proj-arm64/src/conv-c2c/RCS/emax6.c,v 1.128 2022/03/04 04:05:31 nakashim Exp nakashim $";
+static char RcsHeader[] = "$Header: /usr/home/nakashim/proj-arm64/src/conv-c2c/RCS/emax6.c,v 1.151 2022/11/14 09:26:38 nakashim Exp nakashim $";
 
 /* EMAX6 Compiler                      */
 /*         Copyright (C) 2012 by NAIST */
@@ -17,12 +17,11 @@ emit_emax6a(int mode) /* 0:array, 1:drain */
   int c, i, j, k, flag;
   int last_row = -1; /* last location */
   int last_col = -1; /* last location */
-  int last_mex = -1; /* 0:mex0, 1:mex1 */
   int last_mop = -1; /* 0:mop0, 1:mop1 */
   int folding;
   struct cex *dcex;
   struct exu *dexu;
-  struct mex *dmex0, *dmex1;
+  struct mex *dmex;
   struct mop *dmop0, *dmop1;
 
   if (mode == 1) { /* emit drain */
@@ -617,6 +616,8 @@ emit_emax6a(int mode) /* 0:array, 1:drain */
       case OP_MMID3:  /* 3 */
       case OP_MMAX3:  /* 3 */
       case OP_MMIN3:  /* 3 */
+      case OP_MAJ:    /* 3 */
+      case OP_CH:     /* 3 */
         get_valid_row(ITYPE_EXE, 0, insn[i].iexe.src1v, insn[i].iexe.src1h, rdep);
         get_valid_row(ITYPE_EXE, 0, insn[i].iexe.src2v, insn[i].iexe.src2h, rdep);
         get_valid_row(ITYPE_EXE, 0, insn[i].iexe.src3v, insn[i].iexe.src3h, rdep);
@@ -635,6 +636,7 @@ emit_emax6a(int mode) /* 0:array, 1:drain */
       case OP_SUMHH:
       case OP_SUMHL:
 //    case OP_WSWAP:
+      case OP_ROTS:
         get_valid_row(ITYPE_EXE, 0, insn[i].iexe.src4v, insn[i].iexe.src4h, rdep);
         break;
       default:
@@ -709,9 +711,11 @@ emit_emax6a(int mode) /* 0:array, 1:drain */
 	    exit(1);
 	  }
         }
-        else if (row < last_row) {
-          printf("in %s: exe found violation of sequence (row=%d < last_row=%d)\n", id[current_prefix].name, row, last_row);
-          exit(1);
+        else if (row < last_row) { /* 位置を上に戻せない ⇒ sort-msege:戻せるように変更 20221026 */
+          //printf("in %s: exe found violation of sequence (row=%d < last_row=%d)\n", id[current_prefix].name, row, last_row);
+          //exit(1);
+	  last_row = row;
+	  last_col = col;
         }
         else {
           last_row = row;
@@ -822,21 +826,37 @@ emit_emax6a(int mode) /* 0:array, 1:drain */
       insn[i].iheader.fixed = 1;
       break;
     case ITYPE_MEX: /* MEX */
-      /* mex(OP_CMPA_LE, &b0[h],       INIT0?b:b0[h],                INIT0?0:8, BR[r][2][1], BR[r][2][0]); */
-      /* mex(OP_CMPA_GE, &a0[h][CHIP], INIT0?a[h][CHIP]:a0[h][CHIP], INIT0?0:8, BR[r][2][1], BR[r][2][0]); */
-      /* mop(OP_LDR, 3,  &BR[r][2][1], b0[h],       bofs, MSK_W1, b,          2*LP*RMGRP,  0, 0, NULL, 2*LP*RMGRP); */
-      /* mop(OP_LDR, 3,  &BR[r][2][0], a0[h][CHIP], cofs, MSK_W1, a[h][CHIP], 2*LP,        0, 0, NULL, 2*LP); */
-      switch (insn[i].imex.op) {
+      /*****************************************/
+      /* old mex(OP_CMPA_LE, &b0[h],       INIT0?b:b0[h],                INIT0?0:8, BR[r][2][1], BR[r][2][0]);*/
+      /* old mex(OP_CMPA_GE, &a0[h][CHIP], INIT0?a[h][CHIP]:a0[h][CHIP], INIT0?0:8, BR[r][2][1], BR[r][2][0]);*/
+      /* new mex(OP_CMPA_LE, &b0[h][0], INIT0?b[0]:b0[h][0], INIT0?0LL:8LL, OP_CMPA_GE, &a0[h][0][CHIP], INIT0?a[h][CHIP]:a0[h][0][CHIP], INIT0?0LL:8LL, 0LL, BR[r][2][1], BR[r][2][0]);*/
+      /* new mex(OP_CMPA_LE, &J[x],     INIT0?0LL:J[x],      INIT0?0LL:8LL, OP_CMPA_GE, &K[x],           INIT0?0LL:K[x],                  INIT0?0LL:8LL, BE8, BR[r][2][1], BR[r][2][0]);*/
+      /*     mop(OP_LDR, 3,  &BR[r][2][1], b0[h],       bofs, MSK_W1, b,          2*LP*RMGRP,  0, 0, NULL, 2*LP*RMGRP); */
+      /*     mop(OP_LDR, 3,  &BR[r][2][0], a0[h][CHIP], cofs, MSK_W1, a[h][CHIP], 2*LP,        0, 0, NULL, 2*LP); */
+      switch (insn[i].imex.op0) {
       case OP_ALWAYS:
-        get_valid_row(ITYPE_MEX, 0, insn[i].imex.src1v, insn[i].imex.src1h, rdep);
-        get_valid_row(ITYPE_MEX, 0, insn[i].imex.src2v, insn[i].imex.src2h, rdep);
+        get_valid_row(ITYPE_MEX, 0, insn[i].imex.adr1v, insn[i].imex.adr1h, rdep);
+        get_valid_row(ITYPE_MEX, 0, insn[i].imex.adr2v, insn[i].imex.adr2h, rdep);
         break;
       case OP_CMPA_LE:
       case OP_CMPA_GE:
+        get_valid_row(ITYPE_MEX, 0, insn[i].imex.adr1v, insn[i].imex.adr1h, rdep);
+        get_valid_row(ITYPE_MEX, 0, insn[i].imex.adr2v, insn[i].imex.adr2h, rdep);
         get_valid_row(ITYPE_MEX, 0, insn[i].imex.src1v, insn[i].imex.src1h, rdep);
         get_valid_row(ITYPE_MEX, 0, insn[i].imex.src2v, insn[i].imex.src2h, rdep);
-        get_valid_row(ITYPE_MEX, 0, insn[i].imex.src3v, insn[i].imex.src3h, rdep);
-        get_valid_row(ITYPE_MEX, 0, insn[i].imex.src4v, insn[i].imex.src4h, rdep);
+        break;
+      }
+      switch (insn[i].imex.op1) {
+      case OP_ALWAYS:
+        get_valid_row(ITYPE_MEX, 0, insn[i].imex.adr3v, insn[i].imex.adr3h, rdep);
+        get_valid_row(ITYPE_MEX, 0, insn[i].imex.adr4v, insn[i].imex.adr4h, rdep);
+        break;
+      case OP_CMPA_LE:
+      case OP_CMPA_GE:
+        get_valid_row(ITYPE_MEX, 0, insn[i].imex.adr3v, insn[i].imex.adr3h, rdep);
+        get_valid_row(ITYPE_MEX, 0, insn[i].imex.adr4v, insn[i].imex.adr4h, rdep);
+        get_valid_row(ITYPE_MEX, 0, insn[i].imex.src1v, insn[i].imex.src1h, rdep);
+        get_valid_row(ITYPE_MEX, 0, insn[i].imex.src2v, insn[i].imex.src2h, rdep);
         break;
       }
 
@@ -877,42 +897,27 @@ emit_emax6a(int mode) /* 0:array, 1:drain */
         printf("in %s: [%d][%d] mex exceeds EMAX_DEPTH/EMAX_WIDTH\n", id[current_prefix].name, last_row, last_col);
         exit(1);
       }
-      if      (!dec[last_row][last_col].dmex1.op)
-	last_mex = 1;
-      else if (!dec[last_row][last_col].dmex0.op)
-	last_mex = 0;
-      else {
-        printf("in %s: [%d][%d] mex conflicts\n", id[current_prefix].name, last_row, last_col);
-        exit(1);
-      }
       /* 1-4 */
-      dmex0 = &dec[last_row][last_col].dmex0;
-      dmex1 = &dec[last_row][last_col].dmex1;
-      if (last_mex==1) /* load */
-        *dmex1 = insn[i].imex;
-      else /* store/load */
-        *dmex0 = insn[i].imex;
+      dmex  = &dec[last_row][last_col].dmex;
+      *dmex = insn[i].imex; /* new mex()は1つで2つ分指定 */
       /* 1-5 */
       /* BR[][][1],BR[][][0]からの戻りは常時接続なのでselector追加不要 */
       /* ea14woofs,ea04woofsからの戻りは常時接続なのでselector追加不要 */
-      if (last_mex==1) { /* first */
-        set_reg_path(last_row, last_col, 0, type, RTYPE_BASE, 1, dmex1->src1v, dmex1->src1h, dmex1->src1s);
-      }
-      else { /* second */
-        set_reg_path(last_row, last_col, 0, type, RTYPE_BASE, 0, dmex0->src1v, dmex0->src1h, dmex0->src1s);
-      }
+      set_reg_path(last_row, last_col, 0, type, RTYPE_BASE, 0, dmex->adr1v, dmex->adr1h, dmex->adr1s);
+      set_reg_path(last_row, last_col, 0, type, RTYPE_BASE, 1, dmex->adr3v, dmex->adr3h, dmex->adr3s);
       /* 1-6 */
       /* BR[][][1],BR[][][0]からの戻りは常時接続なのでbus設定不要 */
       /* ea14woofs,ea04woofsからの戻りは常時接続なのでbus設定不要 */
-      if (last_mex==1) { /* first */
-	/* do nothing */
-      }
-      else { /* second */
-	/* do nothing */
-      }
-      id[insn[i].imex.mexdh].itype = ITYPE_MEX;
-      id[insn[i].imex.mexdh].row   = last_row;
-      id[insn[i].imex.mexdh].col   = last_col;
+      bus[last_row][last_col].ea0woofsv = dmex->mexd0v;
+      bus[last_row][last_col].ea0woofsh = dmex->mexd0h;
+      bus[last_row][last_col].ea1woofsv = dmex->mexd1v;
+      bus[last_row][last_col].ea1woofsh = dmex->mexd1h;
+      id[insn[i].imex.mexd0h].itype = ITYPE_MEX;
+      id[insn[i].imex.mexd0h].row   = last_row;
+      id[insn[i].imex.mexd0h].col   = last_col;
+      id[insn[i].imex.mexd1h].itype = ITYPE_MEX;
+      id[insn[i].imex.mexd1h].row   = last_row;
+      id[insn[i].imex.mexd1h].col   = last_col;
       insn[i].iheader.fixed = 1;
       break;
     case ITYPE_MO4: /* MO4 */
@@ -1440,6 +1445,9 @@ emit_emax6a(int mode) /* 0:array, 1:drain */
 	      folding = 1; /* load-exe-store folding */
 	    }
 	  }
+	  else if (op0 && !op1 && insn[i].imop.mtype == MTYPE_RLOAD) { /* double buffering (st+ld) */
+	    /* allocate LD at the same col as ST */
+	  }
           else if (op0 || op1) { /* mop0(l/s)=full */
 	    /* new_load,new_storeは次colへ */
 	    last_col++; /* overflowはあとで検査.EXEがWIDTH以上あれば次段へ移動 */
@@ -1487,8 +1495,8 @@ emit_emax6a(int mode) /* 0:array, 1:drain */
                                    && (blk == insn[i].imop.blk)
                                    && (fcev== insn[i].imop.forcev)
                                    && (fceh== insn[i].imop.forceh)
-	                           && (dec[last_row][last_col].dmex0.op)
-	                           && (dec[last_row][last_col].dmex1.op);
+	                           && (dec[last_row][last_col].dmex.op0)
+	                           && (dec[last_row][last_col].dmex.op1);
           if (ldx2_and_op0_is_empty)
             last_mop = 0; /* load */
 	  else if (mex2_and_op0_is_empty) /* mex should merge op1(map to LMM/col2) and op0(map to LMM/col1) w/ different top */
@@ -1515,27 +1523,33 @@ emit_emax6a(int mode) /* 0:array, 1:drain */
         exit(1);
       }
       /* 1-4 */
-      dmex0 = &dec[last_row][last_col].dmex0;
-      dmex1 = &dec[last_row][last_col].dmex1;
+      dmex  = &dec[last_row][last_col].dmex;
       dmop0 = &dec[last_row][last_col].dmop0;
       dmop1 = &dec[last_row][last_col].dmop1;
       if (last_mop==1) { /* load */
         *dmop1 = insn[i].imop;
-	if (dmex1->op && insn[i].imex.op) {
+	if (dmex->op1 && insn[i].imex.op1) {
 	  printf("in %s: [%d][%d] mex1 & mop1(adr++) conflicts\n", id[current_prefix].name, last_row, last_col);
 	  exit(1);
 	}
-	else if (insn[i].imex.op)
-	  *dmex1 = insn[i].imex;
+	else if (insn[i].imex.op0) { /* mop()のINCR情報はmex0にある */
+	  dmex->op1    = insn[i].imex.op0;
+	  dmex->dist2v = insn[i].imex.dist1v;
+	  dmex->dist2h = insn[i].imex.dist1h;
+	}
       }
       else { /* store/load */
         *dmop0 = insn[i].imop;
-	if (dmex0->op && insn[i].imex.op) {
+	if (dmex->op0 && insn[i].imex.op0) {
 	  printf("in %s: [%d][%d] mex0 & mop0(adr++) conflicts\n", id[current_prefix].name, last_row, last_col);
 	  exit(1);
 	}
-	else if (insn[i].imex.op)
-	  *dmex0 = insn[i].imex;
+	else if (insn[i].imex.op0) { /* mop()のINCR情報はmex0にある */
+	  *dmex = insn[i].imex;
+	  dmex->op0    = insn[i].imex.op0;
+	  dmex->dist1v = insn[i].imex.dist1v;
+	  dmex->dist1h = insn[i].imex.dist1h;
+	}
       }
       /* 1-5 */
       if (last_mop==1) { /* load */
@@ -1546,7 +1560,7 @@ emit_emax6a(int mode) /* 0:array, 1:drain */
         /* LD with force-read=0 and ptop!=NULL generates current(lmr) and next(lmp). mapdist==0                  ofs=ptop-top curr  1  top  blk  len   0  0  1 */
         /*                                                                                                               p=1の場合,pref-addrは常にlmmi.top+ofs */
         /* LDDMQ set f=1 and p=1 in lmmc automatically                                                                        curr  1  top  -    -     0  1  1 */
-	if (!(dmex1->op && dmex1->mexdh == dmop1->baseh))
+	if (!(dmex->op1 && dmex->mexd1h == dmop1->baseh))
 	  set_reg_path(last_row, last_col, 0, type, RTYPE_BASE, 1, dmop1->basev, dmop1->baseh, dmop1->bases);
         set_reg_path(last_row, last_col, 0, type, RTYPE_OFFS, 1, dmop1->offsv, dmop1->offsh, dmop1->offss);
         if (dmop1->topv  == T_VARIABLE) {
@@ -1554,10 +1568,10 @@ emit_emax6a(int mode) /* 0:array, 1:drain */
 	  int f  = id[dmop1->forceh].val;
 	  int p  = 0; /* initial value */
 	  int last_col_mex = last_col;
-          if (dmop1->mtype == MTYPE_RLOAD && (dmex1->op == OP_CMPA_LE || dmex1->op == OP_CMPA_GE)) {
+          if (dmop1->mtype == MTYPE_RLOAD && (dmex->op1== OP_CMPA_LE || dmex->op1 == OP_CMPA_GE)) {
 	    //printf("MOP1 CMPA RLOAD\n");
 	  }
-	  else if (last_col == 1 && dmop1->mtype == MTYPE_RLOAD && (dec[last_row][2].dmex0.op == OP_CMPA_LE || dec[last_row][2].dmex0.op == OP_CMPA_GE)) { /* load in load-cfma-store */
+	  else if (last_col == 1 && dmop1->mtype == MTYPE_RLOAD && (dec[last_row][2].dmex.op0 == OP_CMPA_LE || dec[last_row][2].dmex.op0 == OP_CMPA_GE)) { /* load in load-cfma-store */
 	    //printf("MOP0 CMPA RLOAD(load-cfms-store)\n");
 	    last_col_mex = 0; //★★★ last_col=1の場合,mop0のlast_col_mexは0固定でよい
 	  }
@@ -1635,7 +1649,7 @@ emit_emax6a(int mode) /* 0:array, 1:drain */
         /* TR    set f=1 and p=1 in lmmc automatically                                                                        curr  1  top  -    -     1  1  1 */
         if (insn[i].imop.mtype == MTYPE_RSTORE)
           set_reg_path(last_row, last_col, folding, type, RTYPE_DATA, 0, dmop0->mopdv, dmop0->mopdh, dmop0->mopds);
-	if (!(dmex0->op && dmex0->mexdh == dmop0->baseh))
+	if (!(dmex->op0 && dmex->mexd0h == dmop0->baseh))
 	  set_reg_path(last_row, last_col, folding, type, RTYPE_BASE, 0, dmop0->basev, dmop0->baseh, dmop0->bases);
         set_reg_path(last_row, last_col, folding, type, RTYPE_OFFS, 0, dmop0->offsv, dmop0->offsh, dmop0->offss);
         if (dmop0->topv  == T_VARIABLE) {
@@ -1643,20 +1657,25 @@ emit_emax6a(int mode) /* 0:array, 1:drain */
 	  int f  = id[dmop0->forceh].val;
 	  int p  = 0; /* initial value */
 	  int last_col_mex = last_col;
-          if (dmop0->mtype == MTYPE_RLOAD && !(dmex0->op == OP_CMPA_LE || dmex0->op == OP_CMPA_GE)) {
+          if (dmop0->mtype == MTYPE_RLOAD && !(dmex->op0 == OP_CMPA_LE || dmex->op0 == OP_CMPA_GE)) {
             /* if ldx2_and_op0_is_empty==true, dmop0 can share lmmi with dmop1 */
           }
           else {
-	    if (dmex0->op == OP_CMPA_LE || dmex0->op == OP_CMPA_GE) { /* dmop0->mtype == MTYPE_RLOAD && (dmex0->op == OP_CMPA_LE || dmex0->op == OP_CMPA_GE) */
+	    if (dmex->op0 == OP_CMPA_LE || dmex->op0 == OP_CMPA_GE) { /* dmop0->mtype == MTYPE_RLOAD && (dmex->op0 == OP_CMPA_LE || dmex->op0 == OP_CMPA_GE) */
 	      //printf("MOP0 CMPA RLOAD\n");
 	      if (last_col < 2) {
 		printf("in %s: [%d][%d] mex0 should be located col>=2\n", id[current_prefix].name, last_row, last_col);
 		exit(1);
 	      }
-	      last_col_mex = 1; //★★★ last_col=3,2の場合,mop0のlast_col_mexは1固定でよい
-	      printf("dmex0.lmm moved from col%d to col%d ", last_col, last_col_mex);
+	      if (id[dmop0->toph].name != id[dmop1->toph].name) { /* lmm領域が異なる場合(Sparse matrix) */
+		last_col_mex = 1; //★★★ last_col=3,2の場合,mop0のlast_col_mexは1固定でよい
+	        printf("dmex0.lmm moved from col%d to col%d ", last_col, last_col_mex);
+	      }
+	      else { /* lmm領域が同じ場合(Merge sort) */
+	        printf("dmex0.lmm keep col%d ", last_col_mex);
+	      }
 	    }
-	    else if (last_col == 1 && dmop0->mtype == MTYPE_RSTORE && (dec[last_row][2].dmex0.op == OP_CMPA_LE || dec[last_row][2].dmex0.op == OP_CMPA_GE)) { /* store in load-cfma-store */
+	    else if (last_col == 1 && dmop0->mtype == MTYPE_RSTORE && (dec[last_row][2].dmex.op0 == OP_CMPA_LE || dec[last_row][2].dmex.op0 == OP_CMPA_GE)) { /* store in load-cfma-store */
 	      //printf("MOP0 CMPA RSTORE(load-cfms-store)\n");
 	      last_col_mex = 0; //★★★ last_col=1の場合,mop0のlast_col_mexは0固定でよい
 	    }
@@ -1854,9 +1873,9 @@ emit_emax6a(int mode) /* 0:array, 1:drain */
       conf[i][j].cdw1.cex_tab= dec[i][j].dcex.op ? dec[i][j].dcex.table : 0xffff; /* always true */
 
       /* mex0/mop0 */
-      conf[i][j].cdw0.mex0op   = dec[i][j].dmex0.op;
-      conf[i][j].cdw0.mex0init = dec[i][j].dmex0.init;
-      switch (id[dec[i][j].dmex0.disth].val) { /* distance 0:0, 1:1, 2:2, 3:4, 4:8, 5:16, 6:32, 7:64byte */
+      conf[i][j].cdw0.mex0op   = dec[i][j].dmex.op0;
+      conf[i][j].cdw0.mex0init = dec[i][j].dmex.init;
+      switch (id[dec[i][j].dmex.dist1h].val) { /* distance 0:0, 1:1, 2:2, 3:4, 4:8, 5:16, 6:32, 7:64byte */
       case  0: conf[i][j].cdw0.mex0dist = 0; break;
       case  1: conf[i][j].cdw0.mex0dist = 1; break;
       case  2: conf[i][j].cdw0.mex0dist = 2; break;
@@ -1866,27 +1885,47 @@ emit_emax6a(int mode) /* 0:array, 1:drain */
       case 32: conf[i][j].cdw0.mex0dist = 6; break;
       default: conf[i][j].cdw0.mex0dist = 7; break;
       }
+      if (dec[i][j].dmex.op0) {
+	switch (id[dec[i][j].dmex.limith].val) { /* limit 0:0, 1:8, 2:16, .... 10:4096, 11:8192, 12:16384, 13:32768 */
+	case     0: conf[i][j].cdw0.mexlimit = 0; break;
+	case     8: conf[i][j].cdw0.mexlimit = 1; break;
+	case    16: conf[i][j].cdw0.mexlimit = 2; break;
+	case    32: conf[i][j].cdw0.mexlimit = 3; break;
+	case    64: conf[i][j].cdw0.mexlimit = 4; break;
+	case   128: conf[i][j].cdw0.mexlimit = 5; break;
+	case   256: conf[i][j].cdw0.mexlimit = 6; break;
+	case   512: conf[i][j].cdw0.mexlimit = 7; break;
+	case  1024: conf[i][j].cdw0.mexlimit = 8; break;
+	case  2048: conf[i][j].cdw0.mexlimit = 9; break;
+	case  4096: conf[i][j].cdw0.mexlimit =10; break;
+	case  8192: conf[i][j].cdw0.mexlimit =11; break;
+	case 16384: conf[i][j].cdw0.mexlimit =12; break;
+	case 32768: conf[i][j].cdw0.mexlimit =13; break;
+	case 65536: conf[i][j].cdw0.mexlimit =14; break;
+	default:    conf[i][j].cdw0.mexlimit =15; break;
+	}
+      }
       /* mex0.mexdh and mop0.mopdh */
-      if (dec[i][j].dmex0.op && dec[i][j].dmex0.mexdh == dec[i][j].dmop0.baseh) {
+      if (dec[i][j].dmex.op0 && dec[i][j].dmex.mexd0h == dec[i][j].dmop0.baseh) {
 	printf("[%d][%d] detected dmex0.dst==mop0.base.", i, j);
 	                    dec[i][j].dmop0.updt  = 1;
-	regv[i][j].ea0b_v = dec[i][j].dmop0.basev = dec[i][j].dmex0.src1v; /* replace mop0.base to base in mex(&base0, INIT0?base:base0) */
-	regv[i][j].ea0b_h = dec[i][j].dmop0.baseh = dec[i][j].dmex0.src1h; /* replace mop0.base to base in mex(&base0, INIT0?base:base0) */
-	regv[i][j].ea0b_s = dec[i][j].dmop0.bases = dec[i][j].dmex0.src1s; /* replace mop0.base to base in mex(&base0, INIT0?base:base0) */
-	printf(" mop0 renamed from %s to %s\n", id[dec[i][j].dmex0.mexdh].name, id[dec[i][j].dmop0.baseh].name);
+	regv[i][j].ea0b_v = dec[i][j].dmop0.basev = dec[i][j].dmex.adr1v; /* replace mop0.base to base in mex(&base0, INIT0?base:base0) */
+	regv[i][j].ea0b_h = dec[i][j].dmop0.baseh = dec[i][j].dmex.adr1h; /* replace mop0.base to base in mex(&base0, INIT0?base:base0) */
+	regv[i][j].ea0b_s = dec[i][j].dmop0.bases = dec[i][j].dmex.adr1s; /* replace mop0.base to base in mex(&base0, INIT0?base:base0) */
+	printf(" mop0 renamed from %s to %s\n", id[dec[i][j].dmex.mexd0h].name, id[dec[i][j].dmop0.baseh].name);
       }
 
       /* ea[bo] depends on busmap[i][j].br[prev][] and decode[i][j].dmop.ex[123] */
       /* mapdist=0の場合,dmop0.op=OP_IM_PREFの可能性あり,比較対象外 */
-      conf[i][j].cdw1.ea0op    = dec[i][j].dmop0.op;
-      conf[i][j].cdw1.ea0bs    = ((!dec[i][j].dmop0.op||dec[i][j].dmop0.op==OP_IM_PREF )||bus[i][j].ea0brv?0:2)|(dec[i][j].dmop0.updt?1:0); /* 0:ea0br, 1:ea0dr(ea0br+self-loop), 2:eabbrs, 3:ea0dr(eabbrs+self-loop) */
-      conf[i][j].cdw1.ea0os  = (!dec[i][j].dmop0.op||dec[i][j].dmop0.op==OP_IM_PREF )||bus[i][j].ea0orv?0:1; /* 0:ea0or, 1:eaobrs */
+      conf[i][j].cdw1.ea0op  = dec[i][j].dmop0.op;
+      conf[i][j].cdw1.ea0bs  = ((!dec[i][j].dmop0.op||dec[i][j].dmop0.op==OP_IM_PREF )||bus[i][j].ea0brv?0:2)|(dec[i][j].dmop0.updt?1:0); /* 0:ea0br, 1:ea0dr(ea0br+self-loop), 2:eabbrs, 3:ea0dr(eabbrs+self-loop) */
+      conf[i][j].cdw1.ea0os  = ( !dec[i][j].dmop0.op||dec[i][j].dmop0.op==OP_IM_PREF )||bus[i][j].ea0orv?0:1; /* 0:ea0or, 1:eaobrs */
       conf[i][j].cdw1.ea0msk = dec[i][j].dmop0.offsm;
 
       /* mex1/mop1 */
-      conf[i][j].cdw0.mex1op   = dec[i][j].dmex1.op;
-      conf[i][j].cdw0.mex1init = dec[i][j].dmex1.init;
-      switch (id[dec[i][j].dmex1.disth].val) { /* distance 0:0, 1:1, 2:2, 3:4, 4:8, 5:16, 6:32, 7:64byte */
+      conf[i][j].cdw0.mex1op   = dec[i][j].dmex.op1;
+      conf[i][j].cdw0.mex1init = dec[i][j].dmex.init;
+      switch (id[dec[i][j].dmex.dist2h].val) { /* distance 0:0, 1:1, 2:2, 3:4, 4:8, 5:16, 6:32, 7:64byte */
       case  0: conf[i][j].cdw0.mex1dist = 0; break;
       case  1: conf[i][j].cdw0.mex1dist = 1; break;
       case  2: conf[i][j].cdw0.mex1dist = 2; break;
@@ -1896,14 +1935,34 @@ emit_emax6a(int mode) /* 0:array, 1:drain */
       case 32: conf[i][j].cdw0.mex1dist = 6; break;
       default: conf[i][j].cdw0.mex1dist = 7; break;
       }
+      if (dec[i][j].dmex.op1) {
+	switch (id[dec[i][j].dmex.limith].val) { /* limit 0:0, 1:8, 2:16, .... 10:4096, 11:8192, 12:16384, 13:32768 */
+	case     0: conf[i][j].cdw0.mexlimit = 0; break;
+	case     8: conf[i][j].cdw0.mexlimit = 1; break;
+	case    16: conf[i][j].cdw0.mexlimit = 2; break;
+	case    32: conf[i][j].cdw0.mexlimit = 3; break;
+	case    64: conf[i][j].cdw0.mexlimit = 4; break;
+	case   128: conf[i][j].cdw0.mexlimit = 5; break;
+	case   256: conf[i][j].cdw0.mexlimit = 6; break;
+	case   512: conf[i][j].cdw0.mexlimit = 7; break;
+	case  1024: conf[i][j].cdw0.mexlimit = 8; break;
+	case  2048: conf[i][j].cdw0.mexlimit = 9; break;
+	case  4096: conf[i][j].cdw0.mexlimit =10; break;
+	case  8192: conf[i][j].cdw0.mexlimit =11; break;
+	case 16384: conf[i][j].cdw0.mexlimit =12; break;
+	case 32768: conf[i][j].cdw0.mexlimit =13; break;
+	case 65536: conf[i][j].cdw0.mexlimit =14; break;
+	default:    conf[i][j].cdw0.mexlimit =15; break;
+	}
+      }
       /* mex1.mexdh and mop1.mopdh */
-      if (dec[i][j].dmex1.op && dec[i][j].dmex1.mexdh == dec[i][j].dmop1.baseh) {
+      if (dec[i][j].dmex.op1 && dec[i][j].dmex.mexd1h == dec[i][j].dmop1.baseh) {
 	printf("[%d][%d] detected dmex1.dst==mop1.base.", i, j);
 	                    dec[i][j].dmop1.updt  = 1;
-	regv[i][j].ea1b_v = dec[i][j].dmop1.basev = dec[i][j].dmex1.src1v; /* replace mop1.base to base in mex(&base0, INIT0?base:base0) */
-	regv[i][j].ea1b_h = dec[i][j].dmop1.baseh = dec[i][j].dmex1.src1h; /* replace mop1.base to base in mex(&base0, INIT0?base:base0) */
-	regv[i][j].ea1b_s = dec[i][j].dmop1.bases = dec[i][j].dmex1.src1s; /* replace mop1.base to base in mex(&base0, INIT0?base:base0) */
-	printf(" mop1 renamed from %s to %s\n", id[dec[i][j].dmex1.mexdh].name, id[dec[i][j].dmop1.baseh].name);
+	regv[i][j].ea1b_v = dec[i][j].dmop1.basev = dec[i][j].dmex.adr3v; /* replace mop1.base to base in mex(&base0, INIT0?base:base0) */
+	regv[i][j].ea1b_h = dec[i][j].dmop1.baseh = dec[i][j].dmex.adr3h; /* replace mop1.base to base in mex(&base0, INIT0?base:base0) */
+	regv[i][j].ea1b_s = dec[i][j].dmop1.bases = dec[i][j].dmex.adr3s; /* replace mop1.base to base in mex(&base0, INIT0?base:base0) */
+	printf(" mop1 renamed from %s to %s\n", id[dec[i][j].dmex.mexd1h].name, id[dec[i][j].dmop1.baseh].name);
       }
 
       /* ea[bo] depends on busmap[i][j].br[prev][] and decode[i][j].dmop.ex[123] */
@@ -1913,7 +1972,7 @@ emit_emax6a(int mode) /* 0:array, 1:drain */
       else
         conf[i][j].cdw1.ea1op = dec[i][j].dmop1.op;
       conf[i][j].cdw1.ea1bs  = ((!dec[i][j].dmop1.op||dec[i][j].dmop1.op==OP_IM_DRAIN)||bus[i][j].ea1brv?0:2)|(dec[i][j].dmop1.updt?1:0); /* 0:ea1br, 1:ea1dr(ea1br+self-loop), 2:eabbrs, 3:ea1dr(eabbrs+self-loop) */
-      conf[i][j].cdw1.ea1os  = (!dec[i][j].dmop1.op||dec[i][j].dmop1.op==OP_IM_DRAIN)||bus[i][j].ea1orv?0:1; /* 0:ea1or, 1:eaobrs */
+      conf[i][j].cdw1.ea1os  = ( !dec[i][j].dmop1.op||dec[i][j].dmop1.op==OP_IM_DRAIN)||bus[i][j].ea1orv?0:1; /* 0:ea1or, 1:eaobrs */
       conf[i][j].cdw1.ea1msk = dec[i][j].dmop1.offsm;
 
       //printf("conf[%d][%d]: mex0=%d.%d.%d mex1=%d.%d.%d\n", i, j, conf[i][j].cdw0.mex0op, conf[i][j].cdw0.mex0init, conf[i][j].cdw0.mex0dist, conf[i][j].cdw0.mex1op, conf[i][j].cdw0.mex1init, conf[i][j].cdw0.mex1dist);
@@ -2698,7 +2757,7 @@ emit_emax6a(int mode) /* 0:array, 1:drain */
     }
 
     for (j=0; j<EMAX_WIDTH; j++) {
-      fprintf(s2fil, "{ Ull base, offs, adr, mexdist, load64;\n");
+      fprintf(s2fil, "{ Ull base, offs, adr, mexdist, mexlimit, load64;\n");
       fprintf(s2fil, "  static int emax6_unaligned_load_valid;\n");
       fprintf(s2fil, "  static Ull emax6_unaligned_load_high;\n");
       /*********************************************************************************************************/
@@ -2713,6 +2772,11 @@ emit_emax6a(int mode) /* 0:array, 1:drain */
 	fprintf(s2fil, "mexdist = INIT0[CHIP] ? 0 : %d;\n", conf[i][j].cdw0.mex1dist==0? 0: conf[i][j].cdw0.mex1dist==1? 1: conf[i][j].cdw0.mex1dist==2? 2:
                                                             conf[i][j].cdw0.mex1dist==3? 4: conf[i][j].cdw0.mex1dist==4? 8: conf[i][j].cdw0.mex1dist==5?16:
                                                             conf[i][j].cdw0.mex1dist==6?32:64);
+	fprintf(s2fil, "mexlimit = %d;\n", conf[i][j].cdw0.mexlimit== 0?    0: conf[i][j].cdw0.mexlimit== 1?    8: conf[i][j].cdw0.mexlimit== 2?    16:
+                                           conf[i][j].cdw0.mexlimit== 3?   32: conf[i][j].cdw0.mexlimit== 4?   64: conf[i][j].cdw0.mexlimit== 5?   128:
+                                           conf[i][j].cdw0.mexlimit== 6?  256: conf[i][j].cdw0.mexlimit== 7?  512: conf[i][j].cdw0.mexlimit== 8?  1024:
+                                           conf[i][j].cdw0.mexlimit== 9? 2048: conf[i][j].cdw0.mexlimit==10? 4096: conf[i][j].cdw0.mexlimit==11?  8192:
+                                           conf[i][j].cdw0.mexlimit==12?16384: conf[i][j].cdw0.mexlimit==13?32768: conf[i][j].cdw0.mexlimit==14? 65536:131072);
 	switch (conf[i][j].cdw0.mex1op) {
 	case OP_NOP:
 	  fprintf(s2fil, "awoo1[CHIP][%d] = (Ull)(INIT0[CHIP]?base:awoo1[CHIP][%d]);\n", j, j);
@@ -2721,10 +2785,10 @@ emit_emax6a(int mode) /* 0:array, 1:drain */
 	  fprintf(s2fil, "awoo1[CHIP][%d] = (Ull)(INIT0[CHIP]?base:awoo1[CHIP][%d])+(INIT0[CHIP]?0:mexdist);\n", j, j);
 	  break;
 	case OP_CMPA_LE:
-	  fprintf(s2fil, "awoo1[CHIP][%d] = (Ull)(INIT0[CHIP]?base:awoo1[CHIP][%d])+(INIT0[CHIP]?0:((mexd0[CHIP][%d]>>32)!=0xffffffff && (mexd1[CHIP][%d]>>32)<=(mexd0[CHIP][%d]>>32))?mexdist:0);\n", j, j, j, j, j);
+	  fprintf(s2fil, "if (!mexlimit) awoo1[CHIP][%d] = (Ull)(INIT0[CHIP]?base:awoo1[CHIP][%d])+(INIT0[CHIP]?0:((mexd1[CHIP][%d]>>32)!=0xffffffff && (mexd1[CHIP][%d]>>32)<=(mexd0[CHIP][%d]>>32))?mexdist:0);\n", j, j, j, j, j);
 	  break;
 	case OP_CMPA_GE:
-	  fprintf(s2fil, "awoo1[CHIP][%d] = (Ull)(INIT0[CHIP]?base:awoo1[CHIP][%d])+(INIT0[CHIP]?0:((mexd1[CHIP][%d]>>32)!=0xffffffff && (mexd1[CHIP][%d]>>32)>=(mexd0[CHIP][%d]>>32))?mexdist:0);\n", j, j, j, j, j);
+	  fprintf(s2fil, "if (!mexlimit) awoo1[CHIP][%d] = (Ull)(INIT0[CHIP]?base:awoo1[CHIP][%d])+(INIT0[CHIP]?0:((mexd0[CHIP][%d]>>32)!=0xffffffff && (mexd1[CHIP][%d]>>32)>=(mexd0[CHIP][%d]>>32))?mexdist:0);\n", j, j, j, j, j);
 	  break;
 	default:
 	  printf("EMAXSC:undefined conf[%d][%d].mex1op=%d\n", i, j, conf[i][j].cdw0.mex1op);
@@ -2782,6 +2846,11 @@ emit_emax6a(int mode) /* 0:array, 1:drain */
 	fprintf(s2fil, "mexdist = INIT0[CHIP] ? 0 : %d;\n", conf[i][j].cdw0.mex0dist==0? 0: conf[i][j].cdw0.mex0dist==1? 1: conf[i][j].cdw0.mex0dist==2? 2:
                                                             conf[i][j].cdw0.mex0dist==3? 4: conf[i][j].cdw0.mex0dist==4? 8: conf[i][j].cdw0.mex0dist==5?16:
                                                             conf[i][j].cdw0.mex0dist==6?32:64);
+	fprintf(s2fil, "mexlimit = %d;\n", conf[i][j].cdw0.mexlimit== 0?    0: conf[i][j].cdw0.mexlimit== 1?    8: conf[i][j].cdw0.mexlimit== 2?    16:
+                                           conf[i][j].cdw0.mexlimit== 3?   32: conf[i][j].cdw0.mexlimit== 4?   64: conf[i][j].cdw0.mexlimit== 5?   128:
+                                           conf[i][j].cdw0.mexlimit== 6?  256: conf[i][j].cdw0.mexlimit== 7?  512: conf[i][j].cdw0.mexlimit== 8?  1024:
+                                           conf[i][j].cdw0.mexlimit== 9? 2048: conf[i][j].cdw0.mexlimit==10? 4096: conf[i][j].cdw0.mexlimit==11?  8192:
+                                           conf[i][j].cdw0.mexlimit==12?16384: conf[i][j].cdw0.mexlimit==13?32768: conf[i][j].cdw0.mexlimit==14? 65536:131072);
 	switch (conf[i][j].cdw0.mex0op) {
 	case OP_NOP:
 	  fprintf(s2fil, "awoo0[CHIP][%d] = (Ull)(INIT0[CHIP]?base:awoo0[CHIP][%d]);\n", j, j);
@@ -2790,10 +2859,10 @@ emit_emax6a(int mode) /* 0:array, 1:drain */
 	  fprintf(s2fil, "awoo0[CHIP][%d] = (Ull)(INIT0[CHIP]?base:awoo0[CHIP][%d])+(INIT0[CHIP]?0:mexdist);\n", j, j);
 	  break;
 	case OP_CMPA_LE:
-	  fprintf(s2fil, "awoo0[CHIP][%d] = (Ull)(INIT0[CHIP]?base:awoo0[CHIP][%d])+(INIT0[CHIP]?0:((mexd0[CHIP][%d]>>32)!=0xffffffff && (mexd1[CHIP][%d]>>32)<=(mexd0[CHIP][%d]>>32))?mexdist:0);\n", j, j, j, j, j);
+	  fprintf(s2fil, "if (!mexlimit) awoo0[CHIP][%d] = (Ull)(INIT0[CHIP]?base:awoo0[CHIP][%d])+(INIT0[CHIP]?0:((mexd1[CHIP][%d]>>32)!=0xffffffff && (mexd1[CHIP][%d]>>32)<=(mexd0[CHIP][%d]>>32))?mexdist:0);\n", j, j, j, j, j);
 	  break;
 	case OP_CMPA_GE:
-	  fprintf(s2fil, "awoo0[CHIP][%d] = (Ull)(INIT0[CHIP]?base:awoo0[CHIP][%d])+(INIT0[CHIP]?0:((mexd1[CHIP][%d]>>32)!=0xffffffff && (mexd1[CHIP][%d]>>32)>=(mexd0[CHIP][%d]>>32))?mexdist:0);\n", j, j, j, j, j);
+	  fprintf(s2fil, "if (!mexlimit) awoo0[CHIP][%d] = (Ull)(INIT0[CHIP]?base:awoo0[CHIP][%d])+(INIT0[CHIP]?0:((mexd0[CHIP][%d]>>32)!=0xffffffff && (mexd1[CHIP][%d]>>32)>=(mexd0[CHIP][%d]>>32))?mexdist:0);\n", j, j, j, j, j);
 	  break;
 	default:
 	  printf("EMAXSC:undefined conf[%d][%d].mex0op=%d\n", i, j, conf[i][j].cdw0.mex0op);
@@ -3323,9 +3392,9 @@ emit_emax6a(int mode) /* 0:array, 1:drain */
   /*                                                             **range_bitmap[c-dist]=1                  p              */
   for (i=0; i<EMAX_DEPTH; i++) {
     for (j=0; j<EMAX_WIDTH; j++) {
-      if (lmmi[i][j].v & ~lmmi[i][j].hcopy & ~lmmi[i][j].vcopy) {
+      if (lmmi[i][j].v && !(lmmx[i][j].lenv == T_IMMEDIATE && lmmi[i][j].len==0xffff) && !lmmi[i][j].hcopy && !lmmi[i][j].vcopy) {
         lmmi_bitmap[j] |= (1LL<<i);
-	if (lmmi_first_loc == -1 && ~lmmi[i][j].rw && !lmmi[i][j].p) /* lmrとlmfの場合,DYNAMIC_SCONの基準位置として記憶 */
+	if (lmmi_first_loc == -1 && !lmmi[i][j].rw && !lmmi[i][j].p) /* lmrとlmfの場合,DYNAMIC_SCONの基準位置として記憶 */
 	  lmmi_first_loc = i*EMAX_WIDTH+j;
 	if (current_mapdist && lmmi[i][j].rw && !lmmi[i][j].p) /* lmwとlmxの場合,emax6_check_lmmi_and_dma()のためにmarkが必要 */
 	  lmmi_bitmap[j] |= (1LL<<(i-current_mapdist));
@@ -3354,7 +3423,7 @@ emit_emax6a(int mode) /* 0:array, 1:drain */
 	  fprintf(ofile, "\temax6.lmmi[0][%d][%d][emax6.lmmic].top = %s;\n", i, j, (char*)lmmi[i][j].top);
 	}
       }
-      if (lmmi[i][j].v & ~lmmi[i][j].hcopy) {
+      if (lmmi[i][j].v && !(lmmx[i][j].lenv == T_IMMEDIATE && lmmi[i][j].len==0xffff) && !lmmi[i][j].hcopy) {
         range_bitmap[j] |= (1LL<<i);
 	if (current_mapdist && lmmi[i][j].rw && !lmmi[i][j].p) /* lmwとlmxの場合,emax6_check_lmmi_and_dma()のためにmarkが必要 */
 	  range_bitmap[j] |= (1LL<<(i-current_mapdist));
@@ -3427,8 +3496,16 @@ mode_drain_dirty_lmm:
   /* conf */
   fprintf(ofile, "\tif (emax6.last_conf != emax6_conf_%s) {\n", id[current_prefix].name);
   fprintf(ofile, "\t  Dll *dst, *src;\n");
-  fprintf(ofile, "\t  int i,j;\n");
+  fprintf(ofile, "\t  int i,j,hard_stat,hard_depth;\n");
   fprintf(ofile, "\t  emax6.status = STATUS_CONF;\n");
+#if 1
+  fprintf(ofile, "\t  hard_stat  = ((struct reg_ctrl*)emax6.reg_ctrl)->i[0].stat>>8 & 0xffffff0f;\n");
+  fprintf(ofile, "\t  hard_depth = (hard_stat==3)?64:(hard_stat==2)?32:(hard_stat==1)?16:8;\n");
+  fprintf(ofile, "\t  if (hard_depth != %d) {\n", EMAX_DEPTH);
+  fprintf(ofile, "\t    printf(\"EMAX_DEPTH mismatch in emax6_conf_%s. hard_depth=%%d code_depth=%d\\n\", hard_depth);\n", id[current_prefix].name, EMAX_DEPTH);
+  fprintf(ofile, "\t    exit(1);\n");
+  fprintf(ofile, "\t  }\n");
+#endif
   fprintf(ofile, "\t  emax6.last_conf = emax6_conf_%s;\n", id[current_prefix].name);
   fprintf(ofile, "\t  emax6.lastdist = 0;\n");
   fprintf(ofile, "\t  dst = (Dll*)(((struct reg_ctrl*)emax6.reg_ctrl)->i[0].conf);\n");
@@ -3720,9 +3797,6 @@ mode_drain_dirty_lmm:
 
   fprintf(ofile, "\tget_nanosec(NANOS_LOAD);\n");/*=================================*/
 
-  /* exec */
-  fprintf(ofile, "\t((struct reg_ctrl*)emax6.reg_ctrl)->i[0].cmd = 3LL; // EXEC\n");
-
   /* confは1wayあたり,32B*16行=0.5KB,32B*64行=2KB(最大). 4way分連続にするには,16行で2KB,64行で8KBアラインが必要. ZYNQのpage-sizeが8KB以上であればOK */
 
   /* EXEC中●lmmi指示ルール (copy from conv-c2c/emac5.c)                                                            lmmi-loc  v  top  blk  len  rw  f  p */
@@ -3743,17 +3817,25 @@ mode_drain_dirty_lmm:
   fprintf(ofile, "\t Uint            lmmic     = emax6.lmmic;\n");
   for (i=0; i<EMAX_DEPTH; i++) {
     for (j=0; j<EMAX_WIDTH; j++) {
-      if (lmmi_bitmap[j] & (1LL<<i) && lmmi[i][j].ofs) {
+      if (range_bitmap[j] & (1LL<<i) && lmmi[i][j].ofs) {
+	int source_i;
+	if (lmmi_bitmap[j] & (1LL<<i))
+	  source_i = i;
+	else
+	  source_i = range_link[i][j];
 	if (lmmi[i][j].cidx) { /* NCHIP間でlmm_topが異なる場合 */
 	  for (c=0; c<current_nchip; c++)
-	    fprintf(ofile, "\t*(Ull*)&(reg_ctrl->i[%d].addr[%d][%d].top) = ((Ull)(emax6.lmmi[%d][%d][%d][lmmic].top+emax6.lmmi[%d][%d][%d][lmmic].ofs+*((Ushort*)&emax6.lmmi[%d][%d][%d][lmmic]+1)*sizeof(Uint)+(sizeof(Uint)-1))<<32) | (Ull)(Uint)(emax6.lmmi[%d][%d][%d][lmmic].top+emax6.lmmi[%d][%d][%d][lmmic].ofs);\n", c, i, j, c, i, j, c, i, j, c, i, j, c, i, j, c, i, j);
+	    fprintf(ofile, "\t*(Ull*)&(reg_ctrl->i[%d].addr[%d][%d].top) = ((Ull)(emax6.lmmi[%d][%d][%d][lmmic].top+emax6.lmmi[%d][%d][%d][lmmic].ofs+*((Ushort*)&emax6.lmmi[%d][%d][%d][lmmic]+1)*sizeof(Uint)+(sizeof(Uint)-1))<<32) | (Ull)(Uint)(emax6.lmmi[%d][%d][%d][lmmic].top+emax6.lmmi[%d][%d][%d][lmmic].ofs);\n", c, i, j, c, source_i, j, c, source_i, j, c, source_i, j, c, source_i, j, c, source_i, j);
 	}
 	else /* NCHIP間でlmm_topが共通の場合 */
-	  fprintf(ofile, "\t*(Ull*)&(reg_ctrl->i[0].addr[%d][%d].top) = ((Ull)(emax6.lmmi[0][%d][%d][lmmic].top+emax6.lmmi[0][%d][%d][lmmic].ofs+*((Ushort*)&emax6.lmmi[0][%d][%d][lmmic]+1)*sizeof(Uint)+(sizeof(Uint)-1))<<32) | (Ull)(Uint)(emax6.lmmi[0][%d][%d][lmmic].top+emax6.lmmi[0][%d][%d][lmmic].ofs);\n", i, j, i, j, i, j, i, j, i, j, i, j);
+	  fprintf(ofile, "\t*(Ull*)&(reg_ctrl->i[0].addr[%d][%d].top) = ((Ull)(emax6.lmmi[0][%d][%d][lmmic].top+emax6.lmmi[0][%d][%d][lmmic].ofs+*((Ushort*)&emax6.lmmi[0][%d][%d][lmmic]+1)*sizeof(Uint)+(sizeof(Uint)-1))<<32) | (Ull)(Uint)(emax6.lmmi[0][%d][%d][lmmic].top+emax6.lmmi[0][%d][%d][lmmic].ofs);\n", i, j, source_i, j, source_i, j, source_i, j, source_i, j, source_i, j);
       }
     }
   }
   fprintf(ofile, "\t}\n");
+
+  /* exec */
+  fprintf(ofile, "\t((struct reg_ctrl*)emax6.reg_ctrl)->i[0].cmd = 3LL; // EXEC\n");
 
   /* ■■■dma(pdrain) */
   /* ■■■dma(pload) */
@@ -3937,6 +4019,18 @@ get_valid_row(int insn_type, int mid, int src_type, int src_hash, char *rdep)
         }
       }
       break;
+    case ITYPE_MEX:
+      if (insn_type == ITYPE_MO4 ||  insn_type == ITYPE_MOP) { /* 後続命令タイプ MO4 || MOP */
+	if (*rdep < id[src_hash].row) /* loc of new_insn < loc of dst_reg */
+	  *rdep = id[src_hash].row; /* same row ★EXE+MOPの組合せは同一UNIT収容可能 */
+      }
+      else {
+        if (id[src_hash].row >= 0) { /* if defined as dst in EMAX */
+          if (*rdep <= id[src_hash].row) /* loc of new_insn < loc of dst_reg */
+            *rdep = id[src_hash].row+1; /* next row */
+        }
+      }
+      break;
     case ITYPE_MO4:
     case ITYPE_MOP:
       if (id[src_hash].row >= 0) { /* if defined as dst in EMAX */
@@ -3953,7 +4047,7 @@ get_valid_row(int insn_type, int mid, int src_type, int src_hash, char *rdep)
 set_reg_path(int last_row, int last_col, int folding, int insn_type, int reg_type, int reg_loc, int src_type, int src_hash, int src_sidx)
      /* last_row:  配置先行位置 */
      /* last_col:  配置先列位置 */
-     /* insn_type: 命令種別     ITYPE_WHILE, ITYPE_FOR, ITYPE_CEX, ITYPE_EX4, ITYPE_EXE, ITYPE_MO4, ITYPE_MOP */
+     /* insn_type: 命令種別     ITYPE_WHILE, ITYPE_FOR, ITYPE_CEX, ITYPE_EX4, ITYPE_EXE, ITYPE_MEX, ITYPE_MO4, ITYPE_MOP */
      /* reg_type:  ITYPE_MEX/ITYPE_MO4/ITYPE_MOPの場合のみ有効: レジスタ種別 RTYPE_DATA, RTYPE_BASE, RTYPE_OFFS */
      /* reg_loc:   ITYPE_MEX/ITYPE_MO4/ITYPE_MOPの場合のみ有効: MO4/MOPのbase/offsの位置 0:mop0, 1:mop1 */
      /* src_type:  T_NONE, T_IMMEDIATE, T_EXRNO, T_ALRNO, T_BDRNO, T_INITNO, T_LOOPNO, T_VARIABLE */
@@ -4123,6 +4217,45 @@ set_reg_path(int last_row, int last_col, int folding, int insn_type, int reg_typ
         }
         printf("in %s: [%d][%d] cannot find BR[2] for %s (BR[2] is occupied by %s)\n", id[current_prefix].name, last_row, last_col, id[src_hash].name, id[bus[h][j].br[2].h].name);
         exit(1);
+      }
+      else if (id[src_hash].itype == ITYPE_MEX) { /* 変数がMEXのea0woofs/ea1woofs出力の場合，各々BR[3],BR[2]に接続 */
+        j = id[src_hash].col;
+        if (j<0)        /* exe->&VARの場合,j=last_colがセットされている */
+          j = src_sidx; /* exe->VAR[c],AR[r][c]をバラで使う場合,j=-1がセットされている */
+        if (bus[h][j].ea0woofsv==src_type && bus[h][j].ea0woofsh==src_hash) {
+	  //printf("------ea0woofs h=%d j=%d name=%s | v=%d srctype=%d h=%d srchash=%d s=%d srcidx=%d\n", h, j, id[src_hash].name, bus[h][j].br[2].v, src_type, bus[h][j].br[2].h, src_hash, bus[h][j].br[2].s, src_sidx);
+	  if (bus[h][j].br[2].v==src_type && bus[h][j].br[2].h==src_hash && bus[h][j].br[2].s==src_sidx) /* already set */
+	    goto srp_ar_br_ready; /* found & proceed */
+	  /* find empty BR[2] */
+	  if (!bus[h][j].br[2].v) { /* empty BR[2] found */
+	    bus[h][j].br[2].v = src_type;
+	    bus[h][j].br[2].h = src_hash;
+	    bus[h][j].br[2].s = src_sidx;
+	    conf[h][j].cdw2.brs2 = 3; /* 3:exdr(brs3=3の場合,ea0woofsに接続) */
+	    goto srp_ar_br_ready; /* found & proceed */
+	  }
+	  printf("in %s: [%d][%d] cannot find BR[2] for %s (BR[2] is occupied by %s)\n", id[current_prefix].name, last_row, last_col, id[src_hash].name, id[bus[h][j].br[2].h].name);
+	  exit(1);
+	}
+        else if (bus[h][j].ea1woofsv==src_type && bus[h][j].ea1woofsh==src_hash) {
+	  //printf("------ea1woofs h=%d j=%d name=%s | v=%d srctype=%d h=%d srchash=%d s=%d srcidx=%d\n", h, j, id[src_hash].name, bus[h][j].br[3].v, src_type, bus[h][j].br[3].h, src_hash, bus[h][j].br[3].s, src_sidx);
+	  if (bus[h][j].br[3].v==src_type && bus[h][j].br[3].h==src_hash && bus[h][j].br[3].s==src_sidx) /* already set */
+	    goto srp_ar_br_ready; /* found & proceed */
+	  /* find empty BR[3] */
+	  if (!bus[h][j].br[3].v) { /* empty BR[3] found */
+	    bus[h][j].br[3].v = src_type;
+	    bus[h][j].br[3].h = src_hash;
+	    bus[h][j].br[3].s = src_sidx;
+	    conf[h][j].cdw2.brs3 = 3; /* 3:ea1woofs */
+	    goto srp_ar_br_ready; /* found & proceed */
+	  }
+	  printf("in %s: [%d][%d] cannot find BR[3] for %s (BR[3] is occupied by %s)\n", id[current_prefix].name, last_row, last_col, id[src_hash].name, id[bus[h][j].br[3].h].name);
+	  exit(1);
+	}
+	else {
+	  printf("in %s: [%d][%d] cannot find MEX ea0woofs/ea1woofs for %s)\n", id[current_prefix].name, last_row, last_col, id[src_hash].name);
+	  exit(1);
+	}
       }
     }
 srp_ar_br_ready:
@@ -4452,10 +4585,10 @@ emit_tgif(int i, int j)
            conf[i][j].cdw1.ea0msk,  /*:  4; 14:64bit, 13:word1, 12:word0, 11-8:half3-0, 7-0:byte7-0 of offset */
            conf[i][j].cdw1.eabbrs,  /*:  4; 0:br0_0, 1:br0_1, ... 15:3_3 */
            conf[i][j].cdw1.eaobrs,  /*:  4; 0:br0_0, 1:br0_1, ... 15:3_3 */
-	   conf[i][j].cdw0.mex0op,  /* mex(sparse matrix) conditional 0:NOP, 1:AL, 2:OP_CMPA_LE, 3:GE */
+	   conf[i][j].cdw0.mex0op,  /* mex(sparse matrix) conditional 0:NOP, 1:AL, 2:OP_CMPA_LE, 3:OP_CMPA_GE */
 	   conf[i][j].cdw0.mex0init,/* mex(sparse matrix) 0:none, 1:INIT0? */
-	   conf[i][j].cdw0.mex0dist /* distance 0:0, 1:1, 2:2, 3:4, 4:8, 5:16, 6:32, 7:64byte */
-
+	   conf[i][j].cdw0.mex0dist,/* distance 0:0, 1:1, 2:2, 3:4, 4:8, 5:16, 6:32, 7:64byte */
+	   conf[i][j].cdw0.mexlimit /* limit 0:0, 1:8, 2:16, .... 10:4096, 11:8192, 12:16384, 13:32768 */
            );
 
   draw_ea1(e1b_x, e1b_y,
@@ -4465,9 +4598,10 @@ emit_tgif(int i, int j)
            conf[i][j].cdw1.ea1msk,  /*:  4; 14:64bit, 13:word1, 12:word0, 11-8:half3-0, 7-0:byte7-0 of offset */
            conf[i][j].cdw1.eabbrs,  /*:  4; 0:br0_0, 1:br0_1, ... 15:3_3 */
            conf[i][j].cdw1.eaobrs,  /*:  4; 0:br0_0, 1:br0_1, ... 15:3_3 */
-	   conf[i][j].cdw0.mex1op,  /* mex(sparse matrix) conditional 0:NOP, 1:AL, 2:OP_CMPA_LE, 3:GE */
+	   conf[i][j].cdw0.mex1op,  /* mex(sparse matrix) conditional 0:NOP, 1:AL, 2:OP_CMPA_LE, 3:OP_CMPA_GE */
 	   conf[i][j].cdw0.mex1init,/* mex(sparse matrix) 0:none, 1:INIT0? */
-	   conf[i][j].cdw0.mex1dist /* distance 0:0, 1:1, 2:2, 3:4, 4:8, 5:16, 6:32, 7:64byte */
+	   conf[i][j].cdw0.mex1dist,/* distance 0:0, 1:1, 2:2, 3:4, 4:8, 5:16, 6:32, 7:64byte */
+	   conf[i][j].cdw0.mexlimit /* limit 0:0, 1:8, 2:16, .... 10:4096, 11:8192, 12:16384, 13:32768 */
            );
 
   draw_trx(trb_x, trb_y,
@@ -4486,13 +4620,17 @@ emit_tgif(int i, int j)
            );
 
   draw_lmx(lmb_x, lmb_y,
-	   lmmi[i][j].v,            /*:  1; valid */
-           conf[i][j].cdw1.ea0op,   /*:  5; mem_opcd */
-           conf[i][j].cdw2.mwsa,    /*:  1; 0:lmwa,  1:ea0d        */
-           conf[i][j].cdw2.mws0,    /*:  2; 0:lmwd0, 1:exdr, 2:ts0 */
-           conf[i][j].cdw2.mws1,    /*:  2; 0:lmwd1, 1:exdr, 2:ts1 */
-           conf[i][j].cdw2.mws2,    /*:  2; 0:lmwd2, 1:exdr, 2:ts2 */
-           conf[i][j].cdw2.mws3,    /*:  2; 0:lmwd3, 1:exdr, 2:ts3 */
+	   lmmi[i][j].v,           /*:  1; valid */
+           conf[i][j].cdw1.ea0op,  /*:  5; mem_opcd */
+           conf[i][j].cdw2.mwsa,   /*:  1; 0:lmwa,  1:ea0d        */
+           conf[i][j].cdw2.mws0,   /*:  2; 0:lmwd0, 1:exdr, 2:ts0 */
+           conf[i][j].cdw2.mws1,   /*:  2; 0:lmwd1, 1:exdr, 2:ts1 */
+           conf[i][j].cdw2.mws2,   /*:  2; 0:lmwd2, 1:exdr, 2:ts2 */
+           conf[i][j].cdw2.mws3,   /*:  2; 0:lmwd3, 1:exdr, 2:ts3 */
+           conf[i][j].cdw2.ts0,
+           conf[i][j].cdw2.ts1,
+           conf[i][j].cdw2.ts2,
+           conf[i][j].cdw2.ts3,
            conf[i][j].cdw2.lmm_mode,/*:  2; 0:無効, 1:分割無, 2:2分割, 3:4分割 */
            lmmi[i][j].top
            );
@@ -4877,7 +5015,7 @@ draw_cex(int cxb_x, int cxb_y,
     col=0; /*black*/
     thi=1;
   }
-  draw_arrow(cxb_x,    cxb_y-160+cs0*5+10, cxb_x,    cxb_y-5,  thi, col);
+  draw_arrow(cxb_x+30, cxb_y-160+cs0*5+10, cxb_x+30, cxb_y-5,  thi, col);
   /* SRC2 */
   if (cex_tab != 0xffff) {
     col=2; /*green*/
@@ -4887,7 +5025,7 @@ draw_cex(int cxb_x, int cxb_y,
     col=0; /*black*/
     thi=1;
   }
-  draw_arrow(cxb_x+10, cxb_y-160+cs1*5+10, cxb_x+10, cxb_y-5, thi, col);
+  draw_arrow(cxb_x+20, cxb_y-160+cs1*5+10, cxb_x+20, cxb_y-5, thi, col);
   /* SRC3 */
   if (cex_tab != 0xffff) {
     col=2; /*green*/
@@ -4897,7 +5035,7 @@ draw_cex(int cxb_x, int cxb_y,
     col=0; /*black*/
     thi=1;
   }
-  draw_arrow(cxb_x+20, cxb_y-160+cs2*5+10, cxb_x+20, cxb_y-5, thi, col);
+  draw_arrow(cxb_x+10, cxb_y-160+cs2*5+10, cxb_x+10, cxb_y-5, thi, col);
   /* SRC4 */
   if (cex_tab != 0xffff) {
     col=2; /*green*/
@@ -4907,7 +5045,7 @@ draw_cex(int cxb_x, int cxb_y,
     col=0; /*black*/
     thi=1;
   }
-  draw_arrow(cxb_x+30, cxb_y-160+cs3*5+10, cxb_x+30, cxb_y-5, thi, col);
+  draw_arrow(cxb_x+0,  cxb_y-160+cs3*5+10, cxb_x+0,  cxb_y-5, thi, col);
 }
 
 draw_ea0(int e0b_x, int e0b_y,
@@ -4919,17 +5057,22 @@ draw_ea0(int e0b_x, int e0b_y,
          int eaobrs, /*:  4; 0:br0_0, 1:br0_1, ... 15:3_3 */
 	 int mex0op,
 	 int mex0init,
-	 int mex0dist
+	 int mex0dist,
+	 int mexlimit
          )
 {
-#define E0LABELMAX 30
+#define E0LABELMAX 80
   char opcd[E0LABELMAX];
   int col, thi;
   int ea0singleload = (ea0op && (ea0op <= OP_LDBR));
 
   /* EA0 */
-  if (ea0op) {
+  if (ea0op&0x10) {
     col=1; /*red*/
+    thi=3;
+  }
+  else if (ea0op) {
+    col=4; /*blue*/
     thi=3;
   }
   else {
@@ -5007,7 +5150,7 @@ draw_ea0(int e0b_x, int e0b_y,
   }
   draw_line (e0b_x+65, e0b_y+360,             e0b_x+80, e0b_y+360,     thi, col);
   draw_arrow(e0b_x+65, e0b_y+360,             e0b_x+65, e0b_y-40,      thi, col);
-  snprintf(opcd, E0LABELMAX, "%s-%d-%d", mex0op==OP_ALWAYS?"AL":mex0op==OP_CMPA_LE?"LE":mex0op==OP_CMPA_GE?"GE":"NA", mex0init, mex0dist);
+  snprintf(opcd, E0LABELMAX, "%s-%d-%d-%d", mex0op==OP_ALWAYS?"AL":mex0op==OP_CMPA_LE?"LE":mex0op==OP_CMPA_GE?"GE":"NA", mex0init, mex0dist, mexlimit);
   draw_text(e0b_x+30, e0b_y-40, opcd, 1, 0);
 
   /* SRC2 */
@@ -5042,10 +5185,11 @@ draw_ea1(int e1b_x, int e1b_y,
          int eaobrs, /*:  4; 0:br0_0, 1:br0_1, ... 15:3_3 */
 	 int mex1op,
 	 int mex1init,
-	 int mex1dist
+	 int mex1dist,
+	 int mexlimit
          )
 {
-#define E1LABELMAX 30
+#define E1LABELMAX 80
   char opcd[E1LABELMAX];
   int col, thi;
   int ea1singleload = (ea1op && (ea1op <= OP_LDBR));
@@ -5130,7 +5274,7 @@ draw_ea1(int e1b_x, int e1b_y,
   }
   draw_line (e1b_x+65, e1b_y+360,             e1b_x+80, e1b_y+360,     thi, col);
   draw_arrow(e1b_x+65, e1b_y+360,             e1b_x+65, e1b_y-40,      thi, col);
-  snprintf(opcd, E1LABELMAX, "%s-%d-%d", mex1op==OP_ALWAYS?"AL":mex1op==OP_CMPA_LE?"LE":mex1op==OP_CMPA_GE?"GE":"NA", mex1init, mex1dist);
+  snprintf(opcd, E1LABELMAX, "%s-%d-%d-%d", mex1op==OP_ALWAYS?"AL":mex1op==OP_CMPA_LE?"LE":mex1op==OP_CMPA_GE?"GE":"NA", mex1init, mex1dist, mexlimit);
   draw_text(e1b_x+30, e1b_y-40, opcd, 1, 0);
 
   /* SRC2 */
@@ -5241,6 +5385,10 @@ draw_lmx(int lmb_x, int lmb_y,
          int mws1,    /*:  2; 0:lmwd1, 1:exdr, 2:ts1 */
          int mws2,    /*:  2; 0:lmwd2, 1:exdr, 2:ts2 */
          int mws3,    /*:  2; 0:lmwd3, 1:exdr, 2:ts3 */
+	 int ts0,
+	 int ts1,
+	 int ts2,
+	 int ts3,
 	 int lmm_mode,/*:  2; 0:無効, 1:分割無, 2:2分割, 3:4分割 */
 	 Ull top
          )
@@ -5285,7 +5433,7 @@ draw_lmx(int lmb_x, int lmb_y,
   draw_arrow(lmb_x+380,   lmb_y-150, lmb_x+380, lmb_y-60,  thi, col);
   if (ea0store && mws0==2) { col=1; /*red*/   thi=3; } /* ts0 */
   else                     { col=0; /*black*/ thi=1; }
-  draw_arrow(lmb_x+390,   lmb_y-370, lmb_x+390, lmb_y-60,  thi, col);
+  draw_arrow(lmb_x+390,   lmb_y-370+ts0*5, lmb_x+390, lmb_y-60,  thi, col);
 
   /* MW1 */
   if (ea0store) {
@@ -5311,7 +5459,7 @@ draw_lmx(int lmb_x, int lmb_y,
   draw_arrow(lmb_x+260,   lmb_y-150, lmb_x+260, lmb_y-60,  thi, col);
   if (ea0store && mws1==2) { col=1; /*red*/   thi=3; } /* ts1 */
   else                     { col=0; /*black*/ thi=1; }
-  draw_arrow(lmb_x+270,   lmb_y-370, lmb_x+270, lmb_y-60,  thi, col);
+  draw_arrow(lmb_x+270,   lmb_y-370+ts1*5, lmb_x+270, lmb_y-60,  thi, col);
 
   /* MW2 */
   if (ea0store) {
@@ -5337,7 +5485,7 @@ draw_lmx(int lmb_x, int lmb_y,
   draw_arrow(lmb_x+140,   lmb_y-150, lmb_x+140, lmb_y-60,  thi, col);
   if (ea0store && mws2==2) { col=1; /*red*/   thi=3; } /* ts2 */
   else                     { col=0; /*black*/ thi=1; }
-  draw_arrow(lmb_x+150,   lmb_y-370, lmb_x+150, lmb_y-60,  thi, col);
+  draw_arrow(lmb_x+150,   lmb_y-370+ts2*5, lmb_x+150, lmb_y-60,  thi, col);
 
   /* MW3 */
   if (ea0store) {
@@ -5363,7 +5511,7 @@ draw_lmx(int lmb_x, int lmb_y,
   draw_arrow(lmb_x+20,    lmb_y-150, lmb_x+20,  lmb_y-60,  thi, col);
   if (ea0store && mws3==2) { col=1; /*red*/   thi=3; } /* ts3 */
   else                     { col=0; /*black*/ thi=1; }
-  draw_arrow(lmb_x+30,    lmb_y-370, lmb_x+30,  lmb_y-60,  thi, col);
+  draw_arrow(lmb_x+30,    lmb_y-370+ts3*5, lmb_x+30,  lmb_y-60,  thi, col);
 
   switch (lmm_mode) {
   case 0:
@@ -5387,8 +5535,8 @@ draw_bri(int bri_x, int bri_y,
          int ea1op,  /*:  5; mem_opcd */
          int brs0,   /*:  2; 0:off, 1:mr10, 2:tr0, 3:mr0  */
          int brs1,   /*:  2; 0:off, 1:mr11, 2:tr1, 3:mr1  */
-         int brs2,   /*:  2; 0:off, 1:mr12, 2:tr2, 3:exdr */
-         int brs3,   /*:  2; 0:off, 1:mr13, 2:tr3         */
+         int brs2,   /*:  2; 0:off, 1:mr12, 2:tr2, 3:exd(brs3=3の場合,ea0woofsに接続) */
+         int brs3,   /*:  2; 0:off, 1:mr13, 2:tr3  3:ea1woofs */
          int br0v,
          int br0h,
          int br0s,
@@ -5593,11 +5741,14 @@ draw_bri(int bri_x, int bri_y,
   if (brs2==2) { col=4; thi=3; } /* tr2 */
   else         { col=0; thi=1; }
   draw_arrow(bri_x+150,   bri_y-170, bri_x+150, bri_y,     thi, col);
-  if (brs2==3) { col=5; thi=3; } /* exdr */
-  else         { col=0; thi=1; }
+  if (brs2==3 && brs3!=3) { col=5; thi=3; } /* exdr */
+  else                    { col=0; thi=1; }
   draw_line (bri_x+90,    bri_y-170, bri_x+90,  bri_y-20,  thi, col);
   draw_line (bri_x+90,    bri_y-20,  bri_x+140, bri_y-20,  thi, col);
   draw_arrow(bri_x+140,   bri_y-20,  bri_x+140, bri_y,     thi, col);
+  if (brs2==3 && brs3==3) { col=2; thi=3; /* ea0woofs */
+  draw_arrow(bri_x+330,   bri_y-140,  bri_x+170, bri_y,     thi, col);
+  }
   switch (br2v) {
   case 0: /* T_NONE */
     col=0; /*black*/
@@ -5657,6 +5808,9 @@ draw_bri(int bri_x, int bri_y,
   if (brs3==2) { col=4; thi=3; } /* tr3 */
   else         { col=0; thi=1; }
   draw_arrow(bri_x+30,    bri_y-170, bri_x+30,  bri_y,     thi, col);
+  if (brs3==3) { col=2; thi=3; /* ea1woofs */
+  draw_arrow(bri_x+210,   bri_y-140, bri_x+50,  bri_y,     thi, col);
+  }
   switch (br3v) {
   case 0: /* T_NONE */
     col=0; /*black*/

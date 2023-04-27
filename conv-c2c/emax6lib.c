@@ -275,6 +275,7 @@ volatile struct emax_info {
 #include <stdbool.h>
 #include <string.h>
 #include <dirent.h>
+#include <errno.h>
 #include <linux/ioctl.h>
 
 #define DMA_BASE_PHYS	 0x00000000fd500000LL
@@ -309,7 +310,7 @@ static void trim(char *d_name)
   if (p != NULL) *p = '\0';
 }
 
-static int is_dma_dev(char *d_name)
+static int is_target_dev(char *d_name, char *target)
 {
   char path[32];
   char name[32];
@@ -321,7 +322,7 @@ static int is_dma_dev(char *d_name)
     return 0;
   }
   fclose(fp);
-  if (strcmp(name, "dma\n") != 0) return 0;
+  if (strcmp(name, target) != 0) return 0;
   return 1;
 }
 
@@ -353,59 +354,87 @@ emax6_open()
   int  fd_dma;
   int  fd_reg;
   int  fd_ddr;
-
-  if ((fd_reg = open("/dev/uio8", O_RDWR | O_SYNC)) == -1) {
-    printf("open(\"/dev/uio8\", ...) failed.\n");
-    return (NULL);
-  }
-  if ((fd_ddr = open("/dev/uio9", O_RDWR | O_SYNC)) == -1) {
-    printf("open(\"/dev/uio9\", ...) failed.\n");
-    return (NULL);
-  }
-
-  // mmap(cache-off) 4KB aligned
-  emax_info.reg_phys = REG_BASE_PHYS;
-  emax_info.reg_mmap = (Ull)mmap(NULL, REG_MMAP_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED, fd_reg, 0); /* 4GB */
-  if (emax_info.reg_mmap == MAP_FAILED) {
-    printf("fd_reg mmap() failed.\n");
-    return (NULL);
-  }
-  emax_info.lmm_phys = LMM_BASE_PHYS;
-  emax_info.lmm_mmap = emax_info.reg_mmap + (LMM_BASE_PHYS - REG_BASE_PHYS);
-
-  // mmap(cache-on)  4KB aligned
-  emax_info.ddr_phys = DDR_BASE_PHYS;
-  emax_info.ddr_mmap = (Ull)mmap(NULL, DDR_MMAP_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED, fd_ddr, 0); /* 2GB */
-  if (emax_info.ddr_mmap == MAP_FAILED) {
-    printf("fd_ddr mmap() failed.\n");
-    return (NULL);
-  }
+  char *UIO_DMA           = "dma\n";
+  char *UIO_AXI_CHIP2CHIP = "axi_chip2chip\n";
+  char *UIO_AXI_EMAX6     = "emax6\n";
+  char *UIO_DDR_HIGH      = "ddr_high\n";
 
   if ((num_dirs = scandir("/sys/class/uio", &namelist, filter, alphasort)) == -1)
     return (NULL);
 
   for (dir = 0; dir < num_dirs; ++dir) {
     trim(namelist[dir]->d_name);
-    if (!is_dma_dev(namelist[dir]->d_name)) {
+    if (!fd_dma_found && is_target_dev(namelist[dir]->d_name, UIO_DMA) && (reg_size = get_reg_size(namelist[dir]->d_name))) {
+      if (strlen(namelist[dir]->d_name)>4) /* ignore /dev/uio1X */
+	continue;
+      sprintf(path, "/dev/%s", namelist[dir]->d_name);
+      free(namelist[dir]);
+      if ((fd_dma = open(path, O_RDWR | O_SYNC)) == -1)
+	continue;
+      printf("%s: %s", path, UIO_DMA);
+      emax_info.dma_phys = DMA_BASE_PHYS;
+      emax_info.dma_mmap = (Ull)mmap(NULL, reg_size, PROT_READ|PROT_WRITE, MAP_SHARED, fd_dma, 0);
+      close(fd_dma);
+      if (emax_info.dma_mmap == MAP_FAILED)
+	continue;
+      fd_dma_found++;
+    }
+    else if (is_target_dev(namelist[dir]->d_name, UIO_AXI_CHIP2CHIP)) {
+      sprintf(path, "/dev/%s", namelist[dir]->d_name);
+      free(namelist[dir]);
+      if ((fd_reg = open(path, O_RDWR | O_SYNC)) == -1) {
+	printf("open failed. %s", UIO_AXI_CHIP2CHIP);
+	return (NULL);
+      }
+      printf("%s: %s", path, UIO_AXI_CHIP2CHIP);
+      // mmap(cache-off) 4KB aligned
+      emax_info.reg_phys = REG_BASE_PHYS;
+      emax_info.reg_mmap = (Ull)mmap(NULL, REG_MMAP_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED, fd_reg, 0); /* 4GB */
+      if (emax_info.reg_mmap == MAP_FAILED) {
+	printf("fd_reg mmap() failed. errno=%d\n", errno);
+	return (NULL);
+      }
+      emax_info.lmm_phys = LMM_BASE_PHYS;
+      emax_info.lmm_mmap = emax_info.reg_mmap + (LMM_BASE_PHYS - REG_BASE_PHYS);
+    }
+    else if (is_target_dev(namelist[dir]->d_name, UIO_AXI_EMAX6)) {
+      sprintf(path, "/dev/%s", namelist[dir]->d_name);
+      free(namelist[dir]);
+      if ((fd_reg = open(path, O_RDWR | O_SYNC)) == -1) {
+	printf("open failed. %s", UIO_AXI_EMAX6);
+	return (NULL);
+      }
+      printf("%s: %s", path, UIO_AXI_EMAX6);
+      // mmap(cache-off) 4KB aligned
+      emax_info.reg_phys = REG_BASE_PHYS;
+      emax_info.reg_mmap = (Ull)mmap(NULL, REG_MMAP_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED, fd_reg, 0); /* 4GB */
+      if (emax_info.reg_mmap == MAP_FAILED) {
+	printf("fd_reg mmap() failed. errno=%d\n", errno);
+	return (NULL);
+      }
+      emax_info.lmm_phys = LMM_BASE_PHYS;
+      emax_info.lmm_mmap = emax_info.reg_mmap + (LMM_BASE_PHYS - REG_BASE_PHYS);
+    }
+    else if (is_target_dev(namelist[dir]->d_name, UIO_DDR_HIGH)) {
+      sprintf(path, "/dev/%s", namelist[dir]->d_name);
+      free(namelist[dir]);
+      if ((fd_ddr = open(path, O_RDWR | O_SYNC)) == -1) {
+	printf("open failed. %s",UIO_DDR_HIGH);
+	return (NULL);
+      }
+      printf("%s: %s", path, UIO_DDR_HIGH);
+      // mmap(cache-on)  4KB aligned
+      emax_info.ddr_phys = DDR_BASE_PHYS;
+      emax_info.ddr_mmap = (Ull)mmap(NULL, DDR_MMAP_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED, fd_ddr, 0); /* 2GB */
+      if (emax_info.ddr_mmap == MAP_FAILED) {
+	printf("fd_ddr mmap() failed. errno=%d\n", errno);
+	return (NULL);
+      }
+    }
+    else {
       free(namelist[dir]);
       continue;
     }
-    if ((reg_size = get_reg_size(namelist[dir]->d_name)) == 0) {
-      free(namelist[dir]);
-      continue;
-    }
-
-    sprintf(path, "/dev/%s", namelist[dir]->d_name);
-    free(namelist[dir]);
-    if ((fd_dma = open(path, O_RDWR | O_SYNC)) == -1)
-      continue;
-    emax_info.dma_phys = DMA_BASE_PHYS;
-    emax_info.dma_mmap = (Ull)mmap(NULL, reg_size, PROT_READ|PROT_WRITE, MAP_SHARED, fd_dma, 0);
-    close(fd_dma);
-    if (emax_info.dma_mmap == MAP_FAILED)
-      continue;
-    fd_dma_found++;
-    break;
   }
   free(namelist);
 
@@ -571,20 +600,20 @@ emax6_check_lmmi_and_dma(int mode, int phase, int lastdist, int c, int i, int j)
   }
   else if (phase == 2) { /* load */
     if     ((lmmc_stat== 8               && !lmm_ready)                                                                                                                              /* ●1 lmr & !ready */
-         || (lmmc_stat== 9 && !lmmc_ofsz && !lmm_readz)                                                                                                                              /* ●7 lmp & !readz */
+         || (lmmc_stat== 9               && !lmm_readz)                                                                                                                              /* ●7 lmp & !readz */
          || (lmmc_stat==10                            )                                                                                                                              /* ●3 lmf always load */
          || (lmmc_stat==14               && !lmm_ready))                           { mark=1;                          dmadr=lmmicp->top;dmlen=lmmicp->len;dmnxt=lmmicp1->top;dmrw=0;}/* ●3 lmx always load */
     else                                                                           { mark=0;                                                                                        }/* skip load */
   }
   else if (phase == 3) { /* exec */
-    if      (lmmc_stat== 9                    ) { mark=1;                                                             dmadr=lmmicp->top;dmlen=lmmicp->len;dmrw=0;                   }/* ●5 lmp */
-    else if (lmmc_stat==12 || lmmc_stat==14   ) { mark=0;emax6.lmmd[i][j]|=(1<<c);                                                                                                  }/* ●6 lmw/lmx */
-    else if (lmmc_stat==13                    ) { mark=  emax6.lmmd[m][j]& (1<<c); emax6.lmmd[m][j]|=((!lastdist)<<c);dmadr=lmmicp->top;dmlen=lmmicp->len;dmrw=1;                   }/* ●6 lmd & dirty */
+    if      (lmmc_stat== 9 && (lastdist||!lmmc_ofsz)) { mark=1;                                                             dmadr=lmmicp->top;dmlen=lmmicp->len;dmrw=0;             }/* ●5 lmp */
+    else if (lmmc_stat==12 || lmmc_stat==14         ) { mark=0;emax6.lmmd[i][j]|=(1<<c);                                                                                            }/* ●6 lmw/lmx */
+    else if (lmmc_stat==13                          ) { mark=  emax6.lmmd[m][j]& (1<<c); emax6.lmmd[m][j]|=((!lastdist)<<c);dmadr=lmmicp->top;dmlen=lmmicp->len;dmrw=1;             }/* ●6 lmd & dirty */
 #ifndef IGNORE_LDDMQ_HANDSHAKE
-//  else if (lmmc_stat==11                    ) { mark=1;                             } /*     LDDMQ */
-//  else if (lmmc_stat==15                    ) { mark=1;                             } /*     TR */
+//  else if (lmmc_stat==11                          ) { mark=1;                             } /*     LDDMQ */
+//  else if (lmmc_stat==15                          ) { mark=1;                             } /*     TR */
 #endif
-    else                                        { mark=0;                             } /* skip pdrain/pload */
+    else                                              { mark=0;                             } /* skip pdrain/pload */
   }
 
   if (mark) {
@@ -594,7 +623,7 @@ emax6_check_lmmi_and_dma(int mode, int phase, int lastdist, int c, int i, int j)
       /* concat_adr=adr0,L=0 adr0,L=0,mark=0 | adr1,L=0        | adr2,L=0        */
       /* concat_adr=adr0,L=1          mark=0 | adr1,L=0,mark=0 | adr2,L=0        */
       /* concat_adr=adr0,L=2          mark=0 |          mark=0 | adr2,L=0,mark=1 */
-//printf("drain: adr=%08.8x len=%08.8x nxt=%08.8x\n", (Uint)dmaadr, (Uint)dmalen, (Uint)dmnxt);
+//printf("drain: adr=%08.8x len=%08.8x nxt=%08.8x\n", (Uint)dmadr, (Uint)dmlen, (Uint)dmnxt);
       if ((emax6.lmmd[(m+1)%EMAX_DEPTH][j]&(1<<c)) && (dmadr+(dmlen+1)*sizeof(Uint)) == dmnxt) {
 	if (!concat_adr[c]) { concat_adr[c] = dmadr; concat_len[c] = dmlen; }
 	else             { concat_len[c] += dmlen+1; }
@@ -673,7 +702,7 @@ emax6_check_lmmi_and_dma(int mode, int phase, int lastdist, int c, int i, int j)
     }
 #if 0
 printf("====DMA mode=%x phase=%x i=%x m=%x j=%x lmmic/o=%x/%x lmmc_stat=%x(dirty=%x) lmmo_stat=%x(dirty=%x) mark=%x\n", mode, phase, i, m, j, emax6.lmmic, emax6.lmmio, lmmc_stat, emax6.lmmd[i][j], lmmo_stat, emax6.lmmd[m][j], mark);
-printf("        rw=%d ddraddr=%08.8x lmmaddr=%08.8x dmalen=%d", emax6.rw, (Uint)emax6.ddraddr, (Uint)emax6.lmmaddr, (Uint)emax6.dmalen);
+printf("        rw=0x%x ddraddr=%08.8x lmmaddr=%08.8x dmalen=0x%x ", emax6.rw, (Uint)emax6.ddraddr, (Uint)emax6.lmmaddr, (Uint)emax6.dmalen);
 #endif
     concat_adr[c] = 0;
     emax6_kick_dma(j);
@@ -694,27 +723,25 @@ emax6_kick_dma(int j) /* col */
     emax6.csel_save = j;
   }
 #if defined(FPDDMA)
-  /* kick dma_ctrl (Simple Mode) */
-  /* 1. ZDMA_CH_STATUS レジスタを読み出し、STATEが00または11(DMAがIDLEステート) になるまで待つ. */
-  /*    DMAがPAUSEステートの場合、「チャネル一時停止」で説明する手順に従って PAUSE ステートを終了. */
-
-  // 最後に移動
-       
-  /* 2. ZDMA_CH_CTRL0レジスタの POINT_TYPE (ビット 6) を 0 に設定 */
-  /*    データソースバッファのアドレスの LSB を ZDMA_CH_SRC_DSCR_WORD0レジスタに書き込む */
-  /*    データソースバッファのアドレスの MSB を ZDMA_CH_SRC_DSCR_WORD1レジスタに書き込む */
-  /* 3. データデスティネーションバッファのアドレスの LSB を ZDMA_CH_DST_DSCR_WORD0レジスタに書き込む */
-  /*    データデスティネーションバッファのアドレスの MSB を ZDMA_CH_DST_DSCR_WORD1レジスタに書き込む */
-  /* 4. Simple Modeでは、SRCトランザクションサイズとDSTトランザクションサイズの両方を設定する必要がある */
-  /*    DMA は SRCトランザクションサイズを使用しますが、両方のレジスタを設定しておく必要がある */
-  /*    ZDMA_CH_SRC_DSCR_WORD2 レジスタにソースデータサイズを書き込む */
-  /*    ZDMA_CH_DST_DSCR_WORD2 レジスタにデスティネーショントランザクションサイズを書き込む */
-  /*    SRCトランザクションサイズとDSTトランザクションサイズは必ず同じ */
-  if (emax6.dmalen > 0) {
+#define FPDDMA_DEFINED 1
+#else
+#define FPDDMA_DEFINED 0
+#endif
+  if (FPDDMA_DEFINED && emax6.dmalen > 1) { /* 4B/8B: ->PIO */
+    /* kick dma_ctrl (Simple Mode) */
+    /* 1. ZDMA_CH_STATUS レジスタを読み出し、STATEが00または11(DMAがIDLEステート) になるまで待つ. */
+    /*    DMAがPAUSEステートの場合、「チャネル一時停止」で説明する手順に従って PAUSE ステートを終了. */
+    /* 2. ZDMA_CH_CTRL0レジスタの POINT_TYPE (ビット 6) を 0 に設定 */
+    /*    データソースバッファのアドレスの LSB を ZDMA_CH_SRC_DSCR_WORD0レジスタに書き込む */
+    /*    データソースバッファのアドレスの MSB を ZDMA_CH_SRC_DSCR_WORD1レジスタに書き込む */
+    /* 3. データデスティネーションバッファのアドレスの LSB を ZDMA_CH_DST_DSCR_WORD0レジスタに書き込む */
+    /*    データデスティネーションバッファのアドレスの MSB を ZDMA_CH_DST_DSCR_WORD1レジスタに書き込む */
+    /* 4. Simple Modeでは、SRCトランザクションサイズとDSTトランザクションサイズの両方を設定する必要がある */
+    /*    DMA は SRCトランザクションサイズを使用しますが、両方のレジスタを設定しておく必要がある */
+    /*    ZDMA_CH_SRC_DSCR_WORD2 レジスタにソースデータサイズを書き込む */
+    /*    ZDMA_CH_DST_DSCR_WORD2 レジスタにデスティネーショントランザクションサイズを書き込む */
+    /*    SRCトランザクションサイズとDSTトランザクションサイズは必ず同じ */
     if (emax6.rw == 0) { /* mem->lmm */
-      do {
-	status = ((struct dma_ctrl*)emax6.dma_ctrl)->ZDMA_CH_STATUS & 3;
-      } while (status != 0 && status != 3);
       *(Ull*)&(((struct dma_ctrl*)emax6.dma_ctrl)->ZDMA_CH_SRC_DSCR_WORD0) = emax6.ddraddr-emax_info.ddr_mmap+emax_info.ddr_phys;     /* address should be 4B-aligned */
       ((struct dma_ctrl*)emax6.dma_ctrl)->ZDMA_CH_SRC_DSCR_WORD2 = (emax6.dmalen+1)*sizeof(Uint);                                     /* length should be # of words */
       *(Ull*)&(((struct dma_ctrl*)emax6.dma_ctrl)->ZDMA_CH_DST_DSCR_WORD0) = emax6.lmmaddr-emax_info.ddr_mmap+emax_info.lmm_phys;     /* (emax6.awaddr & ~(sizeof(Ull)*UNIT_WIDTH-1)) */
@@ -731,9 +758,7 @@ emax6_kick_dma(int j) /* col */
       /*#define LMM_BASE2_PHYS 	         0x60000000  */
       /*#define LMM_BASE_PHYS	 0x0000000480000000LL ... DMAREADBUFのvsimのため, dmrp_topに差の0x20000000を加算 */
       /*                                            tb_top.convでもLMMアドレスに0x20000000を加算するのに合わせる */
-      do {
-	status = ((struct dma_ctrl*)emax6.dma_ctrl)->ZDMA_CH_STATUS & 3;
-      } while (status != 0 && status != 3);
+      while (((struct reg_ctrl*)emax6.reg_ctrl)->i[0].stat & 0xffff00f0); //LMRING_BUSY
       ((struct reg_ctrl*)emax6.reg_ctrl)->i[0].dmrp = (1LL<<63)|((emax6.dmalen+1)*sizeof(Uint)<<40)|(emax6.lmmaddr-emax_info.ddr_mmap+emax_info.lmm_phys);
       /*printf("dmrp=%08.8x_%08.8x\n", (Uint)((((struct reg_ctrl*)emax6.reg_ctrl)->i[0].dmrp)>>32), (Uint)(((struct reg_ctrl*)emax6.reg_ctrl)->i[0].dmrp));*/
       *(Ull*)&(((struct dma_ctrl*)emax6.dma_ctrl)->ZDMA_CH_SRC_DSCR_WORD0) = emax6.lmmaddr-emax_info.ddr_mmap+emax_info.lmm_phys;     /* (emax6.awaddr & ~(sizeof(Ull)*UNIT_WIDTH-1)) */
@@ -747,13 +772,13 @@ emax6_kick_dma(int j) /* col */
       /* end of DMAREADBUF */
       ((struct reg_ctrl*)emax6.reg_ctrl)->i[0].dmrp = (0LL<<63); /* off */
     }
-  /* 5. 必要に応じ,ZDMA_CH_DST_DSCR_WORD3およびZDMA_CH_SRC_DSCR_WORD3レジスタでINTRを1にセットし割り込みを有効にする */
-  /* 6. ソースおよびデスティネーションバッファがキャッシュコヒーレントとして割り当てられているかフラッシュされている場合, */
-  /*    COHRNTをセットする必要はない. それ以外の場合,ソースおよびデスティネーションバッファがキャッシュコヒーレントとして */
-  /*    割り当てられていない、またはフラッシュされていない場合、ZDMA_CH_SRC_DSCR_WORD3およびZDMA_CH_DST_DSCR_WORD3レジスタで */
-  /*    それぞれ COHRNTをセットする. COHRNTビットは LPD-DMA の場合のみ有効. FPD-DMAはコヒーレンシをサポートしない. */
-  /* 7. ZDMA_CH_CTRL2レジスタのENビットをセットして,DMA転送に使用するDMAチャネルを有効にする. */
-  /*    DMAを有効にした後、「エラー条件」に示すエラー条件をチェックする. */
+    /* 5. 必要に応じ,ZDMA_CH_DST_DSCR_WORD3およびZDMA_CH_SRC_DSCR_WORD3レジスタでINTRを1にセットし割り込みを有効にする */
+    /* 6. ソースおよびデスティネーションバッファがキャッシュコヒーレントとして割り当てられているかフラッシュされている場合, */
+    /*    COHRNTをセットする必要はない. それ以外の場合,ソースおよびデスティネーションバッファがキャッシュコヒーレントとして */
+    /*    割り当てられていない、またはフラッシュされていない場合、ZDMA_CH_SRC_DSCR_WORD3およびZDMA_CH_DST_DSCR_WORD3レジスタで */
+    /*    それぞれ COHRNTをセットする. COHRNTビットは LPD-DMA の場合のみ有効. FPD-DMAはコヒーレンシをサポートしない. */
+    /* 7. ZDMA_CH_CTRL2レジスタのENビットをセットして,DMA転送に使用するDMAチャネルを有効にする. */
+    /*    DMAを有効にした後、「エラー条件」に示すエラー条件をチェックする. */
     switch (status) {
     case 0:
       break;
@@ -763,70 +788,63 @@ emax6_kick_dma(int j) /* col */
     }
   }
   else { /* ★投機実行によりcache-fillを起動してしまう.投機失敗後にDMAが動き,cache-fillもされるのでmismatchとなる★ */
+    /*printf("emax_info.lmm_mmap-emax_info.ddr_mmap=%08.8x_%08.8x\n", (Uint)((emax_info.lmm_mmap-emax_info.ddr_mmap)>>32), (Uint)(emax_info.lmm_mmap-emax_info.ddr_mmap));*/
     if (emax6.rw == 0) { /* mem->lmm */
       dst = emax6.lmmaddr-emax_info.ddr_mmap+emax_info.lmm_mmap;
       src = emax6.ddraddr;
+#if 0
+      printf("emax6.lmmaddr:%08.8x_%08.8x <- emax6.ddraddr:%08.8x_%08.8x\n",
+	     (Uint)((Ull)((Ull*)emax6.lmmaddr)>>32), (Uint)(Ull)((Ull*)emax6.lmmaddr),
+	     (Uint)((Ull)((Ull*)emax6.ddraddr)>>32), (Uint)(Ull)((Ull*)emax6.ddraddr));
+#endif
     }
     else { /* lmm->mem */
       dst = emax6.ddraddr;
       src = emax6.lmmaddr-emax_info.ddr_mmap+emax_info.lmm_mmap;
-    }    
-    *(Uint*)dst = *(Uint*)src;
-  }
-#else
-  /*printf("emax_info.lmm_mmap-emax_info.ddr_mmap=%08.8x_%08.8x\n", (Uint)((emax_info.lmm_mmap-emax_info.ddr_mmap)>>32), (Uint)(emax_info.lmm_mmap-emax_info.ddr_mmap));*/
-  if (emax6.rw == 0) { /* mem->lmm */
-    dst = emax6.lmmaddr-emax_info.ddr_mmap+emax_info.lmm_mmap;
-    src = emax6.ddraddr;
-    /*printf("(emax6.lmmaddr+pio_loop):%08.8x_%08.8x <- (emax6.ddraddr + pio_loop):%08.8x_%08.8x\n",
-           (Uint)((Ull)((Ull*)emax6.lmmaddr + pio_loop)>>32), (Uint)(Ull)((Ull*)emax6.lmmaddr + pio_loop),
-           (Uint)((Ull)((Ull*)emax6.ddraddr + pio_loop)>>32), (Uint)(Ull)((Ull*)emax6.ddraddr + pio_loop));*/
-  }
-  else { /* lmm->mem */
-    dst = emax6.ddraddr;
-    src = emax6.lmmaddr-emax_info.ddr_mmap+emax_info.lmm_mmap;
-    /*printf("(emax6.lmmaddr+pio_loop):%08.8x_%08.8x -> (emax6.ddraddr + pio_loop):%08.8x_%08.8x\n",
-           (Uint)((Ull)((Ull*)emax6.lmmaddr + pio_loop)>>32), (Uint)(Ull)((Ull*)emax6.lmmaddr + pio_loop),
-           (Uint)((Ull)((Ull*)emax6.ddraddr + pio_loop)>>32), (Uint)(Ull)((Ull*)emax6.ddraddr + pio_loop));*/
-  }
-  /* srcとdstは32Bアラインされており,片側のみ非アラインになることはない */
-  pio_words = emax6.dmalen+1;
-  if (src & (sizeof(Ull)-1) & sizeof(Uint)) { /* 4B-access 0,4 */
-    *(Uint*)dst = *(Uint*)src;
-    src += sizeof(Uint);
-    dst += sizeof(Uint);
-    pio_words--;
-  }
-  if (pio_words >= 2) {
-    if (src & (sizeof(Dll)-1) & sizeof(Ull)) { /* 8B-access 0,4 */
+#if 0
+      printf("emax6.lmmaddr:%08.8x_%08.8x -> emax6.ddraddr:%08.8x_%08.8x\n",
+	     (Uint)((Ull)((Ull*)emax6.lmmaddr)>>32), (Uint)(Ull)((Ull*)emax6.lmmaddr),
+	     (Uint)((Ull)((Ull*)emax6.ddraddr)>>32), (Uint)(Ull)((Ull*)emax6.ddraddr));
+#endif
+    }
+    /* srcとdstは32Bアラインされており,片側のみ非アラインになることはない */
+    pio_words = emax6.dmalen+1;
+    if (src & (sizeof(Ull)-1) & sizeof(Uint)) { /* 4B-access 0,4 */
+      *(Uint*)dst = *(Uint*)src;
+      src += sizeof(Uint);
+      dst += sizeof(Uint);
+      pio_words--;
+    }
+    if (pio_words >= 2) {
+      if (src & (sizeof(Dll)-1) & sizeof(Ull)) { /* 8B-access 0,4 */
+	*(Ull*)dst = *(Ull*)src;
+	src += sizeof(Ull);
+	dst += sizeof(Ull);
+	pio_words-=2;
+      }
+    }
+    if (pio_words >= 4) {
+      if (pio_loop = pio_words/(sizeof(Dll)/sizeof(Uint))) {
+	for(pio_i=0; pio_i<pio_loop; pio_i++)
+	  *((Dll*)dst + pio_i) = *((Dll*)src + pio_i);
+	pio_words -= pio_loop*(sizeof(Dll)/sizeof(Uint));
+	src += pio_loop*sizeof(Dll);
+	dst += pio_loop*sizeof(Dll);
+      }
+    }
+    if (pio_words >= 2) { /* 8B-access */
       *(Ull*)dst = *(Ull*)src;
       src += sizeof(Ull);
       dst += sizeof(Ull);
       pio_words-=2;
     }
-  }
-  if (pio_words >= 4) {
-    if (pio_loop = pio_words/(sizeof(Dll)/sizeof(Uint))) {
-      for(pio_i=0; pio_i<pio_loop; pio_i++)
-	*((Dll*)dst + pio_i) = *((Dll*)src + pio_i);
-      pio_words -= pio_loop*(sizeof(Dll)/sizeof(Uint));
-      src += pio_loop*sizeof(Dll);
-      dst += pio_loop*sizeof(Dll);
+    if (pio_words >= 1) { /* 4B-access */
+      *(Uint*)dst = *(Uint*)src;
+      src += sizeof(Uint);
+      dst += sizeof(Uint);
+      pio_words--;
     }
   }
-  if (pio_words >= 2) { /* 8B-access */
-    *(Ull*)dst = *(Ull*)src;
-    src += sizeof(Ull);
-    dst += sizeof(Ull);
-    pio_words-=2;
-  }
-  if (pio_words >= 1) { /* 4B-access */
-    *(Uint*)dst = *(Uint*)src;
-    src += sizeof(Uint);
-    dst += sizeof(Uint);
-    pio_words--;
-  }
-#endif
 
   return (0);
 }
@@ -1160,6 +1178,7 @@ exe(Uint op_ex1, Ull *d, Ull s1, Uint exp1, Ull s2, Uint exp2, Ull s3, Uint exp3
   union { Uint i; float f; } f3, f2, f1, f0;
   Ull r1, r2, r3;
   Ull t3, t2, t1, t0;
+  Ull ro00, ro01, ro02, ro10, ro11, ro12;
   Ull c1, c0;
   Ull ex1_outd;
   Ull ex1_outd_sfma[8];
@@ -1516,6 +1535,12 @@ exe(Uint op_ex1, Ull *d, Ull s1, Uint exp1, Ull s2, Uint exp2, Ull s3, Uint exp3
              | ((r1&0x000000000000ff00LL)<(r2&0x000000000000ff00LL)?(r1&0x000000000000ff00LL):(r2&0x000000000000ff00LL))
              | ((r1&0x00000000000000ffLL)<(r2&0x00000000000000ffLL)?(r1&0x00000000000000ffLL):(r2&0x00000000000000ffLL));
     break;
+  case OP_MAJ: /* (((x) & (y))^((x) & (z))^((y) & (z))) */
+    ex1_outd = (r1&0xffffffff00000000LL) | (((r1 & r2)^(r1 & r3)^(r2 & r3))&0xffffffffLL);
+    break;
+  case OP_CH: /*  (((x) & (y))^(~(x) & (z))) */
+    ex1_outd = (r1&0xffffffff00000000LL) | (((r1 & r2)^(~r1 & r3))&0xffffffffLL);
+    break;
   default:
     printf("emax6lib: exe: undefined op_ex1=%d\n", op_ex1);
     break;
@@ -1562,6 +1587,18 @@ exe(Uint op_ex1, Ull *d, Ull s1, Uint exp1, Ull s2, Uint exp2, Ull s3, Uint exp3
 //case OP_WSWAP: /* 32bit 2in swap and mask words */
 //  ex2_outd = ((ex1_outd<<32)|(ex1_outd>>32)) & r4;
 //  break;
+  case OP_ROTS: /* hi-32bit #define ROTRIGHT (((a) >> (b)) | ((a) << (32-(b)))) */
+    t2 = ex1_outd & 0xffffffff00000000LL;
+    ro10 = r4>>32 & 0xff;
+    ro11 = r4>>40 & 0xff;
+    ro12 = r4>>48 & 0xff;
+    t0 = ex1_outd & 0x00000000ffffffffLL;
+    ro00 = r4     & 0xff;
+    ro01 = r4>> 8 & 0xff;
+    ro02 = r4>>16 & 0xff;
+    ex2_outd = (((t2>>ro12|t2<<(32-ro12))^(t2>>ro11|t2<<(32-ro11))^(t2>>ro10|t2<<(32-ro10)))&0xffffffff00000000LL)
+              |(((t0>>ro02|t0<<(32-ro02))^(t0>>ro01|t0<<(32-ro01))^(t0>>ro00|t0<<(32-ro00)))&0x00000000ffffffffLL);
+    break;
   default:
     printf("emax6lib: exe: undefined op_ex2=%d\n", op_ex2);
     break;
@@ -1620,26 +1657,57 @@ exe(Uint op_ex1, Ull *d, Ull s1, Uint exp1, Ull s2, Uint exp2, Ull s3, Uint exp3
 }
 
 void /*__attribute__((always_inline))*/
-mex(Uint op_mx, Uchar **d, Uchar *base, Ull ofs, Ull s2, Ull s1)
+mex(Uint op_mex2, Uchar **d2, Uchar *base2, Ull ofs2, Uint op_mex1, Uchar **d1, Uchar *base1, Ull ofs1, Ull limit, Ull s2, Ull s1)
 {
+  /* limit:  0, 8, 16, .... 4096, 8192, 16384, 32768     */
+  /* encode: 0, 1, 2,  3,   10    11    12     13 (4bit) */
+  Uint limit2 = limit*2;
   Uint ss2 = s2>>32;
   Uint ss1 = s1>>32;
 
-  switch (op_mx) {
+  switch (op_mex1) {
   case OP_NOP:
-    *d = base;
+    *d1 = base1;
     break;
   case OP_ALWAYS: /* base++ 対応 */
-    *d = base + ofs;
-    break;
-  case OP_CMPA_LE:
-    *d = base + ((ss1!=0xffffffff && ss2<=ss1) ? ofs:0); /* sparse matrix */
+    *d1 = base1 + ofs1;
     break;
   case OP_CMPA_GE:
-    *d = base + ((ss2!=0xffffffff && ss2>=ss1) ? ofs:0); /* sparse matrix */
+    //d1自分(ss1)がffffffffなら停止. base1==limit2なら停止. base2==limit なら前進
+    if (!limit) /* sparse matrix */
+      *d1 = base1 + ((ss1!=0xffffffff && ss2>=ss1) ? ofs1:0);
+    else { /* merge sort */
+      if ((base2==limit && base1+ofs1==limit2)||(base2+ofs2==limit && base1==limit2))
+	*d1 = limit;
+      else
+	*d1 = base1 + (base1!=limit2 && ((base2!=limit  && ss2>=ss1)||base2==limit ) ? ofs1:0);
+    }
     break;
   default:
-    printf("emax6lib: mex: undefined op_mx=%d\n", op_mx);
+    printf("emax6lib: mex: undefined op_mex1=%d\n", op_mex1);
+    break;
+  }  
+
+  switch (op_mex2) {
+  case OP_NOP:
+    *d2 = base2;
+    break;
+  case OP_ALWAYS: /* base++ 対応 */
+    *d2 = base2 + ofs2;
+    break;
+  case OP_CMPA_LE:
+    //d2自分(ss2)がffffffffなら停止. base2==limit なら停止. base1==limit2なら前進
+    if (!limit) /* sparse matrix */
+      *d2 = base2 + ((ss2!=0xffffffff && ss2<=ss1) ? ofs2:0);
+    else { /* merge sort */
+      if ((base2==limit && base1+ofs1==limit2)||(base2+ofs2==limit && base1==limit2))
+	*d2 = 0;
+      else
+	*d2 = base2 + (base2!=limit  && ((base1!=limit2 && ss2<=ss1)||base1==limit2) ? ofs2:0);
+    }
+    break;
+  default:
+    printf("emax6lib: mex: undefined op_mex2=%d\n", op_mex2);
     break;
   }  
 }
@@ -1707,7 +1775,7 @@ mmp(Uint op_mm, Ull ex, Ull *d, Ull adr, Ull top, Uint len, Uint blk)
   if (!((op_mm==OP_LDRQ && blk) || op_mm==OP_LDDMQ || op_mm==OP_TR) && (!adr || !top)) return; /* NULL skip DMA */
 
 #define CHECK_MMP_MARGIN 12
-  if (!((op_mm==OP_LDRQ && blk) || op_mm==OP_LDDMQ || op_mm==OP_TR) && (adr < top || adr >= top+len*sizeof(Uint)+CHECK_MMP_MARGIN)) {
+  if (!((op_mm==OP_LDRQ && blk) || op_mm==OP_LDDMQ || op_mm==OP_TR) && ex && len && (adr < top || adr >= top+len*sizeof(Uint)+CHECK_MMP_MARGIN)) {
     printf("mmp: adr=%08.8x_%08.8x out of range (top=%08.8x_%08.8x len=%dB)\n", (Uint)(adr>>32), (Uint)adr, (Uint)(top>>32), (Uint)top, len*sizeof(Uint));
     fflush(stdout);
   }

@@ -441,11 +441,15 @@ EMAX6AUNIT : CGRA_WHILE "(" VARIABLE CGRA_DECR ")" "\{" {
 	  insn[last_insn].iexe.exedh   = $5;
           last_insn++;
         }
-        | CGRA_MEX "(" expr "," mex_dst "," INITNO "?" XVARIABLE ":" XVARIABLE "," INITNO "?" expr ":" expr "," mex_src3 "," mex_src4 ")" ";" {
-	  /* mex(OP_CMPA_LE, &b0[h],       INIT0?b:b0[h],                INIT0?0:8, BR[r][2][1], BR[r][2][0]); */
-	  /* mex(OP_CMPA_GE, &a0[h][CHIP], INIT0?a[h][CHIP]:a0[h][CHIP], INIT0?0:8, BR[r][2][1], BR[r][2][0]); */
-	  /* mop(OP_LDR, 3,  &BR[r][2][1], b0[h],       bofs, MSK_W1, b,          2*LP*RMGRP,  0, 0, NULL, 2*LP*RMGRP); */
-	  /* mop(OP_LDR, 3,  &BR[r][2][0], a0[h][CHIP], cofs, MSK_W1, a[h][CHIP], 2*LP,        0, 0, NULL, 2*LP); */
+      /*| CGRA_MEX "(" expr "," mex_dst "," INITNO "?" XVARIABLE ":" XVARIABLE "," INITNO "?" expr ":" expr "," mex_src3 "," mex_src4 ")" ";" {*/
+        | CGRA_MEX "(" expr "," mex_dst2 "," INITNO "?" mex_adr3 ":" XVARIABLE "," INITNO "?" expr ":" expr "," expr "," mex_dst1 "," INITNO "?" mex_adr1 ":" XVARIABLE "," INITNO "?" expr ":" expr "," expr "," mex_src2 "," mex_src1 ")" ";" {
+          /*  1     2    3   4     5      6    7     8      9     10     11     12   13    14  15   16  17   18  19   20    21     22   23    24    25     26    27      28   29    30  31   32  33   34  35   36    37     38    39 */
+	  /* old mex(OP_CMPA_LE, &b0[h],       INIT0?b:b0[h],                INIT0?0:8, BR[r][2][1], BR[r][2][0]);*/
+	  /* old mex(OP_CMPA_GE, &a0[h][CHIP], INIT0?a[h][CHIP]:a0[h][CHIP], INIT0?0:8, BR[r][2][1], BR[r][2][0]);*/
+	  /* new mex(OP_CMPA_LE, &b0[h][0], INIT0?b[0]:b0[h][0], INIT0?0LL:8LL, OP_CMPA_GE, &a0[h][0][CHIP], INIT0?a[h][CHIP]:a0[h][0][CHIP], INIT0?0LL:8LL, 0LL, BR[r][2][1], BR[r][2][0]);*/
+	  /* new mex(OP_CMPA_LE, &J[x],     INIT0?0LL:J[x],      INIT0?0LL:8LL, OP_CMPA_GE, &K[x],           INIT0?0LL:K[x],                  INIT0?0LL:8LL, BE8, BR[r][2][1], BR[r][2][0]);*/
+	  /*     mop(OP_LDR, 3, &BR[r][2][1], b0[h],       bofs, MSK_W1, b,          2*LP*RMGRP, 0, 0, NULL, 2*LP*RMGRP);*/
+	  /*     mop(OP_LDR, 3, &BR[r][2][0], a0[h][CHIP], cofs, MSK_W1, a[h][CHIP], 2*LP,       0, 0, NULL, 2*LP      );*/
 	  int loop_no0 = id[$7].val;
           if (last_insn >= INSN_DEPTH) {
 	    fprintf(stderr, "in %s: last_insn exceeds INSN_DEPTH=%d\n", id[current_prefix].name, INSN_DEPTH);
@@ -455,45 +459,56 @@ EMAX6AUNIT : CGRA_WHILE "(" VARIABLE CGRA_DECR ")" "\{" {
 	    fprintf(stderr, "in %s: mex(INIT0) should be specified\n", id[current_prefix].name);
             exit(1);
 	  }
-	  if ($5 != $11) {
-	    fprintf(stderr, "in %s: exe(dst,INIT0?src1:src2) dst and src2 should be the same\n", id[current_prefix].name);
-            exit(1);
-	  }
-	  if (loop_no0 != id[$13].val) {
+	  if (loop_no0 != id[$13].val || loop_no0 != id[$23].val || loop_no0 != id[$29].val) {
 	    fprintf(stderr, "in %s: mex() INIT# mismatch\n", id[current_prefix].name);
             exit(1);
 	  }
-	  if (id[$15].val != 0) {
-	    fprintf(stderr, "in %s: mex(INIT0?expr1:expr2) expr1 should be zero\n", id[current_prefix].name);
+	  if ($5 != $11 || $21 != $27) {
+	    fprintf(stderr, "in %s: mex(dst,INIT0?src0:src) dst and src should be the same\n", id[current_prefix].name);
             exit(1);
 	  }
-	  if (id[$19].val != id[$21].val) {
-	    fprintf(stderr, "in %s: mex(src3[%d][%d],src4[%d][%d]) should be the same row/col\n", id[current_prefix].name, (Uint)id[$19].val/EMAX_WIDTH, (Uint)id[$19].val%EMAX_WIDTH, (Uint)id[$21].val/EMAX_WIDTH, (Uint)id[$21].val%EMAX_WIDTH);
+	  if (id[$15].val != 0 || id[$31].val != 0) {
+	    fprintf(stderr, "in %s: mex(INIT0?expr0:expr) expr0 should be zero\n", id[current_prefix].name);
             exit(1);
 	  }
-	  if (insn[last_insn].imex.src3s != 1 || insn[last_insn].imex.src4s != 0) {
-	    fprintf(stderr, "in %s: mex(src3[%d][%d][%d],src4[%d][%d][%d]) should be src3[][][1] and src4[][][0]\n", id[current_prefix].name, (Uint)id[$19].val/EMAX_WIDTH, (Uint)id[$19].val%EMAX_WIDTH, insn[last_insn].imex.src3s, (Uint)id[$21].val/EMAX_WIDTH, (Uint)id[$21].val%EMAX_WIDTH, insn[last_insn].imex.src4s);
+	  if (id[$37].val != id[$39].val) {
+	    fprintf(stderr, "in %s: mex(src2[%d][%d],src1[%d][%d]) should be the same row/col\n", id[current_prefix].name, (Uint)id[$31].val/EMAX_WIDTH, (Uint)id[$31].val%EMAX_WIDTH, (Uint)id[$33].val/EMAX_WIDTH, (Uint)id[$33].val%EMAX_WIDTH);
+            exit(1);
+	  }
+	  if (insn[last_insn].imex.src2s != 1 || insn[last_insn].imex.src1s != 0) {
+	    fprintf(stderr, "in %s: mex(src2[%d][%d][%d],src1[%d][%d][%d]) should be src2[][][1] and src1[][][0]\n", id[current_prefix].name, (Uint)id[$31].val/EMAX_WIDTH, (Uint)id[$31].val%EMAX_WIDTH, insn[last_insn].imex.src2s, (Uint)id[$33].val/EMAX_WIDTH, (Uint)id[$33].val%EMAX_WIDTH, insn[last_insn].imex.src1s);
             exit(1);
 	  }
 	  insn[last_insn].iheader.type = 6; /* MEX */
-	  insn[last_insn].iheader.row  = id[$19].type==T_BDRNO?(id[$19].val/EMAX_WIDTH):-1; /* adr/bdr */
-	  insn[last_insn].iheader.col  = id[$19].type==T_BDRNO?(id[$19].val%EMAX_WIDTH):-1; /* adr/bdr */
-	  insn[last_insn].imex.op      = id[ $3].val; /* activate self_update */
+	  insn[last_insn].iheader.row  = id[$37].type==T_BDRNO?(id[$37].val/EMAX_WIDTH):-1; /* adr/bdr */
+	  insn[last_insn].iheader.col  = id[$37].type==T_BDRNO?(id[$37].val%EMAX_WIDTH):-1; /* adr/bdr */
+	  insn[last_insn].imex.op0     = id[$19].val; /* activate self_update */
+	  insn[last_insn].imex.op1     = id[ $3].val; /* activate self_update */
 	  insn[last_insn].imex.init    = 1;           /* activate INIT0?src1 */
-	  insn[last_insn].imex.src1v   = id[ $9].type;
-	  insn[last_insn].imex.src1h   = $9;
-	  insn[last_insn].imex.src1s   = -1;
-	  insn[last_insn].imex.src2v   = id[$11].type;
-	  insn[last_insn].imex.src2h   = $11;
-	  insn[last_insn].imex.src2s   = -1;
-	  insn[last_insn].imex.distv   = id[$17].type;
-	  insn[last_insn].imex.disth   = $17;
-	  insn[last_insn].imex.src3v   = id[$19].type;
-	  insn[last_insn].imex.src3h   = $19;
-	  insn[last_insn].imex.src4v   = id[$21].type;
-	  insn[last_insn].imex.src4h   = $21;
-	  insn[last_insn].imex.mexdv   = id[ $5].type;
-	  insn[last_insn].imex.mexdh   = $5;
+	  insn[last_insn].imex.adr1v   = id[$25].type; 
+	  insn[last_insn].imex.adr1h   = $25;
+	  insn[last_insn].imex.adr2v   = id[$27].type;
+	  insn[last_insn].imex.adr2h   = $27;
+	  insn[last_insn].imex.adr2s   = -1;
+	  insn[last_insn].imex.dist1v  = id[$33].type;
+	  insn[last_insn].imex.dist1h  = $33;
+	  insn[last_insn].imex.adr3v   = id[ $9].type;
+	  insn[last_insn].imex.adr3h   = $9;
+	  insn[last_insn].imex.adr4v   = id[$11].type;
+	  insn[last_insn].imex.adr4h   = $11;
+	  insn[last_insn].imex.adr4s   = -1;
+	  insn[last_insn].imex.dist2v  = id[$17].type;
+	  insn[last_insn].imex.dist2h  = $17;
+	  insn[last_insn].imex.limitv  = id[$35].type;
+	  insn[last_insn].imex.limith  = $35;
+	  insn[last_insn].imex.src1v   = id[$39].type;
+	  insn[last_insn].imex.src1h   = $39;
+	  insn[last_insn].imex.src2v   = id[$37].type;
+	  insn[last_insn].imex.src2h   = $37;
+	  insn[last_insn].imex.mexd0v  = id[$21].type;
+	  insn[last_insn].imex.mexd0h  = $21;
+	  insn[last_insn].imex.mexd1v  = id[ $5].type;
+	  insn[last_insn].imex.mexd1h  = $5;
           last_insn++;
         }
         | CGRA_MO4 "(" expr "," mop_ex "," mo4_srcdst "," mop_base "," mop_offset "," expr "," mop_top "," mop_len "," expr "," force "," mop_top "," mop_len ")" ";" {
@@ -533,9 +548,9 @@ EMAX6AUNIT : CGRA_WHILE "(" VARIABLE CGRA_DECR ")" "\{" {
 		exit(1);
 	      }
 	      /* one_shotを使用し,アドレス計算の初回は,immediateを０として扱う */
-	      insn[last_insn].imex.op      = OP_ALWAYS;
-	      insn[last_insn].imex.distv   = T_IMMEDIATE;
-	      insn[last_insn].imex.disth   = hash_reg_immediate(size);
+	      insn[last_insn].imex.op0    = OP_ALWAYS;
+	      insn[last_insn].imex.dist1v = T_IMMEDIATE;
+	      insn[last_insn].imex.dist1h = hash_reg_immediate(size);
 	    }
 	  }
 	  else if (insn[last_insn].imop.op == OP_LDDMQ) {
@@ -548,9 +563,9 @@ EMAX6AUNIT : CGRA_WHILE "(" VARIABLE CGRA_DECR ")" "\{" {
 	    insn[last_insn].imop.basev   = T_IMMEDIATE;
 	    insn[last_insn].imop.baseh   = hash_reg_immediate(0LL); /* start from lmm_0 */
 	    insn[last_insn].imop.bases   = -1;
-	    insn[last_insn].imex.op      = OP_ALWAYS;
-	    insn[last_insn].imex.distv   = T_IMMEDIATE;
-	    insn[last_insn].imex.disth   = hash_reg_immediate(32LL);
+	    insn[last_insn].imex.op0     = OP_ALWAYS;
+	    insn[last_insn].imex.dist1v  = T_IMMEDIATE;
+	    insn[last_insn].imex.dist1h  = hash_reg_immediate(32LL);
 	  }
 	  insn[last_insn].imop.offsm   = id[$13].val;
 	  insn[last_insn].imop.topv    = id[$15].type;
@@ -574,8 +589,8 @@ EMAX6AUNIT : CGRA_WHILE "(" VARIABLE CGRA_DECR ")" "\{" {
             exit(1);
           }
 	  insn[last_insn].iheader.type = 8; /* MOP */
-	  insn[last_insn].iheader.row  = id[ $7].type==T_ALRNO?(id[$7].val)                :id[$7].type==T_BDRNO?(id[$7].val/EMAX_WIDTH):-1; /* adr/bdr */
-	  insn[last_insn].iheader.col  = id[ $7].type==T_ALRNO?(insn[last_insn].imop.mopds):id[$7].type==T_BDRNO?(id[$7].val%EMAX_WIDTH):-1; /* adr/bdr */
+	  insn[last_insn].iheader.row  = id[ $7].type==T_ALRNO?(id[$7].val)                :id[ $3].val<OP_IM_BUFRD&&id[$7].type==T_BDRNO?(id[$7].val/EMAX_WIDTH):-1; /* adr/bdr */
+	  insn[last_insn].iheader.col  = id[ $7].type==T_ALRNO?(insn[last_insn].imop.mopds):id[ $3].val<OP_IM_BUFRD&&id[$7].type==T_BDRNO?(id[$7].val%EMAX_WIDTH):-1; /* adr/bdr */
 	  insn[last_insn].imop.op      = id[ $3].val;
 	  insn[last_insn].imop.mtype   = get_mop_type(id[ $3].val);
 	  insn[last_insn].imop.exv     = id[ $5].type;
@@ -607,9 +622,9 @@ EMAX6AUNIT : CGRA_WHILE "(" VARIABLE CGRA_DECR ")" "\{" {
 		exit(1);
 	      }
 	      /* one_shotを使用し,アドレス計算の初回は,immediateを０として扱う */
-	      insn[last_insn].imex.op      = OP_ALWAYS;
-	      insn[last_insn].imex.distv   = T_IMMEDIATE;
-	      insn[last_insn].imex.disth   = hash_reg_immediate(size);
+	      insn[last_insn].imex.op0    = OP_ALWAYS;
+	      insn[last_insn].imex.dist1v = T_IMMEDIATE;
+	      insn[last_insn].imex.dist1h = hash_reg_immediate(size);
 	    }
 	  }
 	  insn[last_insn].imop.offsm   = id[$13].val;
@@ -793,40 +808,62 @@ exe_dstd : "\&" XVARIABLE { /* &var */
 	}
 	;
 
-mex_src1 : XVARIABLE {
+mex_adr1 : expr {
+	  insn[last_insn].imex.adr1s = -1;
+          $$ = $1;
+        }
+        | XVARIABLE {
+	  insn[last_insn].imex.adr1s = -1;
+          $$ = $1;
+	}
+        | CGRA_ULL XVARIABLE {
+	  insn[last_insn].imex.adr1s = -1;
+          $$ = $2;
+	}
+	;
+
+mex_adr3 : expr {
+	  insn[last_insn].imex.adr3s = -1;
+          $$ = $1;
+        }
+        | XVARIABLE {
+	  insn[last_insn].imex.adr3s = -1;
+          $$ = $1;
+	}
+        | CGRA_ULL XVARIABLE {
+	  insn[last_insn].imex.adr3s = -1;
+          $$ = $2;
+	}
+	;
+
+mex_src1 : expr {
 	  insn[last_insn].imex.src1s = -1;
           $$ = $1;
         }
+        | BDRNO "\[" expr "\]" { /* BR[r][c][s] */
+	  insn[last_insn].imex.src1s = id[$3].val;
+          $$ = $1;
+        }
         ;
 
-mex_src2 : XVARIABLE {
+mex_src2 : expr {
 	  insn[last_insn].imex.src2s = -1;
           $$ = $1;
         }
-        ;
-
-mex_src3 : expr {
-	  insn[last_insn].iexe.src3s = -1;
-          $$ = $1;
-        }
         | BDRNO "\[" expr "\]" { /* BR[r][c][s] */
-	  insn[last_insn].imex.src3s = id[$3].val;
+	  insn[last_insn].imex.src2s = id[$3].val;
           $$ = $1;
         }
         ;
 
-mex_src4 : expr {
-	  insn[last_insn].iexe.src4s = -1;
-          $$ = $1;
-        }
-        | BDRNO "\[" expr "\]" { /* BR[r][c][s] */
-	  insn[last_insn].imex.src4s = id[$3].val;
-          $$ = $1;
-        }
-        ;
+mex_dst1 : "\&" XVARIABLE {
+	  insn[last_insn].imex.mexd0s = -1;
+          $$ = $2;
+	}
+	;
 
-mex_dst : "\&" XVARIABLE {
-	  insn[last_insn].imex.mexds = -1;
+mex_dst2 : "\&" XVARIABLE {
+	  insn[last_insn].imex.mexd1s = -1;
           $$ = $2;
 	}
 	;
