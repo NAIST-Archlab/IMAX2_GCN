@@ -6,7 +6,7 @@
 
 PROGRAM	      = conv-c2c-zynq
 ifeq ($(MACHTYPE),aarch64)
-CFLAGS        = -O2 -fsigned-char
+CFLAGS        = -O2 -fsigned-char -fcommon
 LDFLAGS       =
 else
 CFLAGS        = -O2 -m32 -fsigned-char

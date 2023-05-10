@@ -4,55 +4,50 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#define ROW (46*8)
-
-void trans_matrix(float *dst, float *org, int row, int col) {
-    for (int i = 0; i < row; i++) {
-        for (int j = 0; j < col; j++) {
-            dst[i*col + j] = org[(j/2)*(row*2)+(i*2)+(j%2)];
-        }
-    }
-}
 
 int main(int argc, char **argv) {
     SparseMatrix sp;
     SparseMatrixParams sp_params;
     HiddenLayer result;
     struct timespec t1, t2;
-    float *m, *tm;
+    float *m;
     int i, j;
+    int row_mul = 1;
 
-    if (argc < 2) {
-        printf("Usage: %s row_nnz\n");
+    if (argc < 3) {
+        printf("Usage: %s row_size row_nnz (row_mul)\n", argv[0]);
         return 1;
     }
+
+    if (argc > 3) row_mul = atoi(argv[3]);
     
-    int row_nnz = atoi(argv[1]);
-    sp.nnz = row_nnz * ROW / 2;
-    sp.row_size = ROW;
-    sp.row_p = (int*) malloc(sizeof(int) * (ROW + 1));
-    sp.col_size = ROW;
+    int row_nnz = atoi(argv[2]);
+    int row = atoi(argv[1]) * row_mul;
+
+    printf("Size:(%d*%d), nnz: %d\n", row, row, row_nnz);
+
+    sp.nnz = row_nnz * row / 2;
+    sp.row_size = row;
+    sp.row_p = (int*) malloc(sizeof(int) * (row + 1));
+    sp.col_size = row;
     sp.col_p = (int*) malloc(sizeof(int) * sp.nnz);
     sp.val = (float*) malloc(sizeof(float) * sp.nnz);
 
-    m = (float*) malloc(sizeof(float) * ROW * ROW);
-    #ifdef USE_IMAX2
-    tm = (float*) malloc(sizeof(float) * ROW * ROW);
-    #endif
+    m = (float*) malloc(sizeof(float) * row * row);
 
-    result.weight = (float*) malloc(sizeof(float) * ROW * ROW);
-    memset(result.weight, 0, sizeof(float) * ROW * ROW);
-    result.dim_in = ROW;
-    result.dim_out = ROW;
+    result.weight = (float*) malloc(sizeof(float) * row * row);
+    memset(result.weight, 0, sizeof(float) * row * row);
+    result.dim_in = row;
+    result.dim_out = row;
     
     sp.row_p[0] = 0;
-    for (i = 1; i < ROW; i++) {
+    for (i = 1; i < row; i++) {
         if (i % 2) sp.row_p[i] = sp.row_p[i-1] + row_nnz;
         else sp.row_p[i] = sp.row_p[i-1];
     }
-    sp.row_p[ROW] = sp.nnz;
+    sp.row_p[row] = sp.nnz;
 
-    for (i = 0; i < ROW; i++) {
+    for (i = 0; i < row; i++) {
         int k = 0;
         for (j = sp.row_p[i]; j < sp.row_p[i+1]; j++) {
             sp.col_p[j] = k;
@@ -61,38 +56,38 @@ int main(int argc, char **argv) {
         }
     }
 
-    for (i = 0; i < ROW*ROW; i++) {
-        m[i] = 3.0F;
+    for (i = 0; i < row*row; i++) {
+        if (i % 2) m[i] = 0.0F;
+        else m[i] = 1.0F;
     }
-
-    printf("%f %f\n", sp.val[100], m[100]);
 
     #ifdef USE_IMAX2
     IMAXSparseMatrix imax_sp;
-    trans_imax_format(&imax_sp, &sp);
+    IMAXDenseMatrix imax_m, imax_r;
+    imax_sparse_format_init(&imax_sp, row, row, 46, 8);
+    convert_imax_sparse_format(&imax_sp, &sp);
+    imax_dense_format_init_from_sparse(&imax_m, &imax_sp, row, 8);
+    imax_dense_format_init(&imax_r, row, row, imax_sp.row_padded_size, imax_m.col_padded_size, imax_sp.row_blk_size, imax_m.col_blk_size);
+    convert_imax_dense_format(&imax_m, m);
     timespec_get(&t1, TIME_UTC);
-    spmm(result.weight, &imax_sp, m, ROW);
+    printf("<<<IMAX>>>\n");
+    reset_nanosec();
+    spmm(&imax_r, &imax_sp, &imax_m);
+    get_nanosec(0);
     timespec_get(&t2, TIME_UTC);
-    trans_matrix(tm, result.weight, ROW, ROW);
-    free(result.weight);
-    result.weight = tm;
+    convert_dense_format(result.weight, &imax_r);
     #else
     timespec_get(&t1, TIME_UTC);
-    spmm(result.weight, &sp, &sp_params, m, ROW); 
+    spmm(result.weight, &sp, &sp_params, m, row); 
     timespec_get(&t2, TIME_UTC);
     #endif
 
-    int nonzero = 0;
-    for (i = 0; i < ROW*ROW; i++) {
-        if (result.weight[i] != 0) nonzero++;
-    }
-    printf("\n");
-
-    printf("%d\n", nonzero);
-
     print_weight(&result);
-    printf("%d\n", row_nnz*3);
+    printf("nnz val: %d\n", row_nnz);
     printf("SpMM: %lf sec.\n", cal_time(&t2, &t1));
+    #ifdef USE_IMAX2
+    show_nanosec();
+    #endif
 
     return 0;
 }

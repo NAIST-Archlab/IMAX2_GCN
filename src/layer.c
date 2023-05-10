@@ -159,17 +159,24 @@ float* make_weight(int dim_in, int dim_out) {
 HiddenLayer* propagation(GCNNetwork *network) {
     GCNLayer *p = network->layers;
     HiddenLayer *result = NULL, *end_vectors = NULL;
+    IMAXDenseMatrix h, w, tmp_dh;
     double spmm_time = 0, mm_time = 0, relu_time = 0;
     struct timespec t1, t2;
     
     while (p != NULL) {
-        float *tmp = (float *)malloc(sizeof(float) * network->graph->matrix.row_size * p->latent_vectors.dim_out);
+        #ifdef USE_IMAX2
+        imax_dense_format_init_from_sparse(&h, &network->graph->imax_matrix, p->hidden_layer.dim_out, 8);
+        imax_dense_format_init(&tmp_dh, network->graph->imax_matrix.row_padded_size, h.col_size, network->graph->imax_matrix.row_padded_size, h.col_padded_size, network->graph->imax_matrix.row_blk_size, h.col_blk_size);
+        #endif
         int out_size = network->graph->matrix.row_size * p->hidden_layer.dim_out;
+        float *tmp = (float *)malloc(sizeof(float) * network->graph->matrix.row_size * p->latent_vectors.dim_out);
         float *tmp2 = (float *)malloc(sizeof(float) * out_size);
 
         timespec_get(&t1, TIME_UTC);
         #ifdef USE_IMAX2
-        spmm(tmp, &network->graph->imax_matrix,  p->latent_vectors.weight, p->latent_vectors.dim_out);
+        convert_imax_dense_format(&h, p->latent_vectors.weight);
+        spmm(&tmp_dh, &network->graph->imax_matrix, &h);
+        convert_dense_format(tmp, &tmp_dh);
         #else
         spmm(tmp, &network->graph->matrix, &network->graph->params, p->latent_vectors.weight, p->latent_vectors.dim_out);
         #endif

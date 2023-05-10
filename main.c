@@ -119,26 +119,15 @@ int main(int argc, char **argv) {
     print_layers(&network);
 
     printf("Reading Features now...\n");
-    #ifdef USE_IMAX2
-    float *tmp_feats = (float*)malloc(f_dim_in*f_dim_out*sizeof(float));
-    fread(tmp_feats, sizeof(float), f_dim_in*f_dim_out, fp_feats);
-    #else
     fread(network.layers->latent_vectors.weight, sizeof(float), f_dim_in*f_dim_out, fp_feats);
-    #endif
 
     #ifdef USE_IMAX2
     printf("Transform to IMAX Format..\n");
     timespec_get(&t1, TIME_UTC);
-    #ifdef USE_MP
-    #pragma omp parallel for
-    #endif
-    for (int i = 0; i < f_dim_in/2; i++) {
-        for (int j = 0; j < f_dim_out/2; j++) {
-            ((Ull*)(network.layers[0].latent_vectors.weight))[j*dim_in + i] = ((Ull*)(tmp_feats))[i*dim_out + j];
-        }
-    }
-    free(tmp_feats);
-    trans_imax_format(&network.graph->imax_matrix, &network.graph->matrix);
+    int graph_vec_unit_lcm = 46*8 / gcd(46, 8);
+    int padded_graph_size = network.graph->matrix.col_size + ((network.graph->matrix.col_size % graph_vec_unit_lcm) ? (graph_vec_unit_lcm - (network.graph->matrix.col_size % graph_vec_unit_lcm)) : 0);
+    imax_sparse_format_init(&network.graph->imax_matrix, network.graph->matrix.row_size, network.graph->matrix.col_size, 46, 8);
+    convert_imax_sparse_format(&network.graph->imax_matrix, &network.graph->matrix);
     timespec_get(&t2, TIME_UTC);
     printf("Transform %lf sec.\n", cal_time(&t2, &t1));
     #endif

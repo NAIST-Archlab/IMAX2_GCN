@@ -1,5 +1,5 @@
 *.o
-*-*.c
+src/*-*.*
 *.gch
 imax_gcn
 test_sparse

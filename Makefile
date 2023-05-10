@@ -43,11 +43,11 @@ HOMEBREW_DIR := /opt/homebrew
 
 CPP     := cpp -P
 CC      := gcc
-CFLAGS  := -g3 -O3 -Wall -msse3 -Wno-unknown-pragmas -fopenmp -funroll-loops -fcommon -I$(INCLUDE) -DCBLAS_GEMM -DEMAX6 -DDEBUG
+CFLAGS  := -g3 -O3 -Wall -msse3 -Wno-unknown-pragmas -fopenmp -funroll-loops -fcommon -I$(INCLUDE) -DCBLAS_GEMM -DEMAX6 -DDEBUG -DUSE_IMAX2 -DUSE_MP
 LDFLAGS := -L/usr/lib64 -L/usr/local/lib -lm
 
 ifeq ($(ARM),1)
-CFLAGS  := -O1 -Wall -Wno-unknown-pragmas -funroll-loops -fopenmp -fcommon -I$(INCLUDE) -DARMZYNQ -DEMAX6
+CFLAGS  := -O1 -Wall -Wno-unknown-pragmas -funroll-loops -fopenmp -fcommon -I$(INCLUDE) -DARMZYNQ -DEMAX6 -DDEBUG -DCYCLECNT -DUSE_IMAX2 -DUSE_MP
 LDFLAGS := -L/usr/lib64 -L/usr/local/lib -lm -lrt -lX11 -lXext
 PROGRAM := imax_gcn.emax6
 TEST_SPARSE_PROGRAM := test_sparse.emax6
@@ -58,7 +58,7 @@ OBJS := $(SRCS:.c=.o)
 endif
 
 ifeq ($(ARM_MACOS),1)
-CFLAGS := -g3 -O3 -Wall -Wno-unknown-pragmas -I$(HOMEBREW_DIR)/opt/libomp/include -Xpreprocessor -fopenmp -I$(INCLUDE) -DCBLAS_GEMM -DEMAX6 -DDEBUG
+CFLAGS := -g3 -O3 -Wall -Wno-unknown-pragmas -I$(HOMEBREW_DIR)/opt/libomp/include -Xpreprocessor -fopenmp -I$(INCLUDE) -DCBLAS_GEMM -DEMAX6 -DDEBUG -DUSE_IMAX2 -DUSE_MP
 LDFLAGS := -L/usr/lib -L/usr/local/lib -L$(HOMEBREW_DIR)/opt/libomp/lib -lm -lomp
 endif
 

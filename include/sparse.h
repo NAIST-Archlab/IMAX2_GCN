@@ -1,6 +1,5 @@
 #ifndef __SPARSE_H__
 #define __SPARSE_H__
-#include "options.h"
 #ifdef USE_IMAX2
 #include "emax6.h"
 #else
@@ -21,6 +20,7 @@ typedef struct {Ull u[2];} Dll;
 
 #define KERNEL_MODE_1 1
 #define KERNEL_MODE_2 2
+#define LMM_SIZE 0x4000
 
 typedef struct sparse_matrix {
     int nnz; // Number of Non-zero values
@@ -37,24 +37,40 @@ typedef struct sparse_matrix_params {
 } SparseMatrixParams;
 
 #ifdef USE_IMAX2
-typedef struct sparse_matrix_imax2 {
+typedef struct sparse_matrix_sub_imax2 {
     int nnz;
-    int col_size;
-    int row_size;
-    int row_blk_size;
-    int col_blk_size;
-    int *padding;
     int *row_nnz;
     Uint *row_num;
     Uint *col_num;
     Uint *val;
+    struct sparse_matrix_sub_imax2 *next;
+} IMAXSparseMatrixSub;
+
+typedef struct sparse_matrix_imax2 {
+    int row_size;
+    int col_size;
+    int row_padded_size;
+    int col_padded_size;
+    int row_blk_size;
+    int col_blk_size;
+    int col_blk_min;
+    int nnz_col_blk_size;
+    IMAXSparseMatrixSub *sub;
 } IMAXSparseMatrix;
 
-void trans_imax_format(IMAXSparseMatrix *imax_sp, SparseMatrix *sp);
+typedef struct dense_matrix_imax2 {
+    int row_size;
+    int col_size;
+    int row_padded_size;
+    int col_padded_size;
+    int row_blk_size;
+    int col_blk_size;
+    Uint *val;
+} IMAXDenseMatrix;
 #endif
 
 #ifdef USE_IMAX2
-void spmm(float* result, IMAXSparseMatrix *sp_matrix, float* matrix, int mm_col);
+void spmm(IMAXDenseMatrix* result, IMAXSparseMatrix *imax_sp_matrix, IMAXDenseMatrix* matrix);
 #else
 void spmm(float* result, SparseMatrix *sp_matrix, SparseMatrixParams *sp_params, float* matrix, int mm_col);
 #endif

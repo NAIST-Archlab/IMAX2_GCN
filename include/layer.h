@@ -1,6 +1,5 @@
 #ifndef __LAYER_H__
 #define __LAYER_H__
-#include "options.h"
 #include "emax6.h"
 #include "sparse.h"
 

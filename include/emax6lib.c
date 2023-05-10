@@ -19,13 +19,15 @@ typedef struct {
 typedef struct {
   Uint  e :  6;
   Uint  b :  1;
-  Uint  s :  1;
-} u7bit;
+  Uint  s :  1; /* lower 8bit */
+  Uint dm : 24; /* dummy for >gcc9 */
+} wu7bit;
 
 typedef struct {
   Uint  e :  7;
-  Uint  s :  1;
-} u8bit;
+  Uint  s :  1; /* lower 8bit */
+  Uint dm : 24; /* dummy for >gcc9 */
+} wu8bit;
 
 typedef struct {
   Uchar u[8];
@@ -350,6 +352,7 @@ emax6_open()
   int num_dirs, dir;
   int reg_size;
   int  fd_dma_found = 0;
+  int  emax6_found = 0;
   char path[1024];
   int  fd_dma;
   int  fd_reg;
@@ -414,6 +417,7 @@ emax6_open()
       }
       emax_info.lmm_phys = LMM_BASE_PHYS;
       emax_info.lmm_mmap = emax_info.reg_mmap + (LMM_BASE_PHYS - REG_BASE_PHYS);
+      emax6_found++;
     }
     else if (is_target_dev(namelist[dir]->d_name, UIO_DDR_HIGH)) {
       sprintf(path, "/dev/%s", namelist[dir]->d_name);
@@ -471,6 +475,11 @@ emax6_open()
     ((struct dma_ctrl*)emax_info.dma_mmap)->ZDMA_CH_IRQ_DST_ACCT   = 0x00000000;
     ((struct dma_ctrl*)emax_info.dma_mmap)->ZDMA_CH_CTRL2          = 0x00000000;
   }
+  if (!emax6_found) {
+    printf("EMAX not found: %s", UIO_AXI_EMAX6);
+    exit(1);
+  }
+
   return (1);
 }
 #endif
@@ -953,7 +962,7 @@ ex4(Uint op_ex1, Ull *d, Ull *r1, Uint exp1, Ull *r2, Uint exp2, Ull *r3, Uint e
   }
 }
 
-int convf32tou7(u7bit *out, float in)
+int convf32tou7(Uchar *out, float in)
 {
   //  convf32tou7 e=126     0.992 -> s0111111  0111111111111111111111111111111111111111111111111111111111111111
   //  convf32tou7 e=126 f=0 0.500 -> s0100000  0000000000000000000000000000000011111111111111111111111111111111
@@ -964,43 +973,49 @@ int convf32tou7(u7bit *out, float in)
   //  convf32tou7 e=121 f=0 0.016 -> s0000001  0000000000000000000000000000000000000000000000000000000000000001
   //                        0.000 -> s0000000  0000000000000000000000000000000000000000000000000000000000000000
   f32bit in_f32;
+  wu7bit out_u7;
 
   *(float*)&in_f32 = in;
 
-  out->s = in_f32.s;
-  out->b = 0;
+  out_u7.s = in_f32.s;
+  out_u7.b = 0;
 
   in = abs(in);
-  if  (in >= 1.0) out->e = 63;    /* 乗算時は6bit表現(-1.0+1.0) */
-  else            out->e = in*64; /* number of 1 */    
+  if  (in >= 1.0) out_u7.e = 63;    /* 乗算時は6bit表現(-1.0+1.0) */
+  else            out_u7.e = in*64; /* number of 1 */    
 
-//printf("%7.4f -> %02.2x\n", *(float*)&in_f32, *(Uchar*)out);
+  *out = *(Uchar*)&out_u7;
+//printf("%7.4f -> %02.2x\n", *(float*)&in_f32, *out);
 }
 
-int convf32tou8(u8bit *out, float in)
+int convf32tou8(Uchar *out, float in)
 {
   f32bit in_f32;
+  wu8bit out_u8;
 
   *(float*)&in_f32 = in;
 
-  out->s = in_f32.s;
+  out_u8.s = in_f32.s;
 
   in = abs(in);
-  if  (in >= 2.0) out->e = 127;   /* 乗算時は6bit表現(-1.0+1.0) */
-  else            out->e = in*64; /* number of 1 */    
+  if  (in >= 2.0) out_u8.e = 127;   /* 乗算時は6bit表現(-1.0+1.0) */
+  else            out_u8.e = in*64; /* number of 1 */    
 
-//printf("%7.4f -> %02.2x\n", *(float*)&in_f32, *(Uchar*)out);
+  *out = *(Uchar*)&out_u8;
+//printf("%7.4f -> %02.2x\n", *(float*)&in_f32, *out);
 }
 
-int convu8tof32(float *out, u8bit in)
+int convu8tof32(float *out, Uchar in)
 {
+  wu8bit in_u8;
   f32bit out_f32;
 
-  *(float*)&out_f32 = (float)in.e/64; /* 6bit表現(-2.0+2.0) */
-  out_f32.s = in.s;
+  *(Uchar*)&in_u8 = in;
+  *(float*)&out_f32 = (float)in_u8.e/64; /* 6bit表現(-2.0+2.0) */
+  out_f32.s = in_u8.s;
   *out = *(float*)&out_f32;
 
-//printf("%02.2x -> %7.4f\n", *(Uchar*)&in, *out);
+//printf("%02.2x -> %7.4f\n", in, *out);
 }
 
 Ull urand(int no)
@@ -1134,17 +1149,17 @@ int softu64(int stage, Ull *o1, Ull *o2, Ull *o3, Ull r1, Ull r2, Ull r3, Ull r4
 #if !defined(ARMSIML) && defined(TRACE_SPIKE)
     if (enable_x11) {
       int i;
-      u8bit r2_u8;
-      u8bit r3_u8;
+      Uchar r2_u8;
+      Uchar r3_u8;
       float r1_f32;
       float r2_f32;
       float r3_f32;
       float o3_f32;
-      convu8tof32(&o3_f32, *(u8bit*)o3);   /* for graph */
-      convu8tof32(&r1_f32, *(u8bit*)&r1); /* for graph */
+      convu8tof32(&o3_f32, *(Uchar*)o3);   /* for graph */
+      convu8tof32(&r1_f32, *(Uchar*)&r1); /* for graph */
       for (i=0; i<8; i++) { /* s2 * s3 -> ad2 */
-	*(Uchar*)&r2_u8 = r2>>(i*8)&0xff;
-	*(Uchar*)&r3_u8 = r3>>(i*8)&0xff;
+	r2_u8 = r2>>(i*8)&0xff;
+	r3_u8 = r3>>(i*8)&0xff;
 	convu8tof32(&r2_f32, r2_u8); /* for graph */
 	convu8tof32(&r3_f32, r3_u8); /* for graph */
 	r1_f32 += r2_f32*r3_f32;
