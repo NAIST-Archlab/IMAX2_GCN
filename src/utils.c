@@ -95,10 +95,11 @@ void imax_dense_format_init_from_sparse(IMAXDenseMatrix *imax_m, IMAXSparseMatri
     imax_m->row_size = imax_sp->col_size;
     imax_m->col_size = m_col;
     
-    imax_m->row_padded_size = imax_sp->col_padded_size;
+    int sqrt_lmm = (int)sqrt(LMM_SIZE);
     imax_m->row_blk_size = imax_sp->col_blk_size;
-    imax_m->col_padded_size = imax_m->col_size + ((imax_m->col_size%m_col_blk_min) ? m_col_blk_min - imax_m->col_size%m_col_blk_min : 0);
-    imax_m->col_blk_size = (imax_m->col_padded_size < ((int)sqrt(LMM_SIZE))) ? imax_m->col_padded_size : imax_m->col_padded_size/(imax_m->col_padded_size/(int)sqrt(LMM_SIZE));
+    imax_m->row_padded_size = imax_sp->col_padded_size;
+    imax_m->col_blk_size = sqrt_lmm - (sqrt_lmm%m_col_blk_min);
+    imax_m->col_padded_size = imax_m->col_size + (imax_m->col_blk_size - imax_m->col_size%imax_m->col_blk_size);
     imax_m->val = (Uint*) malloc(sizeof(Uint)*imax_m->row_padded_size*imax_m->col_padded_size);
     memset(imax_m->val, 0, sizeof(Uint)*imax_m->row_padded_size*imax_m->col_padded_size);
     printf("M Params: Orig(%d,%d) Padded(%d,%d) blk(%d,%d)\n", imax_m->row_size, imax_m->col_size, imax_m->row_padded_size, imax_m->col_padded_size, imax_m->row_blk_size, imax_m->col_blk_size);
@@ -137,12 +138,13 @@ void imax_sparse_format_init(IMAXSparseMatrix *imax_sp, int row, int col, int sp
     imax_sp->row_size = row;
     imax_sp->col_size = col;
 
-    imax_sp->row_padded_size = row + ((row%m_col_blk_min) ? (m_col_blk_min - row%m_col_blk_min) : 0);
-    imax_sp->row_blk_size = (imax_sp->row_padded_size < ((int)sqrt(LMM_SIZE))) ? imax_sp->row_padded_size : imax_sp->row_padded_size/(imax_sp->row_padded_size/((int)sqrt(LMM_SIZE)));
-    imax_sp->col_padded_size = col + ((col%m_col_blk_min) ? (m_col_blk_min - col%m_col_blk_min) : 0);
+    int sqrt_lmm = (int)sqrt(LMM_SIZE);
+    imax_sp->row_blk_size = sqrt_lmm - (sqrt_lmm%m_col_blk_min);
+    imax_sp->row_padded_size = row + (imax_sp->row_blk_size - row%imax_sp->row_blk_size);
+    imax_sp->col_blk_size = sqrt_lmm - (sqrt_lmm%m_col_blk_min);
+    imax_sp->col_padded_size = col + (imax_sp->col_blk_size - col%imax_sp->col_blk_size);
     imax_sp->nnz_col_blk_size = sp_col_blk;
     imax_sp->col_blk_min = m_col_blk_min;
-    imax_sp->col_blk_size = (imax_sp->col_padded_size < ((int)sqrt(LMM_SIZE))) ? imax_sp->col_padded_size : imax_sp->col_padded_size/(imax_sp->col_padded_size/((int)sqrt(LMM_SIZE)));
     imax_sp->sub = (IMAXSparseMatrixSub*) malloc(sizeof(IMAXSparseMatrixSub));
     imax_sp->sub->row_num = (Uint*) malloc(sizeof(Uint)*imax_sp->row_padded_size);
     imax_sp->sub->row_nnz = (int*) malloc(sizeof(int)*imax_sp->row_padded_size);
@@ -210,21 +212,23 @@ void convert_imax_sparse_format(IMAXSparseMatrix *imax_sp, SparseMatrix *sp) {
             for (int j=0; j < imax_sp->row_blk_size; j++) {
                 int real_nnz = p->row_nnz[row_th_l+j];
                 int real_row = p->row_num[row_th_l+j];
-                int real_col_s = sp->row_p[real_row];
-                p->row_nnz[row_th_l+j] = new_row_nnz[i];
+                if (real_nnz) {
+                    int real_col_s = sp->row_p[real_row];
+                    p->row_nnz[row_th_l+j] = new_row_nnz[i];
 
-                int nnz_cnt = 0;
-                for (int k=real_col_s; k < sp->row_p[real_row+1]; k++) {
-                    if ((sp->col_p[k] < col_th_h) && (sp->col_p[k] >= col_th_l)) {
-                        p->val[end + (imax_sp->row_blk_size*2)*(nnz_cnt/2)+(j*2)+(nnz_cnt%2)] = *(Uint*)&(sp->val[k]);
-                        p->col_num[end + (imax_sp->row_blk_size*2)*(nnz_cnt/2)+(j*2)+(nnz_cnt%2)] = sp->col_p[k] - col_th_l;
-                        nnz_cnt++;
+                    int nnz_cnt = 0;
+                    for (int k=real_col_s; k < sp->row_p[real_row+1]; k++) {
+                        if ((sp->col_p[k] < col_th_h) && (sp->col_p[k] >= col_th_l)) {
+                            p->val[end + (imax_sp->row_blk_size*2)*(nnz_cnt/2)+(j*2)+(nnz_cnt%2)] = *(Uint*)&(sp->val[k]);
+                            p->col_num[end + (imax_sp->row_blk_size*2)*(nnz_cnt/2)+(j*2)+(nnz_cnt%2)] = sp->col_p[k] - col_th_l;
+                            nnz_cnt++;
+                        }
                     }
-                }
 
-                for (int k=nnz_cnt; k < new_row_nnz[i]; k++) {
-                    p->val[end+ (imax_sp->row_blk_size*2)*(k/2)+(j*2)+(k%2)] = 0;
-                    p->col_num[end + (imax_sp->row_blk_size*2)*(k/2)+(j*2)+(k%2)] = 0;
+                    for (int k=nnz_cnt; k < new_row_nnz[i]; k++) {
+                        p->val[end+ (imax_sp->row_blk_size*2)*(k/2)+(j*2)+(k%2)] = 0;
+                        p->col_num[end + (imax_sp->row_blk_size*2)*(k/2)+(j*2)+(k%2)] = 0;
+                    }
                 }
                 p->row_num[row_th_l+j] -= row_th_l;
             }

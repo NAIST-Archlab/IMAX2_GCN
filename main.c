@@ -126,7 +126,7 @@ int main(int argc, char **argv) {
     timespec_get(&t1, TIME_UTC);
     int graph_vec_unit_lcm = 46*8 / gcd(46, 8);
     int padded_graph_size = network.graph->matrix.col_size + ((network.graph->matrix.col_size % graph_vec_unit_lcm) ? (graph_vec_unit_lcm - (network.graph->matrix.col_size % graph_vec_unit_lcm)) : 0);
-    imax_sparse_format_init(&network.graph->imax_matrix, network.graph->matrix.row_size, network.graph->matrix.col_size, 46, 8);
+    imax_sparse_format_init(&network.graph->imax_matrix, network.graph->matrix.row_size, network.graph->matrix.col_size, 46, 8*NCHIP);
     convert_imax_sparse_format(&network.graph->imax_matrix, &network.graph->matrix);
     timespec_get(&t2, TIME_UTC);
     printf("Transform %lf sec.\n", cal_time(&t2, &t1));

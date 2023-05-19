@@ -5,7 +5,6 @@
 #include "../include/sparse.h"
 #include "../include/emax6.h"
 #include "../include/emax6lib.c"
-#define NCHIP 2
 
 void spmm(IMAXDenseMatrix* result, IMAXSparseMatrix *imax_sp_matrix, IMAXDenseMatrix* matrix) {
     Ull CHIP; Ull LOOP1, LOOP0; Ull INIT1, INIT0;
@@ -56,22 +55,21 @@ void spmm(IMAXDenseMatrix* result, IMAXSparseMatrix *imax_sp_matrix, IMAXDenseMa
             a_row_index = (Uint*)p->row_num + a_row_blk;
             //Select Column of B(= Column of C)
             for (b_col_blk=0; b_col_blk < B_col_size/NCHIP; b_col_blk+=B_col_blk_size) { 
+                for (CHIP=0; CHIP<NCHIP; CHIP++) {
+                    b[CHIP] = (Uint*)matrix->val + a_col_blk*B_col_size + (CHIP*B_col_size/NCHIP + b_col_blk)*B_row_blk_size; 
+                    b0[CHIP] = (Uint*)b[CHIP];
+                    b1[CHIP] = (Uint*)b[CHIP] + B_row_blk_size*2;
+                    b2[CHIP] = (Uint*)b[CHIP] + B_row_blk_size*4;
+                    b3[CHIP] = (Uint*)b[CHIP] + B_row_blk_size*6;
+
+                    c0[CHIP] = (Uint*)result->val + a_row_blk*B_col_size + (CHIP*B_col_size/NCHIP + b_col_blk)*A_row_blk_size;
+                    c00[CHIP]= (Uint*)c0[CHIP];
+                    c01[CHIP]= (Uint*)c0[CHIP] + A_row_blk_size*2;
+                    c02[CHIP]= (Uint*)c0[CHIP] + A_row_blk_size*4;
+                    c03[CHIP]= (Uint*)c0[CHIP] + A_row_blk_size*6;
+                }
                 //Select Column Block of of None-zero values of A
                 for (nnz_col_blk=0; nnz_col_blk < A_nnz_size; nnz_col_blk+=A_nnz_col_blk_size) {
-                    for (CHIP=0; CHIP<NCHIP; CHIP++) {
-                        b[CHIP] = (Uint*)matrix->val + a_col_blk*B_col_size + (CHIP*B_col_size/NCHIP + b_col_blk)*B_row_blk_size; 
-                        b0[CHIP] = (Uint*)b[CHIP];
-                        b1[CHIP] = (Uint*)b[CHIP] + B_row_blk_size*2;
-                        b2[CHIP] = (Uint*)b[CHIP] + B_row_blk_size*4;
-                        b3[CHIP] = (Uint*)b[CHIP] + B_row_blk_size*6;
-
-                        c0[CHIP] = (Uint*)result->val + a_row_blk*B_col_size + (CHIP*B_col_size/NCHIP + b_col_blk)*A_row_blk_size;
-                        c00[CHIP]= (Uint*)c0[CHIP];
-                        c01[CHIP]= (Uint*)c0[CHIP] + A_row_blk_size*2;
-                        c02[CHIP]= (Uint*)c0[CHIP] + A_row_blk_size*4;
-                        c03[CHIP]= (Uint*)c0[CHIP] + A_row_blk_size*6;
-                    }
-
                     for (k=0; k < A_nnz_col_blk_size/2; k++) a[k] = (Uint*)p->val + end_sum + (nnz_col_blk*A_row_blk_size) + (2*k*A_row_blk_size);
                     for (k=0; k < A_nnz_col_blk_size/2; k++) a_col_index[k] = (Uint*)p->col_num + end_sum + (nnz_col_blk*A_row_blk_size) + (2*k*A_row_blk_size);
 
@@ -161,10 +159,10 @@ void spmm(IMAXDenseMatrix* result, IMAXSparseMatrix *imax_sp_matrix, IMAXDenseMa
                                 exe(OP_FAD, &AR[r][1], AR[rm1][1], EXP_H3210, BR[r][1][1], EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);\
                                 exe(OP_FAD, &AR[r][2], AR[rm1][2], EXP_H3210, BR[r][2][1], EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);\
                                 exe(OP_FAD, &AR[r][3], AR[rm1][3], EXP_H3210, BR[r][3][1], EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);\
-                                mop(OP_STR, 3, &AR[r][0], (Ull)r0, (Ull)c00[CHIP], MSK_D0, (Ull)c0[CHIP], A_row_blk_mul_B_col_blk_size, 0, 0, (Ull)NULL, A_row_blk_mul_B_col_blk_size);\
-                                mop(OP_STR, 3, &AR[r][1], (Ull)r0, (Ull)c01[CHIP], MSK_D0, (Ull)c0[CHIP], A_row_blk_mul_B_col_blk_size, 0, 0, (Ull)NULL, A_row_blk_mul_B_col_blk_size);\
-                                mop(OP_STR, 3, &AR[r][2], (Ull)r0, (Ull)c02[CHIP], MSK_D0, (Ull)c0[CHIP], A_row_blk_mul_B_col_blk_size, 0, 0, (Ull)NULL, A_row_blk_mul_B_col_blk_size);\
-                                mop(OP_STR, 3, &AR[r][3], (Ull)r0, (Ull)c03[CHIP], MSK_D0, (Ull)c0[CHIP], A_row_blk_mul_B_col_blk_size, 0, 0, (Ull)NULL, A_row_blk_mul_B_col_blk_size)
+                                mop(OP_STR, 3, &AR[r][0], (Ull)c00[CHIP], (Ull)offset, MSK_D0, (Ull)c0[CHIP], A_row_blk_mul_B_col_blk_size, 0, 0, (Ull)NULL, A_row_blk_mul_B_col_blk_size);\
+                                mop(OP_STR, 3, &AR[r][1], (Ull)c01[CHIP], (Ull)offset, MSK_D0, (Ull)c0[CHIP], A_row_blk_mul_B_col_blk_size, 0, 0, (Ull)NULL, A_row_blk_mul_B_col_blk_size);\
+                                mop(OP_STR, 3, &AR[r][2], (Ull)c02[CHIP], (Ull)offset, MSK_D0, (Ull)c0[CHIP], A_row_blk_mul_B_col_blk_size, 0, 0, (Ull)NULL, A_row_blk_mul_B_col_blk_size);\
+                                mop(OP_STR, 3, &AR[r][3], (Ull)c03[CHIP], (Ull)offset, MSK_D0, (Ull)c0[CHIP], A_row_blk_mul_B_col_blk_size, 0, 0, (Ull)NULL, A_row_blk_mul_B_col_blk_size)
 
 //EMAX5A begin spmm1 mapdist=0
                     for (CHIP=0; CHIP<NCHIP; CHIP++) { /* will be parallelized by multi-chip (M/#chip) */
