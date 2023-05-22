@@ -43,7 +43,6 @@ typedef struct sparse_matrix_sub_imax2 {
     Uint *row_num;
     Uint *col_num;
     Uint *val;
-    struct sparse_matrix_sub_imax2 *next;
 } IMAXSparseMatrixSub;
 
 typedef struct sparse_matrix_imax2 {
@@ -55,7 +54,7 @@ typedef struct sparse_matrix_imax2 {
     int col_blk_size;
     int col_blk_min;
     int nnz_col_blk_size;
-    IMAXSparseMatrixSub *sub;
+    IMAXSparseMatrixSub **sub;
 } IMAXSparseMatrix;
 
 typedef struct dense_matrix_imax2 {

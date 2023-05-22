@@ -12,7 +12,7 @@ TEST_SRCS := $(wildcard $(TEST_DIR)/*.c)
 OBJS := $(SRCS:.c=.o)
 MAIN := main.c
 MAIN_OBJS := main.o
-NCHIP := 4
+NCHIP := 2
 TEST_OBJS := $(TEST_SRCS:.c=.o)
 HEADERS := $(INCLUDE)/emax6.h $(INCLUDE)/layer.h $(INCLUDE)/options.h $(INCLUDE)/sparse.h $(INCLUDE)/utils.h
 
