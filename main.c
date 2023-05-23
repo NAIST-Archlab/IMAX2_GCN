@@ -1,5 +1,6 @@
 #include "./include/layer.h"
 #include "./include/utils.h"
+#include "../include/emax6.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>

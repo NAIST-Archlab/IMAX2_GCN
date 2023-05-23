@@ -86,8 +86,6 @@ void imax_dense_format_init(IMAXDenseMatrix *imax_m, int row, int col, int row_p
     imax_m->col_padded_size = col_padded;
     imax_m->row_blk_size = row_blk;
     imax_m->col_blk_size = col_blk;
-    imax_m->val = (Uint*) malloc(sizeof(Uint)*imax_m->row_padded_size*imax_m->col_padded_size);
-    memset(imax_m->val, 0, sizeof(Uint)*imax_m->row_padded_size*imax_m->col_padded_size);
     printf("M Params: Orig(%d,%d) Padded(%d,%d) blk(%d,%d)\n", imax_m->row_size, imax_m->col_size, imax_m->row_padded_size, imax_m->col_padded_size, imax_m->row_blk_size, imax_m->col_blk_size);
 }
 
@@ -100,8 +98,6 @@ void imax_dense_format_init_from_sparse(IMAXDenseMatrix *imax_m, IMAXSparseMatri
     imax_m->row_padded_size = imax_sp->col_padded_size;
     imax_m->col_blk_size = sqrt_lmm - (sqrt_lmm%m_col_blk_min);
     imax_m->col_padded_size = imax_m->col_size + (imax_m->col_blk_size - imax_m->col_size%imax_m->col_blk_size);
-    imax_m->val = (Uint*) malloc(sizeof(Uint)*imax_m->row_padded_size*imax_m->col_padded_size);
-    memset(imax_m->val, 0, sizeof(Uint)*imax_m->row_padded_size*imax_m->col_padded_size);
     printf("M Params: Orig(%d,%d) Padded(%d,%d) blk(%d,%d)\n", imax_m->row_size, imax_m->col_size, imax_m->row_padded_size, imax_m->col_padded_size, imax_m->row_blk_size, imax_m->col_blk_size);
 }
 
@@ -155,6 +151,33 @@ void imax_sparse_format_init(IMAXSparseMatrix *imax_sp, int row, int col, int sp
     printf("SpM Parameters: Padded(%d,%d) blk(%d,%d) nnz_col_blk(%d)\n", imax_sp->row_padded_size, imax_sp->col_padded_size, imax_sp->row_blk_size, imax_sp->col_blk_size, imax_sp->nnz_col_blk_size);
 }
 
+void imax_allocation(Uchar* membase, IMAXSparseMatrix *imax_sp, IMAXDenseMatrix *imax_m, IMAXDenseMatrix *imax_r) {
+    int col_blk_num = (imax_sp->col_padded_size / imax_sp->col_blk_size);
+
+    sysinit(
+        &membase,
+        (
+            (imax_sp->nnz * 2) +                                   // SpM Col and Data
+            (imax_sp->row_padded_size * col_blk_num * 2) +         // SpM Row
+            (imax_m->row_padded_size * imax_m->col_padded_size) +  // Input M Size
+            (imax_r->row_padded_size * imax_r->col_padded_size)    // Result M Size
+        )*sizeof(Uint),
+        32
+    );
+
+    Uint *sp_tmp = (Uint*) membase;
+
+    for (int i = 0; i < col_blk_num; i++) {
+        memcpy(sp_tmp, imax_sp->sub[i]->row_num, imax_sp->row_padded_size*sizeof(Uint)); free((imax_sp->sub[i]->row_num)); imax_sp->sub[i]->row_num = sp_tmp; sp_tmp += imax_sp->row_padded_size; 
+        memcpy(sp_tmp, imax_sp->sub[i]->row_nnz, imax_sp->row_padded_size*sizeof(Uint)); free((imax_sp->sub[i]->row_nnz)); imax_sp->sub[i]->row_nnz = sp_tmp; sp_tmp += imax_sp->row_padded_size;
+        memcpy(sp_tmp, imax_sp->sub[i]->col_num,     imax_sp->sub[i]->nnz*sizeof(Uint)); free((imax_sp->sub[i]->col_num)); imax_sp->sub[i]->col_num = sp_tmp; sp_tmp += imax_sp->sub[i]->nnz;
+        memcpy(sp_tmp, imax_sp->sub[i]->val,         imax_sp->sub[i]->nnz*sizeof(Uint)); free((imax_sp->sub[i]->val    )); imax_sp->sub[i]->val     = sp_tmp; sp_tmp += imax_sp->sub[i]->nnz;
+    }
+
+    imax_m->val = sp_tmp; sp_tmp += imax_m->row_padded_size * imax_m->col_padded_size;
+    imax_r->val = sp_tmp;
+}
+
 void convert_imax_sparse_format(IMAXSparseMatrix *imax_sp, SparseMatrix *sp) {
     int row_p_blk = imax_sp->row_blk_size;
     int row_blk_num = imax_sp->row_padded_size / row_p_blk;
@@ -164,6 +187,7 @@ void convert_imax_sparse_format(IMAXSparseMatrix *imax_sp, SparseMatrix *sp) {
     int *value_buffer = (int*) malloc(sizeof(int)*imax_sp->row_blk_size);
     int *new_row_nnz = (int*) malloc(sizeof(int)*row_blk_num);
 
+    imax_sp->nnz = 0;
     for (int i=0; i < imax_sp->row_size; i++) 
         for (int j=0; j < col_blk_num; j++) imax_sp->sub[j]->row_num[i] = i;
 
@@ -201,6 +225,7 @@ void convert_imax_sparse_format(IMAXSparseMatrix *imax_sp, SparseMatrix *sp) {
         imax_sp->sub[i]->val = (Uint*) malloc(sizeof(Uint)*new_nnz);
         imax_sp->sub[i]->col_num = (Uint*) malloc(sizeof(Uint)*new_nnz);
         imax_sp->sub[i]->nnz = new_nnz;
+        imax_sp->nnz += new_nnz;
 
         int end = 0;
         int col_th_l = imax_sp->col_blk_size*i;

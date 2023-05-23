@@ -48,14 +48,12 @@ CFLAGS  := -g3 -O3 -Wall -msse3 -Wno-unknown-pragmas -fopenmp -funroll-loops -fc
 LDFLAGS := -L/usr/lib64 -L/usr/local/lib -lm
 
 ifeq ($(ARM),1)
-CFLAGS  := -O1 -Wall -Wno-unknown-pragmas -funroll-loops -fopenmp -fcommon -I$(INCLUDE) -DARMZYNQ -DEMAX6 -DDEBUG -DCYCLECNT -DUSE_IMAX2 -DUSE_MP -DNCHIP=$(NCHIP)
+CFLAGS  := -O1 -Wall -Wno-unknown-pragmas -funroll-loops -fopenmp -fcommon -I$(INCLUDE) -DARMZYNQ -DEMAX6 -DDEBUG -DUSE_IMAX2 -DUSE_MP -DNCHIP=$(NCHIP)
 LDFLAGS := -L/usr/lib64 -L/usr/local/lib -lm -lrt -lX11 -lXext
-PROGRAM := imax_gcn.emax6
-TEST_SPARSE_PROGRAM := test_sparse.emax6
-SRCS := $(filter-out $(SRC_DIR)/sparse_imax.c, $(SRCS)) $(SRC_DIR)/sparse_imax-emax6.c
-TEST_SRCS := $(wildcard $(TEST_DIR)/*.c) $(SRC_DIR)/sparse_imax-emax6.c
-#TEST_SRCS := $(wildcard $(TEST_DIR)/*.c)
-OBJS := $(SRCS:.c=.o)
+CFLAGS_EMAX6  := -O1 -Wall -Wno-unknown-pragmas -funroll-loops -fopenmp -fcommon -I$(INCLUDE) -DARMZYNQ -DEMAX6 -DUSE_IMAX2 -DUSE_MP -DNCHIP=$(NCHIP)
+CFLAGS_EMAX6_DMA  := -O1 -Wall -Wno-unknown-pragmas -funroll-loops -fopenmp -fcommon -I$(INCLUDE) -DARMZYNQ -DEMAX6 -DFPDDMA -DUSE_IMAX2 -DUSE_MP -DNCHIP=$(NCHIP)
+SRCS_EMAX6 := $(filter-out $(SRC_DIR)/sparse_imax.c, $(SRCS)) $(SRC_DIR)/sparse_imax-emax6.c
+OBJS_EMAX6 := $(SRCS_EMAX6:.c=.o)
 endif
 
 ifeq ($(ARM_MACOS),1)
@@ -73,8 +71,24 @@ all: $(PROGRAM)
 $(PROGRAM): $(OBJS) $(MAIN_OBJS)
 	$(CC) $(OBJS) $(MAIN_OBJS) -o $(PROGRAM) $(LDFLAGS) $(CFLAGS)
 
+ifeq ($(ARM), 1)
+$(PROGRAM).emax6: $(OBJS_EMAX6) $(MAIN_OBJS)
+	$(CC) $(OBJS_EMAX6) $(MAIN_OBJS) -o $(PROGRAM).emax6 $(LDFLAGS) $(CFLAGS_EMAX6)
+
+$(PROGRAM).emax6+dma: $(OBJS_EMAX6) $(MAIN_OBJS)
+	$(CC) $(OBJS_EMAX6) $(MAIN_OBJS) -o $(PROGRAM).emax6+dma $(LDFLAGS) $(CFLAGS_EMAX6_DMA)
+endif
+
 $(TEST_SPARSE_PROGRAM): $(OBJS) $(TEST_OBJS)
 	$(CC) $(OBJS) $(TEST_OBJS) -o $(TEST_SPARSE_PROGRAM) $(LDFLAGS) $(CFLAGS)
+
+ifeq ($(ARM), 1)
+$(TEST_SPARSE_PROGRAM).emax6: $(OBJS_EMAX6) $(TEST_OBJS)
+	$(CC) $(OBJS_EMAX6) $(TEST_OBJS) -o $(TEST_SPARSE_PROGRAM).emax6 $(LDFLAGS) $(CFLAGS_EMAX6)
+
+$(TEST_SPARSE_PROGRAM).emax6+dma: $(OBJS_EMAX6) $(TEST_OBJS)
+	$(CC) $(OBJS_EMAX6) $(TEST_OBJS) -o $(TEST_SPARSE_PROGRAM).emax6+dma $(LDFLAGS) $(CFLAGS_EMAX6_DMA)
+endif
 
 $(SRC_DIR)/sparse_imax-emax6.c: $(SRC_DIR)/sparse_imax.c
 	./conv-mark/conv-mark $< > $<-mark.c

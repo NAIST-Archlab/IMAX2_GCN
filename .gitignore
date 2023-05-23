@@ -4,6 +4,7 @@ src/*-*.*
 imax_gcn
 test_sparse
 *.emax6
+*.emax6+dma
 data/
 data_backup/
 .DS_Store

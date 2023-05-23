@@ -6,6 +6,48 @@
 #include "../include/emax6.h"
 #include "../include/emax6lib.c"
 
+void sysinit(Uchar **membase, Uint memsize, Uint alignment) {
+#if defined(ARMZYNQ) && defined(EMAX6)
+  if (emax6_open() == NULL)
+    exit(1);
+  *membase = emax_info.ddr_mmap;
+  {int i; for (i=0; i<(memsize+sizeof(Dll)-1)/sizeof(Dll); i++) *((Dll*)*membase+i)=0;}
+#elif __linux__ == 1
+  posix_memalign(membase, alignment, memsize);
+#else
+  *membase = (void*)malloc(memsize+alignment);
+  if ((Ull)*membase & (Ull)(alignment-1))
+    *membase = (void*)(((Ull)*membase & ~(Ull)(alignment-1))+alignment);
+#endif
+
+#if !defined(ARMZYNQ) && defined(EMAX6)
+  emax_info.dma_phys = DMA_BASE2_PHYS; /* defined in emax6lib.h */
+  emax_info.dma_mmap = emax_info.dma_phys;
+  emax_info.reg_phys = REG_BASE2_PHYS; /* defined in emax6lib.h */
+  emax_info.reg_mmap = emax_info.reg_phys;
+  emax_info.lmm_phys = LMM_BASE2_PHYS;
+  emax_info.lmm_mmap = emax_info.lmm_phys;
+  emax_info.ddr_phys = *membase;
+  emax_info.ddr_mmap = emax_info.ddr_phys;
+#endif
+#if (defined(ARMSIML) || defined(ARMZYNQ)) && defined(EMAX6)
+  emax6.dma_ctrl  = emax_info.dma_mmap;
+  emax6.reg_ctrl  = emax_info.reg_mmap;
+  ((struct reg_ctrl*)emax6.reg_ctrl)->i[0].cmd = CMD_RESET;
+#if defined(ARMZYNQ)
+  usleep(1);
+#endif
+  switch (((struct reg_ctrl*)emax6.reg_ctrl)->i[0].stat>>8 & 0xf) {
+  case  3:EMAX_DEPTH = 64;break;
+  case  2:EMAX_DEPTH = 32;break;
+  case  1:EMAX_DEPTH = 16;break;
+  default:EMAX_DEPTH =  8;break;
+  }
+  ((struct reg_ctrl*)emax6.reg_ctrl)->i[0].adtr = emax_info.ddr_mmap - emax_info.lmm_phys;
+  ((struct reg_ctrl*)emax6.reg_ctrl)->i[0].dmrp = 0LL;
+#endif
+}
+
 void spmm(IMAXDenseMatrix* result, IMAXSparseMatrix *imax_sp_matrix, IMAXDenseMatrix* matrix) {
     Ull CHIP; Ull LOOP1, LOOP0; Ull INIT1, INIT0;
     Ull blk, end_sum, nnz_col_blk, a_row_blk, b_col_blk;

@@ -13,6 +13,7 @@ int main(int argc, char **argv) {
     float *m;
     int i, j;
     int row_mul = 1;
+    Uchar *membase = NULL;
 
     if (argc < 3) {
         printf("Usage: %s row_size row_nnz (row_mul)\n", argv[0]);
@@ -68,6 +69,7 @@ int main(int argc, char **argv) {
     convert_imax_sparse_format(&imax_sp, &sp);
     imax_dense_format_init_from_sparse(&imax_m, &imax_sp, row, 8);
     imax_dense_format_init(&imax_r, row, row, imax_sp.row_padded_size, imax_m.col_padded_size, imax_sp.row_blk_size, imax_m.col_blk_size);
+    imax_allocation(membase, &imax_sp, &imax_m, &imax_r);
     convert_imax_dense_format(&imax_m, m);
     timespec_get(&t1, TIME_UTC);
     printf("<<<IMAX>>>\n");

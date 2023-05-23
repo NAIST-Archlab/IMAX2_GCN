@@ -162,11 +162,13 @@ HiddenLayer* propagation(GCNNetwork *network) {
     IMAXDenseMatrix h, w, tmp_dh;
     double spmm_time = 0, mm_time = 0, relu_time = 0;
     struct timespec t1, t2;
+    Uchar *membase = NULL;
     
     while (p != NULL) {
         #ifdef USE_IMAX2
         imax_dense_format_init_from_sparse(&h, &network->graph->imax_matrix, p->hidden_layer.dim_out, 8);
         imax_dense_format_init(&tmp_dh, network->graph->imax_matrix.row_padded_size, h.col_size, network->graph->imax_matrix.row_padded_size, h.col_padded_size, network->graph->imax_matrix.row_blk_size, h.col_blk_size);
+        imax_allocation(membase, &network->graph->imax_matrix, &h, &tmp_dh);
         #endif
         int out_size = network->graph->matrix.row_size * p->hidden_layer.dim_out;
         float *tmp = (float *)malloc(sizeof(float) * network->graph->matrix.row_size * p->latent_vectors.dim_out);
