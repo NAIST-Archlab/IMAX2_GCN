@@ -20,7 +20,7 @@ typedef struct {Ull u[2];} Dll;
 
 #define KERNEL_MODE_1 1
 #define KERNEL_MODE_2 2
-#define LMM_SIZE 0x2000
+#define LMM_SIZE 0x4000
 
 typedef struct sparse_matrix {
     int nnz; // Number of Non-zero values
@@ -72,6 +72,7 @@ typedef struct dense_matrix_imax2 {
 #ifdef USE_IMAX2
 void spmm(IMAXDenseMatrix* result, IMAXSparseMatrix *imax_sp_matrix, IMAXDenseMatrix* matrix);
 void sysinit(Uchar **membase, Uint memsize, Uint alignment);
+void mem_release(Uchar **membase, Uint memsize);
 #else
 void spmm(float* result, SparseMatrix *sp_matrix, SparseMatrixParams *sp_params, float* matrix, int mm_col);
 #endif

@@ -72,10 +72,7 @@ int main(int argc, char **argv) {
     imax_allocation(membase, &imax_sp, &imax_m, &imax_r);
     convert_imax_dense_format(&imax_m, m);
     timespec_get(&t1, TIME_UTC);
-    printf("<<<IMAX>>>\n");
-    reset_nanosec();
     spmm(&imax_r, &imax_sp, &imax_m);
-    get_nanosec(0);
     timespec_get(&t2, TIME_UTC);
     convert_dense_format(result.weight, &imax_r);
     #else
@@ -87,9 +84,6 @@ int main(int argc, char **argv) {
     print_weight(&result);
     printf("nnz val: %d\n", row_nnz);
     printf("SpMM: %lf sec.\n", cal_time(&t2, &t1));
-    #ifdef USE_IMAX2
-    show_nanosec();
-    #endif
 
     return 0;
 }
