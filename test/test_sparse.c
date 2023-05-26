@@ -7,23 +7,23 @@
 
 int main(int argc, char **argv) {
     SparseMatrix sp;
-    SparseMatrixParams sp_params;
     HiddenLayer result;
     struct timespec t1, t2;
     float *m;
     int i, j;
-    int row_mul = 1;
+    #ifdef USE_IMAX2
     Uchar *membase = NULL;
+    #endif
 
-    if (argc < 3) {
-        printf("Usage: %s row_size row_nnz (row_mul)\n", argv[0]);
+    if (argc < 4) {
+        printf("Usage: %s row_size row_nnz out_size\n", argv[0]);
         return 1;
     }
 
-    if (argc > 3) row_mul = atoi(argv[3]);
+    int out_size = atoi(argv[3]);
     
     int row_nnz = atoi(argv[2]);
-    int row = atoi(argv[1]) * row_mul;
+    int row = atoi(argv[1]);
 
     printf("Size:(%d*%d), nnz: %d\n", row, row, row_nnz);
 
@@ -34,12 +34,12 @@ int main(int argc, char **argv) {
     sp.col_p = (int*) malloc(sizeof(int) * sp.nnz);
     sp.val = (float*) malloc(sizeof(float) * sp.nnz);
 
-    m = (float*) malloc(sizeof(float) * row * row);
+    m = (float*) malloc(sizeof(float) * row * out_size);
 
-    result.weight = (float*) malloc(sizeof(float) * row * row);
-    memset(result.weight, 0, sizeof(float) * row * row);
+    result.weight = (float*) malloc(sizeof(float) * row * out_size);
+    memset(result.weight, 0, sizeof(float) * row * out_size);
     result.dim_in = row;
-    result.dim_out = row;
+    result.dim_out = out_size;
     
     sp.row_p[0] = 0;
     for (i = 1; i < row; i++) {
@@ -57,7 +57,7 @@ int main(int argc, char **argv) {
         }
     }
 
-    for (i = 0; i < row*row; i++) {
+    for (i = 0; i < row*out_size; i++) {
         if (i % 2) m[i] = 0.0F;
         else m[i] = 1.0F;
     }
@@ -65,19 +65,19 @@ int main(int argc, char **argv) {
     #ifdef USE_IMAX2
     IMAXSparseMatrix imax_sp;
     IMAXDenseMatrix imax_m, imax_r;
+    timespec_get(&t1, TIME_UTC);
     imax_sparse_format_init(&imax_sp, row, row, 46, 8);
     convert_imax_sparse_format(&imax_sp, &sp);
-    imax_dense_format_init_from_sparse(&imax_m, &imax_sp, row, 8);
-    imax_dense_format_init(&imax_r, row, row, imax_sp.row_padded_size, imax_m.col_padded_size, imax_sp.row_blk_size, imax_m.col_blk_size);
+    imax_dense_format_init_from_sparse(&imax_m, &imax_sp, out_size, 8);
+    imax_dense_format_init(&imax_r, row, out_size, imax_sp.row_padded_size, imax_m.col_padded_size, imax_sp.row_blk_size, imax_m.col_blk_size);
     imax_allocation(membase, &imax_sp, &imax_m, &imax_r);
     convert_imax_dense_format(&imax_m, m);
-    timespec_get(&t1, TIME_UTC);
     spmm(&imax_r, &imax_sp, &imax_m);
-    timespec_get(&t2, TIME_UTC);
     convert_dense_format(result.weight, &imax_r);
+    timespec_get(&t2, TIME_UTC);
     #else
     timespec_get(&t1, TIME_UTC);
-    spmm(result.weight, &sp, &sp_params, m, row); 
+    spmm(result.weight, &sp, m, out_size); 
     timespec_get(&t2, TIME_UTC);
     #endif
 

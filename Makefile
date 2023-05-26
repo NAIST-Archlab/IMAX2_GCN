@@ -12,7 +12,8 @@ TEST_SRCS := $(wildcard $(TEST_DIR)/*.c)
 OBJS := $(SRCS:.c=.o)
 MAIN := main.c
 MAIN_OBJS := main.o
-NCHIP := 2
+NCHIP := 1
+CPUONLY := 0
 TEST_OBJS := $(TEST_SRCS:.c=.o)
 HEADERS := $(INCLUDE)/emax6.h $(INCLUDE)/layer.h $(INCLUDE)/options.h $(INCLUDE)/sparse.h $(INCLUDE)/utils.h
 
@@ -65,6 +66,10 @@ ifeq ($(ARM_CROSS),1)
 LDFLAGS := -L/usr/lib64 -L/usr/local/lib -lm -fopenmp -fcommon
 endif
 DEVICE_DEBUG := 0
+
+ifeq ($(CPUONLY),1)
+CFLAGS := -g3 -O3 -Wall -Wno-unknown-pragmas -fopenmp -funroll-loops -fcommon -I$(INCLUDE) -DUSE_MP
+endif
 
 all: $(PROGRAM)
 

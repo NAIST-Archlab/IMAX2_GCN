@@ -108,10 +108,10 @@ void spmm(IMAXDenseMatrix* result, IMAXSparseMatrix *imax_sp_matrix, IMAXDenseMa
     reset_nanosec();
     for (a_col_blk=0,a_col_blk_iter=0; a_col_blk < A_col_size; a_col_blk+=A_col_blk_size,a_col_blk_iter+=1) {
         //Select Row of A(=Row of C)
-        a_sub_head     = (Uint*) imax_sp_sub[a_col_blk_iter]->val;
-        a_sub_col_head = (Uint*) imax_sp_sub[a_col_blk_iter]->col_num;
-        a_sub_nnz_head = (Uint*) imax_sp_sub[a_col_blk_iter]->row_nnz;
         a_sub_row_head = (Uint*) imax_sp_sub[a_col_blk_iter]->row_num;
+        a_sub_nnz_head = (Uint*) imax_sp_sub[a_col_blk_iter]->row_nnz;
+        a_sub_col_head = (Uint*) imax_sp_sub[a_col_blk_iter]->col_num;
+        a_sub_head     = (Uint*) imax_sp_sub[a_col_blk_iter]->val;
         for (a_row_blk=0,end_sum=0; a_row_blk < A_row_size; a_row_blk+=A_row_blk_size, end_sum+=A_nnz_size*A_row_blk_size) { // A_row_blk
             if((A_nnz_size=a_sub_nnz_head[a_row_blk])==0) break;
             a_row_index = (Uint*)a_sub_row_head + a_row_blk;
@@ -312,7 +312,7 @@ void spmm(IMAXDenseMatrix* result, IMAXSparseMatrix *imax_sp_matrix, IMAXDenseMa
                                 exe(OP_FMA, &AR[59][1], AR[58][1], EXP_H3210, BR[57][2][1], EXP_H3232, BR[58][0][0], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
                                 exe(OP_FMA, &AR[59][2], AR[58][2], EXP_H3210, BR[57][2][1], EXP_H3232, BR[58][1][1], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
                                 exe(OP_FMA, &AR[59][3], AR[58][3], EXP_H3210, BR[57][2][1], EXP_H3232, BR[58][1][0], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
-                                mop(OP_LDWR, 3, &BR[59][0][1], (Ull)a_row_index, (Ull)rofs, MSK_W0, (Ull)a_row_index, A_row_blk_size, 0, 0, (Ull)NULL, A_row_blk_size);
+                                mop(OP_LDWR, 1, &BR[59][0][1], (Ull)a_row_index, (Ull)rofs, MSK_W0, (Ull)a_row_index, A_row_blk_size, 0, 0, (Ull)NULL, A_row_blk_size);
 
                                 exe(OP_ADD, &r0, BR[59][0][1], EXP_H3210, oofs, EXP_H3210, 0LL, EXP_H3210, OP_AND, 0xffffffffLL, OP_NOP, 0LL);
                                 spmm_final(62, 59, r0);

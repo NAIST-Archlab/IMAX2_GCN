@@ -5,7 +5,7 @@
 #include <omp.h>
 #endif
 
-void spmm(float *result, SparseMatrix *sp_matrix, SparseMatrixParams *sp_params, float *matrix, int mm_col) {
+void spmm(float *result, SparseMatrix *sp_matrix, float *matrix, int mm_col) {
     #ifdef USE_MP
     #pragma omp parallel for
     #endif

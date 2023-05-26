@@ -159,10 +159,12 @@ float* make_weight(int dim_in, int dim_out) {
 HiddenLayer* propagation(GCNNetwork *network) {
     GCNLayer *p = network->layers;
     HiddenLayer *result = NULL, *end_vectors = NULL;
-    IMAXDenseMatrix h, w, tmp_dh;
     double spmm_time = 0, mm_time = 0, relu_time = 0;
     struct timespec t1, t2;
+    #ifdef USE_IMAX2
+    IMAXDenseMatrix h, w, tmp_dh;
     Uchar *membase = NULL;
+    #endif
     
     while (p != NULL) {
         #ifdef USE_IMAX2
@@ -180,7 +182,7 @@ HiddenLayer* propagation(GCNNetwork *network) {
         spmm(&tmp_dh, &network->graph->imax_matrix, &h);
         convert_dense_format(tmp, &tmp_dh);
         #else
-        spmm(tmp, &network->graph->matrix, &network->graph->params, p->latent_vectors.weight, p->latent_vectors.dim_out);
+        spmm(tmp, &network->graph->matrix, p->latent_vectors.weight, p->latent_vectors.dim_out);
         #endif
         timespec_get(&t2, TIME_UTC);
         spmm_time += cal_time(&t2, &t1);

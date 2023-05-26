@@ -37,6 +37,8 @@ int lcm(int a, int b) {
     return a*b / gcd(a,b);
 }
 
+#ifdef USE_IMAX2
+
 void merge(Uint *b_num, int *b_value, Uint *a_num, int *a_value, Ull left, Ull mid, Ull right) {
     int i = left;
     int j = mid;
@@ -98,6 +100,8 @@ void imax_dense_format_init_from_sparse(IMAXDenseMatrix *imax_m, IMAXSparseMatri
     imax_m->row_padded_size = imax_sp->col_padded_size;
     imax_m->col_blk_size = sqrt_lmm - (sqrt_lmm%m_col_blk_min);
     imax_m->col_padded_size = imax_m->col_size + (imax_m->col_blk_size - imax_m->col_size%imax_m->col_blk_size);
+    int col_blk_num = imax_m->col_padded_size / imax_m->col_blk_size;
+    imax_m->col_padded_size += (col_blk_num%NCHIP) ? imax_m->col_blk_size*(NCHIP - imax_m->col_padded_size%NCHIP) : 0;
     printf("M Params: Orig(%d,%d) Padded(%d,%d) blk(%d,%d)\n", imax_m->row_size, imax_m->col_size, imax_m->row_padded_size, imax_m->col_padded_size, imax_m->row_blk_size, imax_m->col_blk_size);
 }
 
@@ -304,3 +308,5 @@ void convert_imax_sparse_format(IMAXSparseMatrix *imax_sp, SparseMatrix *sp) {
 
     printf("SpM -> IMAX_SpM: Padded(%d,%d) blk(%d,%d) col_blk_num(%d)\n", imax_sp->row_padded_size, imax_sp->col_padded_size, imax_sp->row_blk_size, imax_sp->col_blk_size, imax_sp->col_padded_size / imax_sp->col_blk_size);
 }
+
+#endif

@@ -74,7 +74,7 @@ void spmm(IMAXDenseMatrix* result, IMAXSparseMatrix *imax_sp_matrix, IMAXDenseMa
 void sysinit(Uchar **membase, Uint memsize, Uint alignment);
 void mem_release(Uchar **membase, Uint memsize);
 #else
-void spmm(float* result, SparseMatrix *sp_matrix, SparseMatrixParams *sp_params, float* matrix, int mm_col);
+void spmm(float* result, SparseMatrix *sp_matrix, float* matrix, int mm_col);
 #endif
 void mm(float *result, float *a, float *b, int col_a, int row_a, int row_b);
 void relu(float *result, float *a, int size);
