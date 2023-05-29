@@ -28,11 +28,11 @@ void mm(float *result, float *a, float *b, int row_a, int col_a, int col_b) {
     #endif
     for (int i = 0; i < row_a; i++) {
         for (int j = 0; j < col_a; j++) {
-            float sum = 0; 
+            float sum = 0;
             for (int k = 0; k < col_b; k++) {
-                sum += a[i*col_a+k] * b[k*col_b+j];
+                sum += a[i * col_a + k] * b[k * col_b + j];
             }
-            result[i*col_b+j] = sum;
+            result[i * col_b + j] = sum;
         }
     }
 }

@@ -5,15 +5,15 @@
 #else
 #ifndef UTYPEDEF
 #define UTYPEDEF
-typedef unsigned char      Uchar;
-typedef unsigned short     Ushort;
-typedef unsigned int       Uint;
+typedef unsigned char Uchar;
+typedef unsigned short Ushort;
+typedef unsigned int Uint;
 typedef unsigned long long Ull;
-typedef long long int      Sll;
+typedef long long int Sll;
 #if __AARCH64EL__ == 1
 typedef long double Dll;
 #else
-typedef struct {Ull u[2];} Dll;
+typedef struct { Ull u[2]; } Dll;
 #endif
 #endif
 #endif
@@ -23,18 +23,13 @@ typedef struct {Ull u[2];} Dll;
 #define LMM_SIZE 0x4000
 
 typedef struct sparse_matrix {
-    int nnz; // Number of Non-zero values
-    int col_size; //column size
-    int row_size; //row size
-    int *row_p; //row pointer
-    int *col_p; //col pointer
-    float *val; //value of each index/Floating
+    int nnz;      // Number of Non-zero values
+    int col_size; // column size
+    int row_size; // row size
+    int *row_p;   // row pointer
+    int *col_p;   // col pointer
+    float *val;   // value of each index/Floating
 } SparseMatrix;
-
-typedef struct sparse_matrix_params {
-    int mode; //KERNEL_MODE_x
-    int padding; //pading option
-} SparseMatrixParams;
 
 #ifdef USE_IMAX2
 typedef struct sparse_matrix_sub_imax2 {
@@ -67,15 +62,14 @@ typedef struct dense_matrix_imax2 {
     int col_blk_size;
     Uint *val;
 } IMAXDenseMatrix;
-#endif
 
-#ifdef USE_IMAX2
-void spmm(IMAXDenseMatrix* result, IMAXSparseMatrix *imax_sp_matrix, IMAXDenseMatrix* matrix);
+void spmm(IMAXDenseMatrix *result, IMAXSparseMatrix *imax_sp_matrix, IMAXDenseMatrix *matrix);
 void sysinit(Uchar **membase, Uint memsize, Uint alignment);
 void mem_release(Uchar **membase, Uint memsize);
 #else
-void spmm(float* result, SparseMatrix *sp_matrix, float* matrix, int mm_col);
+void spmm(float *result, SparseMatrix *sp_matrix, float *matrix, int mm_col);
 #endif
+
 void mm(float *result, float *a, float *b, int col_a, int row_a, int row_b);
 void relu(float *result, float *a, int size);
 
