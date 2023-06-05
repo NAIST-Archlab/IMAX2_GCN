@@ -12,7 +12,7 @@ TEST_SRCS := $(wildcard $(TEST_DIR)/*.c)
 OBJS := $(SRCS:.c=.o)
 MAIN := main.c
 MAIN_OBJS := main.o
-NCHIP := 1
+NCHIP := 2
 CPUONLY := 0
 TEST_OBJS := $(TEST_SRCS:.c=.o)
 HEADERS := $(INCLUDE)/emax6.h $(INCLUDE)/layer.h $(INCLUDE)/options.h $(INCLUDE)/sparse.h $(INCLUDE)/utils.h
@@ -97,7 +97,7 @@ endif
 
 $(SRC_DIR)/sparse_imax-emax6.c: $(SRC_DIR)/sparse_imax.c
 	./conv-mark/conv-mark $< > $<-mark.c
-	$(CPP) $(CFLAGS) $<-mark.c > $<-cppo.c
+	$(CPP) $(CFLAGS_EMAX6_DMA) $<-mark.c > $<-cppo.c
 	./conv-c2c/conv-c2c $<-cppo.c
 
 .c.o: $(HEADERS)

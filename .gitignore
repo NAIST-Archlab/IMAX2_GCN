@@ -3,10 +3,9 @@ src/*-*.*
 *.gch
 imax_gcn
 test_sparse
-*.emax6
-*.emax6+dma
+*.emax6*
 data/
 data_backup/
 .DS_Store
 .vscode
-*.cpu_zynq
+*.cpu*

@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 int main(int argc, char **argv) {
     SparseMatrix sp;
@@ -24,6 +25,7 @@ int main(int argc, char **argv) {
 
     int row_nnz = atoi(argv[2]);
     int row = atoi(argv[1]);
+    srand((unsigned)time(NULL));
 
     printf("Size:(%d*%d), nnz: %d\n", row, row, row_nnz);
 
@@ -40,6 +42,15 @@ int main(int argc, char **argv) {
     memset(result.weight, 0, sizeof(float) * row * out_size);
     result.dim_in = row;
     result.dim_out = out_size;
+
+    for (i = 0; i < sp.nnz; i++) {
+        sp.col_p[i] = (sp.col_size/sp.nnz) * i;
+    }
+
+    for (i = sp.nnz-1; i >= 0; i--) {
+        j = rand() % (i+1);
+        sp.col_p[i] = sp.col_p[j];
+    }
 
     sp.row_p[0] = 0;
     for (i = 1; i < row; i++) {

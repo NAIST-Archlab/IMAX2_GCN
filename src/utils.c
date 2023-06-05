@@ -98,7 +98,7 @@ void imax_dense_format_init_from_sparse(IMAXDenseMatrix *imax_m, IMAXSparseMatri
     int sqrt_lmm = (int)sqrt(LMM_SIZE);
     imax_m->row_blk_size = imax_sp->col_blk_size;
     imax_m->row_padded_size = imax_sp->col_padded_size;
-    imax_m->col_blk_size = sqrt_lmm - (sqrt_lmm % m_col_blk_min);
+    imax_m->col_blk_size = (sqrt_lmm < imax_m->col_size/NCHIP) ? sqrt_lmm - (sqrt_lmm % m_col_blk_min) : sqrt_lmm/NCHIP - (sqrt_lmm/NCHIP % m_col_blk_min);
     imax_m->col_padded_size = imax_m->col_size + (imax_m->col_blk_size - imax_m->col_size % imax_m->col_blk_size);
     int col_blk_num = imax_m->col_padded_size / imax_m->col_blk_size;
     imax_m->col_padded_size += (col_blk_num % NCHIP) ? imax_m->col_blk_size * (NCHIP - imax_m->col_padded_size % NCHIP) : 0;
