@@ -9,7 +9,7 @@
 int main(int argc, char **argv) {
     SparseMatrix sp;
     HiddenLayer result;
-    struct timespec t1, t2;
+    struct timespec t0, t1, t2;
     float *m;
     int i, j;
     #ifdef USE_IMAX2
@@ -43,8 +43,9 @@ int main(int argc, char **argv) {
     result.dim_in = row;
     result.dim_out = out_size;
 
-    for (i = 0; i < sp.nnz; i++) {
-        sp.col_p[i] = (sp.col_size/sp.nnz) * i;
+    for (i = 0; i < row_nnz; i++) {
+        int rd = rand() % (sp.col_size/row_nnz);
+        sp.col_p[i] = rd + i*(sp.col_size/row_nnz);
     }
 
     for (i = sp.nnz-1; i >= 0; i--) {
@@ -80,29 +81,39 @@ int main(int argc, char **argv) {
     #ifdef USE_IMAX2
         IMAXSparseMatrix imax_sp;
         IMAXDenseMatrix imax_m, imax_r;
+        timespec_get(&t0, TIME_UTC);
         timespec_get(&t1, TIME_UTC);
         imax_sparse_format_init(&imax_sp, row, row, 46, 8);
         convert_imax_sparse_format(&imax_sp, &sp);
+        timespec_get(&t2, TIME_UTC);
+        printf("Convert to IMAX_SpMM: %lf usec.\n", cal_time(&t2, &t1));
         imax_dense_format_init_from_sparse(&imax_m, &imax_sp, out_size, 8);
         imax_dense_format_init(&imax_r, row, out_size, imax_sp.row_padded_size, imax_m.col_padded_size, imax_sp.row_blk_size, imax_m.col_blk_size);
         imax_allocation(membase, &imax_sp, &imax_m, &imax_r);
+        timespec_get(&t1, TIME_UTC);
         convert_imax_dense_format(&imax_m, m);
+        timespec_get(&t2, TIME_UTC);
+        printf("Convert to IMAX_MM: %lf usec.\n", cal_time(&t2, &t1));
         printf("<<<IMAX>>>\n");
         reset_nanosec();
         spmm(&imax_r, &imax_sp, &imax_m);
         get_nanosec(0);
-        show_nanosec();
+        timespec_get(&t1, TIME_UTC);
         convert_dense_format(result.weight, &imax_r);
         timespec_get(&t2, TIME_UTC);
+        printf("Convert to MM: %lf usec.\n", cal_time(&t2, &t1));
     #else
-        timespec_get(&t1, TIME_UTC);
+        timespec_get(&t0, TIME_UTC);
         spmm(result.weight, &sp, m, out_size);
         timespec_get(&t2, TIME_UTC);
     #endif
 
     print_weight(&result);
     printf("nnz val: %d\n", row_nnz);
-    printf("SpMM: %lf usec.\n", cal_time(&t2, &t1));
+    #ifdef USE_IMAX2
+        show_nanosec();
+    #endif
+    printf("SpMM: %lf usec.\n", cal_time(&t2, &t0));
 
     return 0;
 }
