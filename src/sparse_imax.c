@@ -114,7 +114,7 @@ void spmm(IMAXDenseMatrix *result, IMAXSparseMatrix *imax_sp_matrix, IMAXDenseMa
 
         // Select Row of A(=Row of C)
         for (a_row_blk = 0, end_sum = 0; a_row_blk < A_row_size; a_row_blk += A_row_blk_size, end_sum += A_nnz_size * A_row_blk_size) { // A_row_blk
-            if ((A_nnz_size = a_sub_nnz_head[a_row_blk]) == 0) break;
+            if ((A_nnz_size = a_sub_nnz_head[a_row_blk]) == 0) continue;
             a_row_index = (Uint*)a_sub_row_head + a_row_blk;
 
             // Select Column Block of of None-zero values of A

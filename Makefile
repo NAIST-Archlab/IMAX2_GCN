@@ -12,8 +12,9 @@ TEST_SRCS := $(wildcard $(TEST_DIR)/*.c)
 OBJS := $(SRCS:.c=.o)
 MAIN := main.c
 MAIN_OBJS := main.o
-NCHIP := 2
+NCHIP := 1
 CPUONLY := 0
+SAME_DISTANCE := 0
 TEST_OBJS := $(TEST_SRCS:.c=.o)
 HEADERS := $(INCLUDE)/emax6.h $(INCLUDE)/layer.h $(INCLUDE)/options.h $(INCLUDE)/sparse.h $(INCLUDE)/utils.h
 
@@ -46,10 +47,16 @@ HOMEBREW_DIR := /opt/homebrew
 CPP     := cpp -P
 CC      := gcc
 CFLAGS  := -g3 -O3 -Wall -msse3 -Wno-unknown-pragmas -fopenmp -funroll-loops -fcommon -I$(INCLUDE) -DCBLAS_GEMM -DEMAX6 -DDEBUG -DUSE_IMAX2 -DUSE_MP -DNCHIP=$(NCHIP)
+ifeq ($(SAME_DISTANCE), 1)
+CFLAGS  := -g3 -O3 -Wall -msse3 -Wno-unknown-pragmas -fopenmp -funroll-loops -fcommon -I$(INCLUDE) -DCBLAS_GEMM -DEMAX6 -DDEBUG -DUSE_IMAX2 -DUSE_MP -DSAME_DISTANCE -DNCHIP=$(NCHIP)
+endif
 LDFLAGS := -L/usr/lib64 -L/usr/local/lib -lm
 
 ifeq ($(ARM),1)
 CFLAGS  := -O1 -Wall -Wno-unknown-pragmas -funroll-loops -fopenmp -fcommon -I$(INCLUDE) -DARMZYNQ -DEMAX6 -DDEBUG -DUSE_IMAX2 -DUSE_MP -DNCHIP=$(NCHIP)
+ifeq ($(SAME_DISTANCE), 1)
+CFLAGS  := -O1 -Wall -Wno-unknown-pragmas -funroll-loops -fopenmp -fcommon -I$(INCLUDE) -DARMZYNQ -DEMAX6 -DDEBUG -DUSE_IMAX2 -DUSE_MP -DSAME_DISTANCE -DNCHIP=$(NCHIP)
+endif
 LDFLAGS := -L/usr/lib64 -L/usr/local/lib -lm -lrt -lX11 -lXext
 CFLAGS_EMAX6  := -O1 -Wall -Wno-unknown-pragmas -funroll-loops -fopenmp -fcommon -I$(INCLUDE) -DARMZYNQ -DEMAX6 -DUSE_IMAX2 -DUSE_MP -DNCHIP=$(NCHIP)
 CFLAGS_EMAX6_DMA  := -O1 -Wall -Wno-unknown-pragmas -funroll-loops -fopenmp -fcommon -I$(INCLUDE) -DARMZYNQ -DEMAX6 -DFPDDMA -DUSE_IMAX2 -DUSE_MP -DNCHIP=$(NCHIP)

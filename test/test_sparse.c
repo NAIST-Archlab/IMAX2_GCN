@@ -11,7 +11,7 @@ int main(int argc, char **argv) {
     HiddenLayer result;
     struct timespec t0, t1, t2;
     float *m;
-    int i, j;
+    int i, j, k;
     #ifdef USE_IMAX2
         Uchar *membase = NULL;
     #endif
@@ -29,7 +29,7 @@ int main(int argc, char **argv) {
 
     printf("Size:(%d*%d), nnz: %d\n", row, row, row_nnz);
 
-    sp.nnz = row_nnz * row / 2;
+    sp.nnz = row_nnz * row;
     sp.row_size = row;
     sp.row_p = (int *)malloc(sizeof(int) * (row + 1));
     sp.col_size = row;
@@ -43,33 +43,33 @@ int main(int argc, char **argv) {
     result.dim_in = row;
     result.dim_out = out_size;
 
-    for (i = 0; i < row_nnz; i++) {
-        int rd = rand() % (sp.col_size/row_nnz);
-        sp.col_p[i] = rd + i*(sp.col_size/row_nnz);
+    #ifdef SAME_DISTANCE
+    for (i = 0; i < row; i++) {
+        for (j = 0; j < row_nnz; j++) {
+            sp.col_p[i*row_nnz+j] = j*(sp.col_size/row_nnz);
+            sp.val[i*row_nnz+j] = 1.0F;
+        }
     }
+    #endif
 
-    for (i = sp.nnz-1; i >= 0; i--) {
-        j = rand() % (i+1);
-        sp.col_p[i] = sp.col_p[j];
+    #ifndef SAME_DISTANCE
+    int acc = 0;
+    for (i = 0; i < sp.row_size; i+=sp.row_size/10) {
+        for (j = 0; j < sp.row_size/10; j++) {
+            for (k = 0; k < row_nnz; k++) {
+                sp.col_p[acc] = i/2 + k*2;
+                sp.val[acc] = 1.0F;
+                acc++;
+            }
+        }
     }
+    #endif
 
     sp.row_p[0] = 0;
     for (i = 1; i < row; i++) {
-        if (i % 2)
-            sp.row_p[i] = sp.row_p[i - 1] + row_nnz;
-        else
-            sp.row_p[i] = sp.row_p[i - 1];
+        sp.row_p[i] = sp.row_p[i - 1] + row_nnz;
     }
     sp.row_p[row] = sp.nnz;
-
-    for (i = 0; i < row; i++) {
-        int k = 0;
-        for (j = sp.row_p[i]; j < sp.row_p[i + 1]; j++) {
-            sp.col_p[j] = k;
-            sp.val[j] = 1.0F;
-            k += 2;
-        }
-    }
 
     for (i = 0; i < row * out_size; i++) {
         if (i % 2)
@@ -110,6 +110,7 @@ int main(int argc, char **argv) {
 
     print_weight(&result);
     printf("nnz val: %d\n", row_nnz);
+    printf("nnz total: %d\n", sp.nnz);
     #ifdef USE_IMAX2
         show_nanosec();
     #endif
