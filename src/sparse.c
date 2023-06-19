@@ -1,5 +1,5 @@
 #include "../include/sparse.h"
-#ifndef USE_IMAX2
+#if !(defined(USE_IMAX2) || defined(USE_CUDA))
 #include <stdio.h>
 #ifdef USE_MP
 #include <omp.h>

@@ -14,6 +14,7 @@ MAIN := main.c
 MAIN_OBJS := main.o
 NCHIP := 1
 CPUONLY := 0
+CUDA := 0
 SAME_DISTANCE := 0
 TEST_OBJS := $(TEST_SRCS:.c=.o)
 HEADERS := $(INCLUDE)/emax6.h $(INCLUDE)/layer.h $(INCLUDE)/options.h $(INCLUDE)/sparse.h $(INCLUDE)/utils.h
@@ -78,6 +79,15 @@ ifeq ($(CPUONLY),1)
 CFLAGS := -g3 -O3 -Wall -Wno-unknown-pragmas -fopenmp -funroll-loops -fcommon -I$(INCLUDE) -DUSE_MP
 endif
 
+ifeq ($(CUDA),1)
+CC   := nvcc
+SRCS := $(wildcard $(SRC_DIR)/*.c)
+SRCS_CU := $(wildcard $(SRC_DIR)/*.cu)
+OBJS := $(SRCS:.c=.o) $(SRCS_CU:.cu=.o)
+CFLAGS := -O3 -I$(INCLUDE) -DUSE_CUDA
+LDFLAGS := -L/usr/lib64 -L/usr/local/lib -lm -lrt -lX11 -lXext -lcusparse
+endif
+
 all: $(PROGRAM)
 
 $(PROGRAM): $(OBJS) $(MAIN_OBJS)
@@ -107,7 +117,14 @@ $(SRC_DIR)/sparse_imax-emax6.c: $(SRC_DIR)/sparse_imax.c
 	$(CPP) $(CFLAGS_EMAX6_DMA) $<-mark.c > $<-cppo.c
 	./conv-c2c/conv-c2c $<-cppo.c
 
+.SUFFIXES: .o .c .cu
+
 .c.o: $(HEADERS)
+	@[ -d $(SRC_DIR) ]
+	@[ -d $(TEST_DIR) ]
+	$(CC) $(CFLAGS) -o $@ -c $<
+
+.cu.o: $(HEADERS)
 	@[ -d $(SRC_DIR) ]
 	@[ -d $(TEST_DIR) ]
 	$(CC) $(CFLAGS) -o $@ -c $<
