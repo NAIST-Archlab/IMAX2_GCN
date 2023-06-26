@@ -54,10 +54,24 @@ int main(int argc, char **argv) {
 
     #ifndef SAME_DISTANCE
     int acc = 0;
-    for (i = 0; i < sp.row_size; i+=sp.row_size/10) {
-        for (j = 0; j < sp.row_size/10; j++) {
-            for (k = 0; k < row_nnz; k++) {
-                sp.col_p[acc] = i/2 + k*2;
+    for (i = 0; i < sp.row_size; i++) {
+        int start = i - (i%10);
+        if ((start - row_nnz) < 0) {
+            for (j = 0; j < row_nnz*2; j+=2) {
+                sp.col_p[acc] = j;
+                sp.val[acc] = 1.0F;
+                acc++;
+            }
+        } else if ((start - row_nnz) >= 0 && (start + row_nnz < sp.row_size)) {
+            start = i - (i%10) - row_nnz;
+            for (j = start; j < start + row_nnz*2; j+=2) {
+                sp.col_p[acc] = j;
+                sp.val[acc] = 1.0F;
+                acc++;
+            }
+        } else {
+            for (j = sp.row_size - row_nnz*2; j < sp.row_size; j+=2) {
+                sp.col_p[acc] = j;
                 sp.val[acc] = 1.0F;
                 acc++;
             }

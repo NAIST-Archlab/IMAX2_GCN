@@ -77,6 +77,9 @@ DEVICE_DEBUG := 0
 
 ifeq ($(CPUONLY),1)
 CFLAGS := -g3 -O3 -Wall -Wno-unknown-pragmas -fopenmp -funroll-loops -fcommon -I$(INCLUDE) -DUSE_MP
+ifeq ($(SAME_DISTANCE), 1)
+CFLAGS := -g3 -O3 -Wall -Wno-unknown-pragmas -fopenmp -funroll-loops -fcommon -I$(INCLUDE) -DUSE_MP -DSAME_DISTANCE
+endif
 endif
 
 ifeq ($(CUDA),1)
@@ -85,7 +88,10 @@ SRCS := $(wildcard $(SRC_DIR)/*.c)
 SRCS_CU := $(wildcard $(SRC_DIR)/*.cu)
 OBJS := $(SRCS:.c=.o) $(SRCS_CU:.cu=.o)
 CFLAGS := -O3 -I$(INCLUDE) -DUSE_CUDA
-LDFLAGS := -L/usr/lib64 -L/usr/local/lib -lm -lrt -lX11 -lXext -lcusparse
+ifeq ($(SAME_DISTANCE), 1)
+CFLAGS := -O3 -I$(INCLUDE) -DUSE_CUDA -DSAME_DISTANCE
+endif
+LDFLAGS := -L/usr/lib64 -L/usr/local/lib -lm -lrt -lcusparse -lcublas
 endif
 
 all: $(PROGRAM)

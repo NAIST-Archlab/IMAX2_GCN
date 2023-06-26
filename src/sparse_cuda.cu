@@ -1,7 +1,12 @@
 #ifdef USE_CUDA
 #include <cuda.h>
 #include <cusparse_v2.h>
+#include <cublas_v2.h>
+#include <time.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include "../include/sparse.h"
+#include "../include/utils.h"
 
 #define CHECK(call)                                                            \
 {                                                                              \
@@ -30,11 +35,28 @@
     }                                                                          \
 }
 
+#define CHECK_CUBLAS(call)                                                     \
+{                                                                              \
+    cublasStatus_t err;                                                        \
+    if ((err = (call)) != CUBLAS_STATUS_SUCCESS)                               \
+    {                                                                          \
+        fprintf(stderr, "Got error %d at %s:%d\n", err, __FILE__, __LINE__);   \
+        cudaError_t cuda_err = cudaGetLastError();                             \
+        if (cuda_err != cudaSuccess)                                           \
+        {                                                                      \
+            fprintf(stderr, "  CUDA error \"%s\" also detected\n",             \
+                    cudaGetErrorString(cuda_err));                             \
+        }                                                                      \
+        exit(1);                                                               \
+    }                                                                          \
+}
+
 extern "C"
 void spmm(float *result, SparseMatrix *sp_matrix, float *matrix, int mm_col) {
     int *a_row, *a_col;
     float *a_val;
     float *b, *c;
+    struct timespec t1, t2;
     cusparseHandle_t handle;
     cusparseSpMatDescr_t Adescr;
     cusparseDnMatDescr_t Bdescr;
@@ -82,6 +104,7 @@ void spmm(float *result, SparseMatrix *sp_matrix, float *matrix, int mm_col) {
     size_t buffer_size;
     void *buffer;
 
+    timespec_get(&t1, TIME_UTC);
     CHECK_CUSPARSE(
         cusparseSpMM_bufferSize(handle, 
         CUSPARSE_OPERATION_NON_TRANSPOSE, CUSPARSE_OPERATION_NON_TRANSPOSE, 
@@ -104,6 +127,8 @@ void spmm(float *result, SparseMatrix *sp_matrix, float *matrix, int mm_col) {
         CUDA_R_32F, CUSPARSE_SPMM_ALG_DEFAULT, buffer)
     );
     CHECK(cudaDeviceSynchronize());
+    timespec_get(&t2, TIME_UTC);
+    printf("cuSPARSE SpMM: %lf usec.\n", cal_time(&t2, &t1));
 
     CHECK(cudaMemcpy(result, c, sizeof(float)*(sp_matrix->row_size*mm_col), cudaMemcpyDeviceToHost));
     CHECK(cudaDeviceSynchronize());
@@ -123,18 +148,44 @@ void spmm(float *result, SparseMatrix *sp_matrix, float *matrix, int mm_col) {
 
 extern "C"
 void mm(float *result, float *a, float *b, int row_a, int col_a, int col_b) {
-    #ifdef USE_MP
-    #pragma omp parallel for
-    #endif
-    for (int i = 0; i < row_a; i++) {
-        for (int j = 0; j < col_a; j++) {
-            float sum = 0;
-            for (int k = 0; k < col_b; k++) {
-                sum += a[i * col_a + k] * b[k * col_b + j];
-            }
-            result[i * col_b + j] = sum;
-        }
-    }
+    float *dA, *dB, *dC;
+    struct timespec t1, t2;
+    cublasHandle_t handle;
+
+    printf("<<CUDA>>\n");
+    CHECK_CUBLAS(cublasCreate(&handle));
+
+    CHECK(cudaMalloc((void**)&dA,  sizeof(float)*(row_a*col_a)));
+    CHECK(cudaMalloc((void**)&dB,  sizeof(float)*(col_a*col_b)));
+    CHECK(cudaMalloc((void**)&dC,  sizeof(float)*(row_a*col_b)));
+
+    CHECK(cudaMemcpy(dA, a, sizeof(float)*(row_a*col_a), cudaMemcpyHostToDevice));
+    CHECK(cudaMemcpy(dB, b, sizeof(float)*(col_a*col_b), cudaMemcpyHostToDevice));
+    CHECK(cudaMemset(dC, 0, sizeof(float)*(row_a*col_b)));
+
+    float alpha = 1;
+    float beta = 0;
+
+    timespec_get(&t1, TIME_UTC);
+    CHECK_CUBLAS(
+        cublasSgemm(handle,
+            CUBLAS_OP_N, CUBLAS_OP_N,
+            col_b, col_a, row_a,
+            &alpha, dB, col_a, dA, row_a, 
+            &beta, dC, row_a
+        )
+    );
+    CHECK(cudaDeviceSynchronize());
+
+    printf("cuBLAS MM: %lf usec.\n", cal_time(&t2, &t1));
+
+    CHECK(cudaMemcpy(result, dC, sizeof(float)*(row_a*col_b), cudaMemcpyDeviceToHost));
+    CHECK(cudaDeviceSynchronize());
+
+    CHECK(cudaFree(dA));
+    CHECK(cudaFree(dB));
+    CHECK(cudaFree(dC));
+    CHECK_CUBLAS(cublasDestroy(handle));
 }
 
 extern "C"

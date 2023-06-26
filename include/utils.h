@@ -3,7 +3,13 @@
 #include "sparse.h"
 #include <time.h>
 
+#if __cplusplus
+extern "C" {
+#endif
 double cal_time(struct timespec *end, struct timespec *start);
+#if __cplusplus
+}
+#endif
 
 #ifdef USE_IMAX2
 void imax_dense_format_init(IMAXDenseMatrix *imax_m, int row, int col, int row_padded, int col_padded, int row_blk, int col_blk);

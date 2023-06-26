@@ -217,7 +217,7 @@ HiddenLayer *propagation(GCNNetwork *network) {
     timespec_get(&t2, TIME_UTC);
     double softmax_time = cal_time(&t2, &t1);
 
-    printf("SpMM: %lf, MM: %lf, ReLu: %lf, Softmax: %lf sec.\n", spmm_time, mm_time, relu_time, softmax_time);
+    printf("SpMM: %lf, MM: %lf, ReLu: %lf, Softmax: %lf usec.\n", spmm_time, mm_time, relu_time, softmax_time);
     return result;
 }
 

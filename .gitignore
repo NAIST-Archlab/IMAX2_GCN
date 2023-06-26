@@ -9,3 +9,4 @@ data_backup/
 .DS_Store
 .vscode
 *.cpu*
+*.gpu*
