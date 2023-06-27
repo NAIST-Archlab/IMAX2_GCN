@@ -1,0 +1,9 @@
+[submodule "conv-mark"]
+	path = conv-mark
+	url = https://github.com/yasuhiko-nakashima/IMAX2-preprocessor.git
+[submodule "conv-c2c"]
+	path = conv-c2c
+	url = https://github.com/yasuhiko-nakashima/IMAX2-compiler.git
+[submodule "csim"]
+	path = csim
+	url = https://github.com/yasuhiko-nakashima/IMAX2-simulator.git
