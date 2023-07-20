@@ -14,7 +14,7 @@ double cal_time(struct timespec *end, struct timespec *start) {
     return result_sec*1000000.0 + (double)(result_nsec / 1000.0);
 }
 
-#ifdef USE_IMAX2
+#ifdef EMAX6
 int gcd(int a_, int b_) {
     int r, a = a_, b = b_;
 

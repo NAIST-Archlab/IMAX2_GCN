@@ -161,13 +161,13 @@ HiddenLayer *propagation(GCNNetwork *network) {
     HiddenLayer *result = NULL, *end_vectors = NULL;
     double spmm_time = 0, mm_time = 0, relu_time = 0;
     struct timespec t1, t2;
-    #ifdef USE_IMAX2
-        IMAXDenseMatrix h, w, tmp_dh;
+    #ifdef EMAX6
+        IMAXDenseMatrix h, w, tmp_dh, tmp_r;
         Uchar *membase = NULL;
     #endif
 
     while (p != NULL) {
-        #ifdef USE_IMAX2
+        #ifdef EMAX6
             imax_dense_format_init_from_sparse(&h, &network->graph->imax_matrix, p->hidden_layer.dim_out, 8);
             imax_dense_format_init(&tmp_dh, network->graph->imax_matrix.row_padded_size, h.col_size, network->graph->imax_matrix.row_padded_size, h.col_padded_size, network->graph->imax_matrix.row_blk_size, h.col_blk_size);
             imax_allocation(membase, &network->graph->imax_matrix, &h, &tmp_dh);
@@ -177,10 +177,9 @@ HiddenLayer *propagation(GCNNetwork *network) {
         float *tmp2 = (float *)malloc(sizeof(float) * out_size);
 
         timespec_get(&t1, TIME_UTC);
-        #ifdef USE_IMAX2
+        #ifdef EMAX6
             convert_imax_dense_format(&h, p->latent_vectors.weight);
             spmm(&tmp_dh, &network->graph->imax_matrix, &h);
-            convert_dense_format(tmp, &tmp_dh);
         #else
             spmm(tmp, &network->graph->matrix, p->latent_vectors.weight, p->latent_vectors.dim_out);
         #endif
@@ -188,13 +187,22 @@ HiddenLayer *propagation(GCNNetwork *network) {
         spmm_time += cal_time(&t2, &t1);
 
         timespec_get(&t1, TIME_UTC);
-        mm(tmp2, tmp, p->hidden_layer.weight, network->graph->matrix.row_size, p->hidden_layer.dim_in, p->hidden_layer.dim_out);
+        #ifdef EMAX6
+            convert_imax_dense_format(&w, p->hidden_layer.weight);
+            mm(tmp_r, tmp_dh, &h, &w, 1);
+        #else
+            mm(tmp2, tmp, p->hidden_layer.weight, network->graph->matrix.row_size, p->hidden_layer.dim_in, p->hidden_layer.dim_out);
+        #endif
         timespec_get(&t2, TIME_UTC);
         mm_time += cal_time(&t2, &t1);
 
         if (p->next != NULL) {
             timespec_get(&t1, TIME_UTC);
-            relu(p->next->latent_vectors.weight, tmp2, out_size);
+            #ifdef EMAX6
+                convert_dense_format(p->next->latent_vectors, &tmp_r);
+            #else
+                relu(p->next->latent_vectors.weight, tmp2, out_size);
+            #endif
             timespec_get(&t2, TIME_UTC);
             relu_time += cal_time(&t2, &t1);
         } else {
@@ -203,7 +211,11 @@ HiddenLayer *propagation(GCNNetwork *network) {
             end_vectors->dim_out = p->hidden_layer.dim_out;
             end_vectors->weight = make_weight(network->graph->matrix.row_size, p->hidden_layer.dim_out);
             timespec_get(&t1, TIME_UTC);
-            relu(end_vectors->weight, tmp2, out_size);
+            #ifdef EMAX6
+                convert_dense_format(end_vectors->weight, &tmp_dh);
+            #else
+                relu(end_vectors->weight, tmp2, out_size);
+            #endif
             timespec_get(&t2, TIME_UTC);
             relu_time += cal_time(&t2, &t1);
         }

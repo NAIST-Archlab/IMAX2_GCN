@@ -123,7 +123,7 @@ int main(int argc, char **argv) {
     printf("Reading Features now...\n");
     fread(network.layers->latent_vectors.weight, sizeof(float), f_dim_in * f_dim_out, fp_feats);
 
-    #ifdef USE_IMAX2
+    #ifdef EMAX6
         printf("Transform to IMAX Format..\n");
         timespec_get(&t1, TIME_UTC);
         imax_sparse_format_init(&network.graph->imax_matrix, network.graph->matrix.row_size, network.graph->matrix.col_size, 46, 8 * NCHIP);

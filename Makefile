@@ -47,26 +47,26 @@ HOMEBREW_DIR := /opt/homebrew
 
 CPP     := cpp -P
 CC      := gcc
-CFLAGS  := -g3 -O3 -Wall -msse3 -Wno-unknown-pragmas -fopenmp -funroll-loops -fcommon -I$(INCLUDE) -DCBLAS_GEMM -DEMAX6 -DDEBUG -DUSE_IMAX2 -DUSE_MP -DNCHIP=$(NCHIP)
+CFLAGS  := -g3 -O3 -Wall -msse3 -Wno-unknown-pragmas -fopenmp -funroll-loops -fcommon -I$(INCLUDE) -DCBLAS_GEMM -DEMAX6 -DDEBUG -DUSE_MP -DNCHIP=$(NCHIP)
 ifeq ($(SAME_DISTANCE), 1)
-CFLAGS  := -g3 -O3 -Wall -msse3 -Wno-unknown-pragmas -fopenmp -funroll-loops -fcommon -I$(INCLUDE) -DCBLAS_GEMM -DEMAX6 -DDEBUG -DUSE_IMAX2 -DUSE_MP -DSAME_DISTANCE -DNCHIP=$(NCHIP)
+CFLAGS  := -g3 -O3 -Wall -msse3 -Wno-unknown-pragmas -fopenmp -funroll-loops -fcommon -I$(INCLUDE) -DCBLAS_GEMM -DEMAX6 -DDEBUG -DUSE_MP -DSAME_DISTANCE -DNCHIP=$(NCHIP)
 endif
 LDFLAGS := -L/usr/lib64 -L/usr/local/lib -lm
 
 ifeq ($(ARM),1)
-CFLAGS  := -O1 -Wall -Wno-unknown-pragmas -funroll-loops -fopenmp -fcommon -I$(INCLUDE) -DARMZYNQ -DEMAX6 -DDEBUG -DUSE_IMAX2 -DUSE_MP -DNCHIP=$(NCHIP)
+CFLAGS  := -O1 -Wall -Wno-unknown-pragmas -funroll-loops -fopenmp -fcommon -I$(INCLUDE) -DARMZYNQ -DEMAX6 -DDEBUG -DUSE_MP -DNCHIP=$(NCHIP)
 ifeq ($(SAME_DISTANCE), 1)
-CFLAGS  := -O1 -Wall -Wno-unknown-pragmas -funroll-loops -fopenmp -fcommon -I$(INCLUDE) -DARMZYNQ -DEMAX6 -DDEBUG -DUSE_IMAX2 -DUSE_MP -DSAME_DISTANCE -DNCHIP=$(NCHIP)
+CFLAGS  := -O1 -Wall -Wno-unknown-pragmas -funroll-loops -fopenmp -fcommon -I$(INCLUDE) -DARMZYNQ -DEMAX6 -DDEBUG -DUSE_MP -DSAME_DISTANCE -DNCHIP=$(NCHIP)
 endif
 LDFLAGS := -L/usr/lib64 -L/usr/local/lib -lm -lrt -lX11 -lXext
-CFLAGS_EMAX6  := -O1 -Wall -Wno-unknown-pragmas -funroll-loops -fopenmp -fcommon -I$(INCLUDE) -DARMZYNQ -DEMAX6 -DUSE_IMAX2 -DUSE_MP -DNCHIP=$(NCHIP)
-CFLAGS_EMAX6_DMA  := -O1 -Wall -Wno-unknown-pragmas -funroll-loops -fopenmp -fcommon -I$(INCLUDE) -DARMZYNQ -DEMAX6 -DFPDDMA -DUSE_IMAX2 -DUSE_MP -DNCHIP=$(NCHIP)
+CFLAGS_EMAX6  := -O1 -Wall -Wno-unknown-pragmas -funroll-loops -fopenmp -fcommon -I$(INCLUDE) -DARMZYNQ -DEMAX6 -DUSE_MP -DNCHIP=$(NCHIP)
+CFLAGS_EMAX6_DMA  := -O1 -Wall -Wno-unknown-pragmas -funroll-loops -fopenmp -fcommon -I$(INCLUDE) -DARMZYNQ -DEMAX6 -DFPDDMA -DUSE_MP -DNCHIP=$(NCHIP)
 SRCS_EMAX6 := $(filter-out $(SRC_DIR)/sparse_imax.c, $(SRCS)) $(SRC_DIR)/sparse_imax-emax6.c
 OBJS_EMAX6 := $(SRCS_EMAX6:.c=.o)
 endif
 
 ifeq ($(ARM_MACOS),1)
-CFLAGS := -g3 -O3 -Wall -Wno-unknown-pragmas -I$(HOMEBREW_DIR)/opt/libomp/include -Xpreprocessor -fopenmp -I$(INCLUDE) -DCBLAS_GEMM -DEMAX6 -DDEBUG -DUSE_IMAX2 -DUSE_MP -DNCHIP=$(NCHIP)
+CFLAGS := -g3 -O3 -Wall -Wno-unknown-pragmas -I$(HOMEBREW_DIR)/opt/libomp/include -Xpreprocessor -fopenmp -I$(INCLUDE) -DCBLAS_GEMM -DEMAX6 -DDEBUG -DUSE_MP -DNCHIP=$(NCHIP)
 LDFLAGS := -L/usr/lib -L/usr/local/lib -L$(HOMEBREW_DIR)/opt/libomp/lib -lm -lomp
 endif
 

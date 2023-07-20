@@ -146,6 +146,7 @@ void spmm(float *result, SparseMatrix *sp_matrix, float *matrix, int mm_col) {
     CHECK_CUSPARSE(cusparseDestroy(handle));
 }
 
+// Under Construction now...
 extern "C"
 void mm(float *result, float *a, float *b, int row_a, int col_a, int col_b) {
     float *dA, *dB, *dC;

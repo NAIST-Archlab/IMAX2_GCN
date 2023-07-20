@@ -12,7 +12,7 @@ int main(int argc, char **argv) {
     struct timespec t0, t1, t2;
     float *m;
     int i, j, k;
-    #ifdef USE_IMAX2
+    #ifdef EMAX6
         Uchar *membase = NULL;
     #endif
 
@@ -92,7 +92,7 @@ int main(int argc, char **argv) {
             m[i] = 1.0F;
     }
 
-    #ifdef USE_IMAX2
+    #ifdef EMAX6
         IMAXSparseMatrix imax_sp;
         IMAXDenseMatrix imax_m, imax_r;
         timespec_get(&t0, TIME_UTC);
@@ -125,7 +125,7 @@ int main(int argc, char **argv) {
     print_weight(&result);
     printf("nnz val: %d\n", row_nnz);
     printf("nnz total: %d\n", sp.nnz);
-    #ifdef USE_IMAX2
+    #ifdef EMAX6
         show_nanosec();
     #endif
     printf("SpMM: %lf usec.\n", cal_time(&t2, &t0));

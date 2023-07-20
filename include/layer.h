@@ -5,7 +5,7 @@
 
 typedef struct sparse_graph {
     SparseMatrix matrix;
-    #ifdef USE_IMAX2
+    #ifdef EMAX6
     IMAXSparseMatrix imax_matrix;
     #endif
 } SparseGraph;

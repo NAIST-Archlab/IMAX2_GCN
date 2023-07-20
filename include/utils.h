@@ -11,7 +11,7 @@ double cal_time(struct timespec *end, struct timespec *start);
 }
 #endif
 
-#ifdef USE_IMAX2
+#ifdef EMAX6
 void imax_dense_format_init(IMAXDenseMatrix *imax_m, int row, int col, int row_padded, int col_padded, int row_blk, int col_blk);
 void imax_sparse_format_init(IMAXSparseMatrix *imax_sp, int row, int col, int sp_col_blk, int m_col_blk_min);
 void imax_dense_format_init_from_sparse(IMAXDenseMatrix *imax_m, IMAXSparseMatrix *imax_sp, int m_col, int m_col_blk_min);

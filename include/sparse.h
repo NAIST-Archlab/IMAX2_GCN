@@ -1,6 +1,6 @@
 #ifndef __SPARSE_H__
 #define __SPARSE_H__
-#ifdef USE_IMAX2
+#ifdef EMAX6
 #include "emax6.h"
 #else
 #ifndef UTYPEDEF
@@ -31,7 +31,7 @@ typedef struct sparse_matrix {
     float *val;   // value of each index/Floating
 } SparseMatrix;
 
-#ifdef USE_IMAX2
+#ifdef EMAX6
 typedef struct sparse_matrix_sub_imax2 {
     int nnz;
     int *row_nnz;
@@ -64,6 +64,7 @@ typedef struct dense_matrix_imax2 {
 } IMAXDenseMatrix;
 
 void spmm(IMAXDenseMatrix *result, IMAXSparseMatrix *imax_sp_matrix, IMAXDenseMatrix *matrix);
+void mm(IMAXDenseMatrix *result, IMAXDenseMatrix *imax_a, IMAXDenseMatrix *imax_b, int is_relu);
 void sysinit(Uchar **membase, Uint memsize, Uint alignment);
 void mem_release(Uchar **membase, Uint memsize);
 #else
@@ -71,18 +72,11 @@ void mem_release(Uchar **membase, Uint memsize);
 extern "C" {
 #endif
 void spmm(float *result, SparseMatrix *sp_matrix, float *matrix, int mm_col);
-#if __cplusplus
-}
-#endif
-#endif
-
-#if __cplusplus
-extern "C" {
-#endif
 void mm(float *result, float *a, float *b, int col_a, int row_a, int row_b);
 void relu(float *result, float *a, int size);
 #if __cplusplus
 }
+#endif
 #endif
 
 #endif
