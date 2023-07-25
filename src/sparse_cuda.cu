@@ -146,7 +146,6 @@ void spmm(float *result, SparseMatrix *sp_matrix, float *matrix, int mm_col) {
     CHECK_CUSPARSE(cusparseDestroy(handle));
 }
 
-// Under Construction now...
 extern "C"
 void mm(float *result, float *a, float *b, int row_a, int col_a, int col_b) {
     float *dA, *dB, *dC;
@@ -171,12 +170,13 @@ void mm(float *result, float *a, float *b, int row_a, int col_a, int col_b) {
     CHECK_CUBLAS(
         cublasSgemm(handle,
             CUBLAS_OP_N, CUBLAS_OP_N,
-            col_b, col_a, row_a,
-            &alpha, dB, col_a, dA, row_a, 
-            &beta, dC, row_a
+            col_b, row_a, col_a,
+            &alpha, dB, col_b, dA, col_a, 
+            &beta, dC, col_b
         )
     );
     CHECK(cudaDeviceSynchronize());
+    timespec_get(&t2, TIME_UTC);
 
     printf("cuBLAS MM: %lf usec.\n", cal_time(&t2, &t1));
 
@@ -189,14 +189,48 @@ void mm(float *result, float *a, float *b, int row_a, int col_a, int col_b) {
     CHECK_CUBLAS(cublasDestroy(handle));
 }
 
+__global__
+void threshold(float *result, float *input, float threshold, int size) {
+    unsigned int xIdx = blockDim.x * blockIdx.x + threadIdx.x;
+
+    if (xIdx < size) {
+        float input_val = input[xIdx];
+        result[xIdx] = input_val;
+        if (input_val < 0) {
+            result[xIdx] = 0;
+        }
+    }
+}
+
+#define BLOCK_SIZE_CUDA 128
+
 extern "C"
 void relu(float *result, float *a, int size) {
-    #ifdef USE_MP
-    #pragma omp parallel for
-    #endif
-    for (int i = 0; i < size; i++) {
-        result[i] = (a[i] > 0) ? a[i] : 0;
-    }
+    float *dA, *dR;
+    struct timespec t1, t2;
+    dim3 dimBlock(BLOCK_SIZE_CUDA);
+    dim3 dimGrid(size / BLOCK_SIZE_CUDA);
+
+    printf("<<CUDA>>\n");
+
+    CHECK(cudaMalloc((void**)&dA,  sizeof(float)*(size)));
+    CHECK(cudaMalloc((void**)&dR,  sizeof(float)*(size)));
+
+    CHECK(cudaMemcpy(dA, a, sizeof(float)*(size), cudaMemcpyHostToDevice));
+    CHECK(cudaMemset(dR, 0, sizeof(float)*(size)));
+
+    timespec_get(&t1, TIME_UTC);
+    threshold<<<dimGrid, dimBlock>>>(dR, dA, 0, size);
+    CHECK(cudaDeviceSynchronize());
+    timespec_get(&t2, TIME_UTC);
+
+    printf("CUDA ReLU: %lf usec.\n", cal_time(&t2, &t1));
+
+    CHECK(cudaMemcpy(result, dR, sizeof(float)*(size), cudaMemcpyDeviceToHost));
+    CHECK(cudaDeviceSynchronize());
+
+    CHECK(cudaFree(dA));
+    CHECK(cudaFree(dR));
 }
 
 #endif
