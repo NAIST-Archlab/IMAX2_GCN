@@ -94,7 +94,7 @@ int main(int argc, char **argv) {
 
     #ifdef EMAX6
         IMAXSparseMatrix imax_sp;
-        IMAXDenseMatrix imax_m, imax_r;
+        IMAXDenseMatrix imax_m, imax_r, imax_r2, imax_r3;
         timespec_get(&t0, TIME_UTC);
         timespec_get(&t1, TIME_UTC);
         imax_sparse_format_init(&imax_sp, row, row, 46, 8);
@@ -103,7 +103,9 @@ int main(int argc, char **argv) {
         printf("Convert to IMAX_SpMM: %lf usec.\n", cal_time(&t2, &t1));
         imax_dense_format_init_from_sparse(&imax_m, &imax_sp, out_size, 8);
         imax_dense_format_init(&imax_r, row, out_size, imax_sp.row_padded_size, imax_m.col_padded_size, imax_sp.row_blk_size, imax_m.col_blk_size);
-        imax_allocation(membase, &imax_sp, &imax_m, &imax_r);
+        imax_dense_format_init(&imax_r2, out_size, out_size, imax_m.row_padded_size, imax_m.col_padded_size, imax_m.row_blk_size, imax_m.col_blk_size);
+        imax_dense_format_init(&imax_r3, row, out_size, imax_sp.row_padded_size, imax_m.col_padded_size, imax_m.row_blk_size, imax_m.col_blk_size);
+        imax_spmm_allocation(membase, &imax_sp, &imax_m, &imax_r);
         timespec_get(&t1, TIME_UTC);
         convert_imax_dense_format(&imax_m, m);
         timespec_get(&t2, TIME_UTC);
@@ -112,22 +114,35 @@ int main(int argc, char **argv) {
         reset_nanosec();
         spmm(&imax_r, &imax_sp, &imax_m);
         get_nanosec(0);
+        show_nanosec();
         timespec_get(&t1, TIME_UTC);
         convert_dense_format(result.weight, &imax_r);
         timespec_get(&t2, TIME_UTC);
         printf("Convert to MM: %lf usec.\n", cal_time(&t2, &t1));
+        imax_mm_allocation(membase, &imax_r, &imax_r2, &imax_r3);
+        printf("<<<IMAX>>>\n");
+        reset_nanosec();
+        mm(&imax_r3, &imax_r, &imax_r2, 0);
+        get_nanosec(0);
+        show_nanosec();
     #else
         timespec_get(&t0, TIME_UTC);
-        spmm(result.weight, &sp, m, out_size);
+        #ifdef USE_CUDA
+            sendSparseMatrixToGPU(&sp);
+            float *gm, *gr;
+            sendDenseMatrixToGPU(&gm, m);
+            spmm(&gr, &sp, m, out_size) ;
+            sendDenseMatrixToCPU(result.weight, gr);
+            freeGPUDenseMatrix(gm);
+        #else 
+            spmm(result.weight, &sp, m, out_size);
+        #endif
         timespec_get(&t2, TIME_UTC);
     #endif
 
     print_weight(&result);
     printf("nnz val: %d\n", row_nnz);
     printf("nnz total: %d\n", sp.nnz);
-    #ifdef EMAX6
-        show_nanosec();
-    #endif
     printf("SpMM: %lf usec.\n", cal_time(&t2, &t0));
 
     return 0;

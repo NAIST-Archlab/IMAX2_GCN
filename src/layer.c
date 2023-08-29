@@ -165,12 +165,15 @@ HiddenLayer *propagation(GCNNetwork *network) {
         IMAXDenseMatrix h, w, tmp_dh, tmp_r;
         Uchar *membase = NULL;
     #endif
+    #ifdef USE_CUDA
+        float *g_tmp, *g_tmp2;
+    #endif
 
     while (p != NULL) {
         #ifdef EMAX6
             imax_dense_format_init_from_sparse(&h, &network->graph->imax_matrix, p->hidden_layer.dim_out, 8);
             imax_dense_format_init(&tmp_dh, network->graph->imax_matrix.row_padded_size, h.col_size, network->graph->imax_matrix.row_padded_size, h.col_padded_size, network->graph->imax_matrix.row_blk_size, h.col_blk_size);
-            imax_allocation(membase, &network->graph->imax_matrix, &h, &tmp_dh);
+            imax_spmm_allocation(membase, &network->graph->imax_matrix, &h, &tmp_dh);
         #endif
         int out_size = network->graph->matrix.row_size * p->hidden_layer.dim_out;
         float *tmp = (float *)malloc(sizeof(float) * network->graph->matrix.row_size * p->latent_vectors.dim_out);
@@ -181,7 +184,14 @@ HiddenLayer *propagation(GCNNetwork *network) {
             convert_imax_dense_format(&h, p->latent_vectors.weight);
             spmm(&tmp_dh, &network->graph->imax_matrix, &h);
         #else
-            spmm(tmp, &network->graph->matrix, p->latent_vectors.weight, p->latent_vectors.dim_out);
+            #ifdef USE_CUDA
+                float *gpu_h;
+                sendDenseMatrixToGPU(&gpu_h, p->latent_vectors.weight, network->graph->matrix.row_size, p->latent_vectors.dim_out);
+                spmm(&g_tmp, &network->graph->matrix, gpu_h, p->latent_vectors.dim_out);
+                freeGPUDenseMatrix(gpu_h);
+            #else
+                spmm(tmp, &network->graph->matrix, p->latent_vectors.weight, p->latent_vectors.dim_out);
+            #endif
         #endif
         timespec_get(&t2, TIME_UTC);
         spmm_time += cal_time(&t2, &t1);
@@ -189,9 +199,17 @@ HiddenLayer *propagation(GCNNetwork *network) {
         timespec_get(&t1, TIME_UTC);
         #ifdef EMAX6
             convert_imax_dense_format(&w, p->hidden_layer.weight);
-            mm(tmp_r, tmp_dh, &h, &w, 1);
+            mm(&tmp_r, &tmp_dh, &w, 1);
         #else
-            mm(tmp2, tmp, p->hidden_layer.weight, network->graph->matrix.row_size, p->hidden_layer.dim_in, p->hidden_layer.dim_out);
+            #ifdef USE_CUDA
+                float *gpu_w;
+                sendDenseMatrixToGPU(&gpu_w, p->hidden_layer.weight, p->hidden_layer.dim_in, p->hidden_layer.dim_out);
+                mm(&g_tmp2, g_tmp, gpu_w, network->graph->matrix.row_size, p->hidden_layer.dim_in, p->hidden_layer.dim_out);
+                freeGPUDenseMatrix(gpu_w);
+                freeGPUDenseMatrix(g_tmp);
+            #else
+                mm(tmp2, tmp, p->hidden_layer.weight, network->graph->matrix.row_size, p->hidden_layer.dim_in, p->hidden_layer.dim_out);
+            #endif
         #endif
         timespec_get(&t2, TIME_UTC);
         mm_time += cal_time(&t2, &t1);
@@ -199,9 +217,16 @@ HiddenLayer *propagation(GCNNetwork *network) {
         if (p->next != NULL) {
             timespec_get(&t1, TIME_UTC);
             #ifdef EMAX6
-                convert_dense_format(p->next->latent_vectors, &tmp_r);
+                convert_dense_format(p->next->latent_vectors.weight, &tmp_r);
             #else
-                relu(p->next->latent_vectors.weight, tmp2, out_size);
+                #ifdef USE_CUDA
+                    float *gpu_r;
+                    relu(&gpu_r, g_tmp2, out_size);
+                    freeGPUDenseMatrix(g_tmp2);
+                    sendDenseMatrixToCPU(p->next->latent_vectors.weight, gpu_r, network->graph->matrix.row_size, p->hidden_layer.dim_out);
+                #else
+                    relu(p->next->latent_vectors.weight, tmp2, out_size);
+                #endif
             #endif
             timespec_get(&t2, TIME_UTC);
             relu_time += cal_time(&t2, &t1);
@@ -214,7 +239,14 @@ HiddenLayer *propagation(GCNNetwork *network) {
             #ifdef EMAX6
                 convert_dense_format(end_vectors->weight, &tmp_dh);
             #else
-                relu(end_vectors->weight, tmp2, out_size);
+                #ifdef USE_CUDA
+                    float *gpu_r;
+                    relu(&gpu_r, g_tmp2, out_size);
+                    freeGPUDenseMatrix(g_tmp2);
+                    sendDenseMatrixToCPU(end_vectors->weight, gpu_r, network->graph->matrix.row_size, p->hidden_layer.dim_out);
+                #else
+                    relu(end_vectors->weight, tmp2, out_size);
+                #endif
             #endif
             timespec_get(&t2, TIME_UTC);
             relu_time += cal_time(&t2, &t1);

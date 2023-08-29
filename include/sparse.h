@@ -29,6 +29,9 @@ typedef struct sparse_matrix {
     int *row_p;   // row pointer
     int *col_p;   // col pointer
     float *val;   // value of each index/Floating
+    int *cuda_row_p; // for CUDA
+    int *cuda_col_p; // for CUDA
+    float *cuda_val; // for CUDA
 } SparseMatrix;
 
 #ifdef EMAX6
@@ -71,12 +74,23 @@ void mem_release(Uchar **membase, Uint memsize);
 #if __cplusplus
 extern "C" {
 #endif
-void spmm(float *result, SparseMatrix *sp_matrix, float *matrix, int mm_col);
-void mm(float *result, float *a, float *b, int col_a, int row_a, int row_b);
-void relu(float *result, float *a, int size);
+void spmm(float **gpuResult, SparseMatrix *sp_matrix, float *matrix, int mm_col);
+void mm(float **gpuResult, float *a, float *b, int col_a, int row_a, int row_b);
+void relu(float **gpuResult, float *a, int size);
+void sendSparseMatrixToGPU(SparseMatrix *sp_matrix);
+void sendSparseMatrixToCPU(SparseMatrix *sp_matrix);
+void sendDenseMatrixToGPU(float **gpuMatrix, float *matrix, int row, int col);
+void sendDenseMatrixToCPU(float *matrix, float *gpuMatrix, int row, int col);
+void freeGPUDenseMatrix(float *gpuMatrix);
 #if __cplusplus
 }
 #endif
+#endif
+
+#ifndef USE_CUDA
+void spmm(float *result, SparseMatrix *sp_matrix, float *matrix, int mm_col);
+void mm(float *result, float *a, float *b, int col_a, int row_a, int row_b);
+void relu(float *result, float *a, int size);
 #endif
 
 #endif

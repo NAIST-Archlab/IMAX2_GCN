@@ -347,12 +347,12 @@ void mm(IMAXDenseMatrix *result, IMAXDenseMatrix *imax_a, IMAXDenseMatrix *imax_
     Uint W = 4;
     Ull A_row_blk_size = imax_a->row_blk_size;
     Ull A_col_blk_size = imax_a->col_blk_size;
-    Ull A_row_size = imax_sp_matrix->row_padded_size;
-    Ull A_col_size = imax_sp_matrix->col_padded_size;
-    Ull B_row_size = imax_sp_matrix->col_padded_size;
-    Ull B_col_size = matrix->col_padded_size;
-    Ull B_row_blk_size = matrix->row_blk_size;
-    Ull B_col_blk_size = matrix->col_blk_size;
+    Ull A_row_size = imax_a->row_padded_size;
+    Ull A_col_size = imax_a->col_padded_size;
+    Ull B_row_size = imax_b->col_padded_size;
+    Ull B_col_size = imax_b->col_padded_size;
+    Ull B_row_blk_size = imax_b->row_blk_size;
+    Ull B_col_blk_size = imax_b->col_blk_size;
 
     Ull cofs_init = (0-W*4*2*A_row_blk_size)<<32|((0-W*4*2*B_row_blk_size)&0xffffffff);
     Ull rofs_init = (0-1*8LL)<<32|((0-1*4LL)&0xffffffff);

@@ -134,6 +134,9 @@ int main(int argc, char **argv) {
 
     printf("Propagation...\n");
     timespec_get(&t1, TIME_UTC);
+    #ifdef USE_CUDA
+        sendSparseMatrixToGPU(&(network.graph->matrix));
+    #endif
     result = propagation(&network);
     timespec_get(&t2, TIME_UTC);
     printf("Propagation: %lf usec.\n", cal_time(&t2, &t1));

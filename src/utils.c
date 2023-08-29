@@ -155,7 +155,7 @@ void imax_sparse_format_init(IMAXSparseMatrix *imax_sp, int row, int col, int sp
     printf("SpM Parameters: Padded(%d,%d) blk(%d,%d) nnz_col_blk(%d)\n", imax_sp->row_padded_size, imax_sp->col_padded_size, imax_sp->row_blk_size, imax_sp->col_blk_size, imax_sp->nnz_col_blk_size);
 }
 
-void imax_allocation(Uchar *membase, IMAXSparseMatrix *imax_sp, IMAXDenseMatrix *imax_m, IMAXDenseMatrix *imax_r) {
+void imax_spmm_allocation(Uchar *membase, IMAXSparseMatrix *imax_sp, IMAXDenseMatrix *imax_m, IMAXDenseMatrix *imax_r) {
     int col_blk_num = (imax_sp->col_padded_size / imax_sp->col_blk_size);
     printf("Will Allocate Memory Size: %luKiB\n",
            (
@@ -192,6 +192,39 @@ void imax_allocation(Uchar *membase, IMAXSparseMatrix *imax_sp, IMAXDenseMatrix 
         memcpy(sp_tmp, imax_sp->sub[i]->val,     imax_sp->sub[i]->nnz     * sizeof(Uint)); free((imax_sp->sub[i]->val)    ); imax_sp->sub[i]->val = sp_tmp;     sp_tmp += imax_sp->sub[i]->nnz;
     }
 
+    printf("Dense Input  Head: %08x_%08x\n", (Uint)((Ull)sp_tmp >> 32), (Uint)sp_tmp);
+    imax_m->val = sp_tmp;
+    sp_tmp += imax_m->row_padded_size * imax_m->col_padded_size;
+    printf("Dense Output Head: %08x_%08x\n", (Uint)((Ull)sp_tmp >> 32), (Uint)sp_tmp);
+    imax_r->val = sp_tmp;
+}
+
+void imax_mm_allocation(Uchar *membase, IMAXDenseMatrix *imax_l, IMAXDenseMatrix *imax_m, IMAXDenseMatrix *imax_r) {
+    printf("Will Allocate Memory Size: %luKiB\n",
+           (
+               (imax_l->row_padded_size * imax_l->col_padded_size) + // Input M Size
+               (imax_m->row_padded_size * imax_m->col_padded_size) + // Input M Size
+               (imax_r->row_padded_size * imax_r->col_padded_size)   // Result M Size
+               ) *
+               sizeof(Uint) / 1024);
+
+    sysinit(
+        &membase,
+        (
+            (imax_l->row_padded_size * imax_l->col_padded_size) + // Input M Size
+            (imax_m->row_padded_size * imax_m->col_padded_size) + // Input M Size
+            (imax_r->row_padded_size * imax_r->col_padded_size)   // Result M Size
+            ) *
+            sizeof(Uint),
+        32);
+
+    printf("IMAX Allocated Memory Base: %08x_%08x\n", (Uint)((Ull)membase >> 32), (Uint)membase);
+
+    Uint *sp_tmp = (Uint *)membase;
+
+    printf("Dense Input  Head: %08x_%08x\n", (Uint)((Ull)sp_tmp >> 32), (Uint)sp_tmp);
+    imax_l->val = sp_tmp;
+    sp_tmp += imax_l->row_padded_size * imax_l->col_padded_size;
     printf("Dense Input  Head: %08x_%08x\n", (Uint)((Ull)sp_tmp >> 32), (Uint)sp_tmp);
     imax_m->val = sp_tmp;
     sp_tmp += imax_m->row_padded_size * imax_m->col_padded_size;
