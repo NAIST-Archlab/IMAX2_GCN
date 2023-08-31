@@ -87,10 +87,10 @@ void freeGPUDenseMatrix(float *gpuMatrix);
 #endif
 #endif
 
-#ifndef USE_CUDA
-void spmm(float *result, SparseMatrix *sp_matrix, float *matrix, int mm_col);
-void mm(float *result, float *a, float *b, int col_a, int row_a, int row_b);
-void relu(float *result, float *a, int size);
+#if !defined(EMAX6) && !defined(USE_CUDA)
+    void spmm(float *result, SparseMatrix *sp_matrix, float *matrix, int mm_col);
+    void mm(float *result, float *a, float *b, int col_a, int row_a, int row_b);
+    void relu(float *result, float *a, int size);
 #endif
 
 #endif

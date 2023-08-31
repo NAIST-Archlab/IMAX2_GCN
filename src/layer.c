@@ -3,6 +3,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 void print_weight(HiddenLayer *result) {
     Ull i, j;
@@ -47,25 +48,22 @@ SparseGraph *spia(SparseGraph *graph) {
     #endif
     for (int i = 0; i < sp_matrix->row_size; i++) {
         int col_index_of_index = sp_matrix->row_p[i];
-        for (int j = col_index_of_index; j < sp_matrix->row_p[i + 1]; j++) {
+        is_added = 0;
+        for (int j = col_index_of_index; j < sp_matrix->row_p[i+1]; j++) {
             int col_index = sp_matrix->col_p[j];
-            if (col_index < i && (j + 1) >= sp_matrix->row_p[i + 1]) {
-                nnz++;
-                break;
-            }
-            int col_next_index = sp_matrix->col_p[j + 1];
-            if (col_index < i && col_next_index > i) {
-                nnz++;
-                break;
-            } else if (col_index == i) {
+            if (col_index == i) {
+                is_added = 1;
                 break;
             }
         }
+
+        if (!is_added) nnz++;
     }
 
     new_col_p = (int *)malloc(sizeof(int) * nnz);
     new_row_p = (int *)malloc(sizeof(int) * (sp_matrix->row_size + 1));
     new_val = (float *)malloc(sizeof(float) * nnz);
+    memset(new_val, 0, sizeof(float) * nnz);
     result->matrix.nnz = nnz;
     result->matrix.col_p = new_col_p;
     result->matrix.col_size = sp_matrix->col_size;
@@ -75,45 +73,22 @@ SparseGraph *spia(SparseGraph *graph) {
     if (nnz != 0)
         new_row_p[0] = 0;
 
-    for (int i = 0; i <= sp_matrix->row_size; i++) {
+    for (int i = 0; i < sp_matrix->row_size; i++) {
         int col_index_of_index = sp_matrix->row_p[i];
-        int sub = sp_matrix->row_p[i] - sp_matrix->row_p[i - 1];
-        if (i > 0) {
-            if (is_added)
-                new_row_p[i] = new_row_p[i - 1] + sub + 1;
-            else
-                new_row_p[i] = new_row_p[i - 1] + sub;
-            is_added = 0;
-        }
+        int sub = sp_matrix->row_p[i+1] - sp_matrix->row_p[i];
+        is_added = 0;
         for (int j = col_index_of_index; j < sp_matrix->row_p[i + 1]; j++) {
             int col_index = sp_matrix->col_p[j];
-            if (col_index < i && (j + 1) >= sp_matrix->row_p[i + 1]) {
-                new_col_p[k] = col_index;
-                new_val[k] = sp_matrix->val[j];
-                new_col_p[++k] = i;
-                new_val[k] = 1;
+            new_col_p[k++] = col_index;
+            if (col_index == i) {
                 is_added = 1;
-            }
-
-            if ((j + 1) >= sp_matrix->col_size)
                 break;
-
-            int col_next_index = sp_matrix->col_p[j + 1];
-            if (col_index < i && col_next_index > i) {
-                new_col_p[k] = col_index;
-                new_val[k] = sp_matrix->val[j];
-                new_col_p[++k] = i;
-                new_val[k] = 1;
-                is_added = 1;
-            } else if (col_index == i) {
-                new_col_p[k] = col_index;
-                new_val[k] = sp_matrix->val[j] + 1;
-            } else {
-                new_col_p[k] = col_index;
-                new_val[k] = sp_matrix->val[j];
             }
-            k++;
         }
+
+        if (!is_added) {new_row_p[i+1] = new_row_p[i] + sub + 1;new_col_p[k++]=i;}
+        else new_row_p[i+1] = new_row_p[i] + sub;
+        is_added = 0;
     }
 
     return result;

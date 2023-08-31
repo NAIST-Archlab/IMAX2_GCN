@@ -15,14 +15,13 @@ int main(int argc, char **argv) {
     SparseGraph graph;
     SparseGraph *new_graph = &graph;
     HiddenLayer *result;
-    FILE *fp_weight, *fp_graph, *fp_feats, *fp_dims;
+    FILE *fp_weight, *fp_graph, *fp_feats, *fp_dims, *fp_mask;
     int num_layers, dim_in, dim_out;
     float *tmp_weight, *tmp_vectors, *edges_val;
     char tmp_filename[100];
     Ull version, sizeEdgeTy, nv, f_dim_in, ne;
     Uint f_dim_out;
-    Ull *vertices;
-    Uint *edges, *vertices_int;
+    Uint *edges, *vertices, *mask;
 
     struct timespec t1, t2;
 
@@ -58,31 +57,76 @@ int main(int argc, char **argv) {
 
     fscanf(fp_dims, "%lld %d\n", &f_dim_in, &f_dim_out);
 
+    memset(tmp_filename, 0, 100);
+    strcat(tmp_filename, argv[2]);
+    strcat(tmp_filename, "-val_mask.txt");
+    if (!(fp_mask = fopen(tmp_filename, "r"))) {
+        return 1;
+    }
+
     printf("Reading Graph now...\n");
     fread(&version, sizeof(Ull), 1, fp_graph);
     fread(&sizeEdgeTy, sizeof(Ull), 1, fp_graph);
     fread(&nv, sizeof(Ull), 1, fp_graph);
     fread(&ne, sizeof(Ull), 1, fp_graph);
-    vertices = (Ull *)malloc(sizeof(Ull) * (nv + 1));
-    vertices_int = (Uint *)malloc(sizeof(Uint) * (nv + 1));
-    fread(vertices, sizeof(Ull), (nv + 1), fp_graph);
 
-    #ifdef USE_MP
-    #pragma omp parallel for
-    #endif
-    for (int i = 0; i <= nv; i++)
-        vertices_int[i] = (Uint)vertices[i];
+    printf("Reading Mask now...\n");
+    Uint mv, anv;
+    fscanf(fp_mask, "%ld %ld", &mv, &anv);
+    mask = (Uint *) malloc(sizeof(Uint) * nv);
+    for (int i = 0; i < nv; i++) {
+        fscanf(fp_mask, "%ld", &mask[i]);
+    }
 
+    Ull *vertices_tmp = (Ull *)malloc(sizeof(Ull) * (nv + 1));
+    fread(vertices_tmp, sizeof(Ull), (nv + 1), fp_graph);
+    vertices = (Uint *)malloc(sizeof(Uint) * (nv + 1));
+    vertices[0] = 0;
+
+    Uint *edges_tmp = (Uint *)malloc(sizeof(Uint) * vertices_tmp[nv]);
+    Uint *edges_tmp2 = (Uint *)malloc(sizeof(Uint) * vertices_tmp[nv]);
+    fread(edges_tmp, sizeof(Uint), ne, fp_graph);
+
+    int cnt = 0;
+    for (int i = 0; i < nv; i++) {
+        int row_nnz = 0;
+        for (int j = vertices_tmp[i]; j < vertices_tmp[i+1]; j++) {
+            if ((mask[edges_tmp[j]] != 0) && (mask[i] != 0)) {
+                edges_tmp2[cnt] = edges_tmp[j];
+                cnt++;
+                row_nnz++;
+            }
+        }
+        if (row_nnz) {
+            vertices[i+1] = vertices[i] + row_nnz;
+        } else {
+            vertices[i+1] = vertices[i];
+        }
+    }
+
+    for (int i = 0; i < nv; i++) {
+        if (vertices[i+1] < vertices[i]) {
+            printf("%d %d\n", vertices[i+1], vertices[i]);
+        }
+    }
+
+    free(edges_tmp);
+    free(vertices_tmp);
+    
     edges = (Uint *)malloc(sizeof(Uint) * vertices[nv]);
     edges_val = (float *)malloc(sizeof(float) * vertices[nv]);
+    memcpy(edges, edges_tmp2, sizeof(Uint) * vertices[nv]);
     memset(edges_val, 0, sizeof(float) * vertices[nv]);
-    fread(edges, sizeof(Uint), ne, fp_graph);
+    free(edges_tmp2);
+
     graph.matrix.nnz = vertices[nv];
     graph.matrix.col_size = nv;
     graph.matrix.row_size = nv;
-    graph.matrix.row_p = (int *)vertices_int;
+    graph.matrix.row_p = (int *)vertices;
     graph.matrix.col_p = (int *)edges;
     graph.matrix.val = edges_val;
+
+    printf("|V|=%d, |E|=%d\n", nv, vertices[nv]);
 
     printf("Caculating A + I\n");
     timespec_get(&t1, TIME_UTC);
@@ -93,8 +137,8 @@ int main(int argc, char **argv) {
     #ifdef USE_MP
     #pragma omp parallel for
     #endif
-    for (int i = 0; i <= new_graph->matrix.row_size; i++) {
-        for (int j = new_graph->matrix.row_p[i]; j < new_graph->matrix.row_p[i + 1]; j++) {
+    for (int i = 0; i < new_graph->matrix.row_size; i++) {
+        for (int j = new_graph->matrix.row_p[i]; j < new_graph->matrix.row_p[i+1]; j++) {
             int col = new_graph->matrix.col_p[j];
             float d_row = 1 / sqrt(new_graph->matrix.row_p[i + 1] - new_graph->matrix.row_p[i] + 1);
             float d_col = 1 / sqrt(new_graph->matrix.row_p[col + 1] - new_graph->matrix.row_p[col] + 1);
