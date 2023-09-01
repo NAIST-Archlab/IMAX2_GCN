@@ -70,7 +70,8 @@ void spmm(IMAXDenseMatrix *result, IMAXSparseMatrix *imax_sp_matrix, IMAXDenseMa
 void mm(IMAXDenseMatrix *result, IMAXDenseMatrix *imax_a, IMAXDenseMatrix *imax_b, int is_relu);
 void sysinit(Uchar **membase, Uint memsize, Uint alignment);
 void mem_release(Uchar **membase, Uint memsize);
-#else
+#endif
+#if defined(USE_CUDA)
 #if __cplusplus
 extern "C" {
 #endif

@@ -43,9 +43,6 @@ SparseGraph *spia(SparseGraph *graph) {
     int k = 0;
     char is_added = 0;
 
-    #ifdef USE_MP
-    #pragma omp parallel for
-    #endif
     for (int i = 0; i < sp_matrix->row_size; i++) {
         int col_index_of_index = sp_matrix->row_p[i];
         is_added = 0;
@@ -147,7 +144,7 @@ HiddenLayer *propagation(GCNNetwork *network) {
     while (p != NULL) {
         #ifdef EMAX6
             imax_dense_format_init_from_sparse(&h, &network->graph->imax_matrix, p->hidden_layer.dim_out, 8);
-            imax_dense_format_init(&tmp_dh, network->graph->imax_matrix.row_padded_size, h.col_size, network->graph->imax_matrix.row_padded_size, h.col_padded_size, network->graph->imax_matrix.row_blk_size, h.col_blk_size);
+            imax_dense_format_init(&tmp_dh, network->graph->imax_matrix.row_size, h.col_size, network->graph->imax_matrix.row_padded_size, h.col_padded_size, network->graph->imax_matrix.row_blk_size, h.col_blk_size);
             imax_spmm_allocation(membase, &network->graph->imax_matrix, &h, &tmp_dh);
         #endif
         int out_size = network->graph->matrix.row_size * p->hidden_layer.dim_out;
@@ -174,6 +171,7 @@ HiddenLayer *propagation(GCNNetwork *network) {
         timespec_get(&t1, TIME_UTC);
         #ifdef EMAX6
             convert_imax_dense_format(&w, p->hidden_layer.weight);
+            imax_dense_format_init(&tmp_r, h.row_size, w.col_size, h.row_padded_size, w.col_padded_size, h.row_blk_size, w.col_blk_size);
             mm(&tmp_r, &tmp_dh, &w, 1);
         #else
             #ifdef USE_CUDA
