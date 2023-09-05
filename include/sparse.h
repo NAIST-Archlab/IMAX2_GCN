@@ -34,6 +34,13 @@ typedef struct sparse_matrix {
     float *cuda_val; // for CUDA
 } SparseMatrix;
 
+typedef struct dense_matrix {
+    int row_size;
+    int col_size;
+    float *val;
+    float *cuda_val; // for CUDA
+} DenseMatrix;
+
 #ifdef EMAX6
 typedef struct sparse_matrix_sub_imax2 {
     int nnz;
@@ -67,31 +74,43 @@ typedef struct dense_matrix_imax2 {
 } IMAXDenseMatrix;
 
 void spmm(IMAXDenseMatrix *result, IMAXSparseMatrix *imax_sp_matrix, IMAXDenseMatrix *matrix);
-void mm(IMAXDenseMatrix *result, IMAXDenseMatrix *imax_a, IMAXDenseMatrix *imax_b, int is_relu);
+void mm(IMAXDenseMatrix *result, IMAXDenseMatrix *imax_a, IMAXDenseMatrix *imax_b);
+void relu(DenseMatrix *result, DenseMatrix *a);
 void sysinit(Uchar **membase, Uint memsize, Uint alignment);
+void imax_add_alloc(Uchar **membase, Uint memsize, Uint alignment);
 void mem_release(Uchar **membase, Uint memsize);
 #endif
 #if defined(USE_CUDA)
 #if __cplusplus
 extern "C" {
 #endif
-void spmm(float **gpuResult, SparseMatrix *sp_matrix, float *matrix, int mm_col);
-void mm(float **gpuResult, float *a, float *b, int col_a, int row_a, int row_b);
-void relu(float **gpuResult, float *a, int size);
+void spmm(DenseMatrix *result, SparseMatrix *sp_matrix, DenseMatrix *matrix);
+void mm(DenseMatrix *result, DenseMatrix *a, DenseMatrix *b);
+void relu(DenseMatrix *result, DenseMatrix *a);
+void allocSparseMatrix(SparseMatrix *sp_matrix);
+void allocDenseMatrix(DenseMatrix *matrix);
 void sendSparseMatrixToGPU(SparseMatrix *sp_matrix);
 void sendSparseMatrixToCPU(SparseMatrix *sp_matrix);
-void sendDenseMatrixToGPU(float **gpuMatrix, float *matrix, int row, int col);
-void sendDenseMatrixToCPU(float *matrix, float *gpuMatrix, int row, int col);
-void freeGPUDenseMatrix(float *gpuMatrix);
+void sendDenseMatrixToGPU(DenseMatrix *matrix);
+void sendDenseMatrixToCPU(DenseMatrix *matrix);
+void freeGPUDenseMatrix(DenseMatrix *matrix);
+void freeGPUSparseMatrix(SparseMatrix *sp_matrix);
+void freeDenseMatrix(DenseMatrix *matrix);
+void freeSparseMatrix(SparseMatrix *sp_matrix);
 #if __cplusplus
 }
 #endif
+#else
+void allocSparseMatrix(SparseMatrix *sp_matrix);
+void freeSparseMatrix(SparseMatrix *sp_matrix);
+void allocDenseMatrix(DenseMatrix *matrix);
+void freeDenseMatrix(DenseMatrix *matrix);
 #endif
 
 #if !defined(EMAX6) && !defined(USE_CUDA)
-    void spmm(float *result, SparseMatrix *sp_matrix, float *matrix, int mm_col);
-    void mm(float *result, float *a, float *b, int col_a, int row_a, int row_b);
-    void relu(float *result, float *a, int size);
+    void spmm(DenseMatrix *result, SparseMatrix *sp_matrix, DenseMatrix *matrix);
+    void mm(DenseMatrix *result, DenseMatrix *a, DenseMatrix *b);
+    void relu(DenseMatrix *result, DenseMatrix *a);
 #endif
 
 #endif

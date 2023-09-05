@@ -11,14 +11,13 @@ typedef struct sparse_graph {
 } SparseGraph;
 
 typedef struct hidden_layer {
-    int dim_in;
-    int dim_out;
-    float *weight;
+    DenseMatrix matrix;
 } HiddenLayer;
 
 typedef struct gcn_layer {
     HiddenLayer hidden_layer; 
     HiddenLayer latent_vectors;
+    HiddenLayer result_layer;
     struct gcn_layer *prev;
     struct gcn_layer *next;
 } GCNLayer;
@@ -32,10 +31,9 @@ typedef struct gcn_network {
 void print_weight(HiddenLayer *result);
 SparseGraph* spia(SparseGraph *graph);
 void print_layers(GCNNetwork *network);
-void add_gcn_layer(GCNNetwork *network, float *weight, float *vectors, int dim_in, int dim_out);
-float* make_weight(int dim_in, int dim_out);
-HiddenLayer* propagation(GCNNetwork *network);
-HiddenLayer* softmax(HiddenLayer *end_vectors);
+void add_gcn_layer(GCNNetwork *network, DenseMatrix weight, DenseMatrix vectors);
+void propagation(GCNNetwork *network);
+void softmax(HiddenLayer *end_vectors);
 float max_in_array(float *array, int size);
 
 #endif

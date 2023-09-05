@@ -52,14 +52,27 @@
 }
 
 extern "C"
-void sendSparseMatrixToGPU(SparseMatrix *sp_matrix) {
+void allocSparseMatrix(SparseMatrix *sp_matrix) {
+    sp_matrix->row_p = (int*) malloc(sizeof(int)*(sp_matrix->row_size+1));
+    sp_matrix->col_p = (int*) malloc(sizeof(int)*(sp_matrix->nnz));
+    sp_matrix->val = (float*) malloc(sizeof(float)*(sp_matrix->nnz));
     CHECK(cudaMalloc((void**) &sp_matrix->cuda_row_p, sizeof(int)*(sp_matrix->row_size+1)));
     CHECK(cudaMalloc((void**) &sp_matrix->cuda_col_p, sizeof(int)*(sp_matrix->nnz)));
     CHECK(cudaMalloc((void**) &sp_matrix->cuda_val,   sizeof(float)*(sp_matrix->nnz)));
 
+}
+
+extern "C"
+void allocDenseMatrix(DenseMatrix *matrix) {
+    matrix->val = (float*) malloc(sizeof(float)*(matrix->row_size*matrix->col_size));
+    CHECK(cudaMalloc((void**) &matrix->cuda_val, sizeof(float)*(matrix->row_size*matrix->col_size)));
+}
+
+extern "C"
+void sendSparseMatrixToGPU(SparseMatrix *sp_matrix) {
     CHECK(cudaMemcpy(sp_matrix->cuda_row_p, sp_matrix->row_p, sizeof(int)*(sp_matrix->row_size+1), cudaMemcpyHostToDevice));
     CHECK(cudaMemcpy(sp_matrix->cuda_col_p, sp_matrix->col_p, sizeof(int)*(sp_matrix->nnz),        cudaMemcpyHostToDevice));
-    CHECK(cudaMemcpy(sp_matrix->cuda_val,   sp_matrix->val, sizeof(float)*(sp_matrix->nnz),        cudaMemcpyHostToDevice));
+    CHECK(cudaMemcpy(sp_matrix->cuda_val,   sp_matrix->val,   sizeof(float)*(sp_matrix->nnz),        cudaMemcpyHostToDevice));
 }
 
 extern "C"
@@ -67,31 +80,46 @@ void sendSparseMatrixToCPU(SparseMatrix *sp_matrix) {
     CHECK(cudaMemcpy(sp_matrix->row_p, sp_matrix->cuda_row_p, sizeof(int)*(sp_matrix->row_size+1), cudaMemcpyDeviceToHost));
     CHECK(cudaMemcpy(sp_matrix->col_p, sp_matrix->cuda_col_p, sizeof(int)*(sp_matrix->nnz),        cudaMemcpyDeviceToHost));
     CHECK(cudaMemcpy(sp_matrix->val,   sp_matrix->cuda_val,   sizeof(float)*(sp_matrix->nnz),      cudaMemcpyDeviceToHost));
+}
 
+extern "C"
+void sendDenseMatrixToGPU(DenseMatrix *matrix) {
+    CHECK(cudaMemcpy(matrix->cuda_val, matrix->val, sizeof(float)*(matrix->row_size*matrix->col_size), cudaMemcpyHostToDevice));
+}
+
+extern "C"
+void sendDenseMatrixToCPU(DenseMatrix *matrix) {
+    CHECK(cudaMemcpy(matrix->val, matrix->cuda_val, sizeof(float)*(matrix->row_size*matrix->col_size), cudaMemcpyDeviceToHost));
+}
+
+extern "C"
+void freeGPUDenseMatrix(DenseMatrix *matrix) {
+    CHECK(cudaFree(matrix->cuda_val));
+}
+
+extern "C"
+void freeGPUSparseMatrix(SparseMatrix *sp_matrix) {
     CHECK(cudaFree(sp_matrix->cuda_row_p));
     CHECK(cudaFree(sp_matrix->cuda_col_p));
     CHECK(cudaFree(sp_matrix->cuda_val));
 }
 
 extern "C"
-void sendDenseMatrixToGPU(float **gpuMatrix, float *matrix, int row, int col) {
-    CHECK(cudaMalloc((void**) gpuMatrix, sizeof(float)*(row*col)));
-    CHECK(cudaMemcpy(*gpuMatrix, matrix, sizeof(float)*(row*col), cudaMemcpyHostToDevice));
+void freeSparseMatrix(SparseMatrix *sp_matrix) {
+    free(sp_matrix->row_p);
+    free(sp_matrix->col_p);
+    free(sp_matrix->val);
+    freeGPUSparseMatrix(sp_matrix);
 }
 
 extern "C"
-void freeGPUDenseMatrix(float *gpuMatrix) {
-    CHECK(cudaFree(gpuMatrix));
+void freeDenseMatrix(DenseMatrix *matrix) {
+    free(matrix->val);
+    freeGPUDenseMatrix(matrix);
 }
 
 extern "C"
-void sendDenseMatrixToCPU(float *matrix, float *gpuMatrix, int row, int col) {
-    CHECK(cudaMemcpy(matrix, gpuMatrix, sizeof(float)*(row*col), cudaMemcpyDeviceToHost));
-    CHECK(cudaFree(gpuMatrix));
-}
-
-extern "C"
-void spmm(float **gpuResult, SparseMatrix *sp_matrix, float *matrix, int mm_col) {
+void spmm(DenseMatrix *result, SparseMatrix *sp_matrix, DenseMatrix *matrix) {
     struct timespec t1, t2;
     cusparseHandle_t handle;
     cusparseSpMatDescr_t Adescr;
@@ -100,9 +128,6 @@ void spmm(float **gpuResult, SparseMatrix *sp_matrix, float *matrix, int mm_col)
 
     printf("<<CUDA>>\n");
     CHECK_CUSPARSE(cusparseCreate(&handle));
-
-    CHECK(cudaMalloc((void**)gpuResult,     sizeof(float)*(sp_matrix->row_size*mm_col)));
-    CHECK(cudaMemset(*gpuResult,     0,       sizeof(float)*(sp_matrix->row_size*mm_col)));
 
     CHECK_CUSPARSE(
         cusparseCreateCsr(&Adescr, 
@@ -114,14 +139,14 @@ void spmm(float **gpuResult, SparseMatrix *sp_matrix, float *matrix, int mm_col)
 
     CHECK_CUSPARSE(
         cusparseCreateDnMat(&Bdescr, 
-            sp_matrix->col_size, mm_col, mm_col, matrix, 
+            sp_matrix->col_size, matrix->col_size, matrix->col_size, matrix->cuda_val, 
             CUDA_R_32F, CUSPARSE_ORDER_ROW
         )
     );
 
     CHECK_CUSPARSE(
         cusparseCreateDnMat(&Cdescr, 
-            sp_matrix->row_size, mm_col, mm_col, *gpuResult, 
+            sp_matrix->row_size, matrix->col_size, matrix->col_size, result->cuda_val, 
             CUDA_R_32F, CUSPARSE_ORDER_ROW
         )
     );
@@ -166,15 +191,12 @@ void spmm(float **gpuResult, SparseMatrix *sp_matrix, float *matrix, int mm_col)
 }
 
 extern "C"
-void mm(float **gpuResult, float *a, float *b, int row_a, int col_a, int col_b) {
+void mm(DenseMatrix *result, DenseMatrix *a, DenseMatrix *b) {
     struct timespec t1, t2;
     cublasHandle_t handle;
 
     printf("<<CUDA>>\n");
     CHECK_CUBLAS(cublasCreate(&handle));
-
-    CHECK(cudaMalloc((void**)gpuResult,  sizeof(float)*(row_a*col_b)));
-    CHECK(cudaMemset(*gpuResult, 0, sizeof(float)*(row_a*col_b)));
 
     float alpha = 1;
     float beta = 0;
@@ -183,9 +205,9 @@ void mm(float **gpuResult, float *a, float *b, int row_a, int col_a, int col_b) 
     CHECK_CUBLAS(
         cublasSgemm(handle,
             CUBLAS_OP_N, CUBLAS_OP_N,
-            col_b, row_a, col_a,
-            &alpha, b, col_b, a, col_a, 
-            &beta, *gpuResult, col_b
+            b->col_size, a->row_size, a->col_size,
+            &alpha, b->cuda_val, b->col_size, a->cuda_val, a->col_size, 
+            &beta, result->cuda_val, b->col_size
         )
     );
     CHECK(cudaDeviceSynchronize());
@@ -212,18 +234,15 @@ void threshold(float *gpuResult, float *input, float threshold, int size) {
 #define BLOCK_SIZE_CUDA 128
 
 extern "C"
-void relu(float **gpuResult, float *a, int size) {
+void relu(DenseMatrix *result, DenseMatrix *a) {
     struct timespec t1, t2;
     dim3 dimBlock(BLOCK_SIZE_CUDA);
-    dim3 dimGrid(size / BLOCK_SIZE_CUDA);
+    dim3 dimGrid((a->row_size * a->col_size) / BLOCK_SIZE_CUDA);
 
     printf("<<CUDA>>\n");
 
-    CHECK(cudaMalloc((void**)gpuResult, sizeof(float)*(size)));
-    CHECK(cudaMemset(*gpuResult, 0, sizeof(float)*(size)));
-
     timespec_get(&t1, TIME_UTC);
-    threshold<<<dimGrid, dimBlock>>>(*gpuResult, a, 0, size);
+    threshold<<<dimGrid, dimBlock>>>(result->cuda_val, a->cuda_val, 0, a->row_size * a->col_size);
     CHECK(cudaDeviceSynchronize());
     timespec_get(&t2, TIME_UTC);
 

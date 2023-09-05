@@ -1,49 +1,71 @@
 #include "../include/sparse.h"
 #if !(defined(EMAX6) || defined(USE_CUDA))
 #include <stdio.h>
+#include <stdlib.h>
 #ifdef USE_MP
 #include <omp.h>
 #endif
 
-void spmm(float *result, SparseMatrix *sp_matrix, float *matrix, int mm_col) {
+void spmm(DenseMatrix *result, SparseMatrix *sp_matrix, DenseMatrix *matrix) {
     #ifdef USE_MP
     #pragma omp parallel for
     #endif
-    for (int k = 0; k < mm_col; k++) {
+    for (int k = 0; k < matrix->col_size; k++) {
         for (int i = 0; i < sp_matrix->row_size; i++) {
             int col_index_of_index = sp_matrix->row_p[i];
             float sum = 0;
             for (int j = col_index_of_index; j < sp_matrix->row_p[i + 1]; j++) {
                 int col_index = sp_matrix->col_p[j];
-                sum += sp_matrix->val[j] * matrix[col_index * mm_col + k];
+                sum += sp_matrix->val[j] * matrix->val[col_index * matrix->col_size + k];
             }
-            result[i * mm_col + k] = sum;
+            result->val[i * matrix->col_size + k] = sum;
         }
     }
 }
 
-void mm(float *result, float *a, float *b, int row_a, int col_a, int col_b) {
+void mm(DenseMatrix *result, DenseMatrix *a, DenseMatrix *b) {
     #ifdef USE_MP
     #pragma omp parallel for
     #endif
-    for (int i = 0; i < row_a; i++) {
-        for (int j = 0; j < col_a; j++) {
+    for (int i = 0; i < a->row_size; i++) {
+        for (int j = 0; j < a->col_size; j++) {
             float sum = 0;
-            for (int k = 0; k < col_b; k++) {
-                sum += a[i * col_a + k] * b[k * col_b + j];
+            for (int k = 0; k < b->col_size; k++) {
+                sum += a->val[i * a->col_size + k] * b->val[k * b->col_size + j];
             }
-            result[i * col_b + j] = sum;
+            result->val[i * b->col_size + j] = sum;
         }
     }
 }
 
-void relu(float *result, float *a, int size) {
+void relu(DenseMatrix *result, DenseMatrix *a) {
     #ifdef USE_MP
     #pragma omp parallel for
     #endif
-    for (int i = 0; i < size; i++) {
-        result[i] = (a[i] > 0) ? a[i] : 0;
+    for (int i = 0; i < (a->col_size * a->row_size); i++) {
+        result->val[i] = (a->val[i] > 0) ? a->val[i] : 0;
     }
 }
+#endif
 
+#if !defined(USE_CUDA)
+void allocDenseMatrix(DenseMatrix *matrix) {
+    matrix->val = (float*) malloc(sizeof(float)*matrix->row_size*matrix->col_size);
+}
+
+void freeDenseMatrix(DenseMatrix *matrix) {
+    free(matrix->val);
+}
+
+void allocSparseMatrix(SparseMatrix *sp_matrix) {
+    sp_matrix->row_p = (int*) malloc(sizeof(int)*(sp_matrix->row_size+1));
+    sp_matrix->col_p = (int*) malloc(sizeof(int)*(sp_matrix->nnz));
+    sp_matrix->val = (float*) malloc(sizeof(float)*(sp_matrix->nnz));
+}
+
+void freeSparseMatrix(SparseMatrix *sp_matrix) {
+    free(sp_matrix->row_p);
+    free(sp_matrix->col_p);
+    free(sp_matrix->val);
+}
 #endif

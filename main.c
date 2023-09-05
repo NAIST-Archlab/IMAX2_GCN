@@ -14,14 +14,13 @@ int main(int argc, char **argv) {
     GCNNetwork network;
     SparseGraph graph;
     SparseGraph *new_graph = &graph;
-    HiddenLayer *result;
     FILE *fp_weight, *fp_graph, *fp_feats, *fp_dims, *fp_mask;
     int num_layers, dim_in, dim_out;
-    float *tmp_weight, *tmp_vectors, *edges_val;
+    DenseMatrix tmp_weight, tmp_vectors;
     char tmp_filename[100];
     Ull version, sizeEdgeTy, nv, f_dim_in, ne;
     Uint f_dim_out;
-    Uint *edges, *vertices, *mask;
+    Uint *vertices, *mask;
 
     struct timespec t1, t2;
 
@@ -84,8 +83,8 @@ int main(int argc, char **argv) {
     vertices = (Uint *)malloc(sizeof(Uint) * (new_nv + 1));
     vertices[0] = 0;
 
-    Uint *edges_tmp = (Uint *)malloc(sizeof(Uint) * vertices_tmp[nv]);
-    Uint *edges_tmp2 = (Uint *)malloc(sizeof(Uint) * vertices_tmp[nv]);
+    Uint *edges_tmp = (Uint *)malloc(sizeof(Uint)*vertices_tmp[nv]);
+    Uint *edges_tmp2 = (Uint *)malloc(sizeof(Uint)*vertices_tmp[nv]);
     fread(edges_tmp, sizeof(Uint), ne, fp_graph);
 
     int cnt = 0;
@@ -109,27 +108,23 @@ int main(int argc, char **argv) {
     free(edges_tmp);
     free(vertices_tmp);
 
-    edges = (Uint *)malloc(sizeof(Uint) * vertices[new_nv]);
-    edges_val = (float *)malloc(sizeof(float) * vertices[new_nv]);
-    memcpy(edges, edges_tmp2, sizeof(Uint) * vertices[new_nv]);
-    memset(edges_val, 0, sizeof(float) * vertices[new_nv]);
-    free(edges_tmp2);
-
-    graph.matrix.nnz = vertices[new_nv];
-    graph.matrix.col_size = new_nv;
     graph.matrix.row_size = new_nv;
-    graph.matrix.row_p = (int *)vertices;
-    graph.matrix.col_p = (int *)edges;
-    graph.matrix.val = edges_val;
+    graph.matrix.col_size = new_nv;
+    graph.matrix.nnz = vertices[new_nv];
+    allocSparseMatrix(&(graph.matrix));
+
+    memcpy(graph.matrix.row_p, vertices, sizeof(Uint)*(new_nv+1));
+    memcpy(graph.matrix.col_p, edges_tmp2, sizeof(Uint)*vertices[new_nv]);
+    memset(graph.matrix.val, 0, sizeof(float)*vertices[new_nv]);
 
     printf("|V|=%d, |E|=%d\n", new_nv, vertices[new_nv]);
+    free(edges_tmp2);
+    free(vertices);
 
     printf("Caculating A + I\n");
     timespec_get(&t1, TIME_UTC);
     new_graph = spia(&graph);
-    free(graph.matrix.col_p);
-    free(graph.matrix.row_p);
-    free(graph.matrix.val);
+    freeSparseMatrix(&(graph.matrix));
 
     // D^-1*A*D^-1
     printf("Calculating D^-1AD^-1\n");
@@ -141,6 +136,9 @@ int main(int argc, char **argv) {
             new_graph->matrix.val[j] = d_row * d_col;
         }
     }
+    #ifdef USE_CUDA
+        sendSparseMatrixToGPU(&(new_graph->matrix));
+    #endif
 
     timespec_get(&t2, TIME_UTC);
     printf("Preprocessing: %lf usec.\n", cal_time(&t2, &t1));
@@ -154,16 +152,29 @@ int main(int argc, char **argv) {
     for (int i = 0; i < num_layers; i++) {
         fread(&dim_in, sizeof(Uint), 1, fp_weight);
         fread(&dim_out, sizeof(Uint), 1, fp_weight);
-        tmp_weight = make_weight(dim_in, dim_out);
-        fread(tmp_weight, sizeof(float), dim_in * dim_out, fp_weight);
-        tmp_vectors = make_weight(new_nv, dim_in);
-        add_gcn_layer(&network, tmp_weight, tmp_vectors, dim_in, dim_out);
+        tmp_weight.row_size = dim_in;
+        tmp_weight.col_size = dim_out;
+        allocDenseMatrix(&tmp_weight);
+        fread(tmp_weight.val, sizeof(float), dim_in * dim_out, fp_weight);
+        #ifdef USE_CUDA
+            sendDenseMatrixToGPU(&tmp_weight);
+        #endif
+        tmp_vectors.row_size = new_nv;
+        tmp_vectors.col_size = dim_in;
+        allocDenseMatrix(&tmp_vectors);
+        add_gcn_layer(&network, tmp_weight, tmp_vectors);
     }
+    network.layers->result_layer.matrix.row_size = new_nv;
+    network.layers->result_layer.matrix.col_size = dim_out;
+    allocDenseMatrix(&(network.layers->result_layer.matrix));
     print_layers(&network);
 
     printf("Reading Features now...\n");
     fscanf(fp_dims, "%lld %d\n", &f_dim_in, &f_dim_out);
-    fread(network.layers->latent_vectors.weight, sizeof(float), new_nv * f_dim_out, fp_feats);
+    fread(network.layers->latent_vectors.matrix.val, sizeof(float), new_nv * f_dim_out, fp_feats);
+    #ifdef USE_CUDA
+        sendDenseMatrixToGPU(&(network.layers->latent_vectors.matrix));
+    #endif
     fclose(fp_feats);
 
     #ifdef EMAX6
@@ -175,23 +186,14 @@ int main(int argc, char **argv) {
         printf("Transform %lf usec.\n", cal_time(&t2, &t1));
     #endif
 
-    printf("Propagation...\n");
-    timespec_get(&t1, TIME_UTC);
-    #ifdef USE_CUDA
-        sendSparseMatrixToGPU(&(network.graph->matrix));
-    #endif
-    result = propagation(&network);
-    timespec_get(&t2, TIME_UTC);
-    printf("Propagation: %lf usec.\n", cal_time(&t2, &t1));
+    propagation(&network);
+
     printf("Result\n");
-    print_weight(result);
+    print_weight(&(network.layers->result_layer));
     printf("Propagation Done\n");
 
     fclose(fp_graph);
     fclose(fp_weight);
-
-    if (result != NULL)
-        free(result);
 
     return 0;
 }

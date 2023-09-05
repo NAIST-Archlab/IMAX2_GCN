@@ -48,6 +48,18 @@ void sysinit(Uchar **membase, Uint memsize, Uint alignment) {
 #endif
 }
 
+void imax_add_alloc(Uchar **membase, Uint memsize, Uint alignment) {
+#if defined(ARMZYNQ) && defined(EMAX6)
+  {int i; for (i=0; i<(memsize+sizeof(Dll)-1)/sizeof(Dll); i++) *((Dll*)*membase+i)=0;}
+#elif __linux__ == 1
+  posix_memalign(membase, alignment, memsize);
+#else
+  *membase = (void*)malloc(memsize+alignment);
+  if ((Ull)*membase & (Ull)(alignment-1))
+    *membase = (void*)(((Ull)*membase & ~(Ull)(alignment-1))+alignment);
+#endif
+}
+
 void mem_release(Uchar **membase, Uint memsize) {
   #if defined(ARMZYNQ) && defined(EMAX6)
     {int i; for (i=0; i<(memsize+sizeof(Dll)-1)/sizeof(Dll); i++) *((Dll*)*membase+i)=0;}
@@ -104,6 +116,8 @@ void spmm(IMAXDenseMatrix *result, IMAXSparseMatrix *imax_sp_matrix, IMAXDenseMa
     Uint *a_sub_col_head, *a_sub_head, *a_sub_nnz_head, *a_sub_row_head;
     Uint *b_head = (Uint*)matrix->val;
     Uint *c_head = (Uint*)result->val;
+
+    printf("<<IMAX>>\n");
 
     // Select Column of A(=Row of B)
     for (a_col_blk = 0, a_col_blk_iter = 0; a_col_blk < A_col_size; a_col_blk += A_col_blk_size, a_col_blk_iter += 1) {
@@ -330,7 +344,7 @@ void spmm(IMAXDenseMatrix *result, IMAXSparseMatrix *imax_sp_matrix, IMAXDenseMa
 //EMAX5A drain_dirty_lmm
 }
 
-void mm(IMAXDenseMatrix *result, IMAXDenseMatrix *imax_a, IMAXDenseMatrix *imax_b, int is_relu) {
+void mm(IMAXDenseMatrix *result, IMAXDenseMatrix *imax_a, IMAXDenseMatrix *imax_b) {
     Ull CHIP;
     Ull LOOP1, LOOP0;
     Ull INIT1, INIT0;
@@ -375,6 +389,8 @@ void mm(IMAXDenseMatrix *result, IMAXDenseMatrix *imax_a, IMAXDenseMatrix *imax_
     Uint *a_head = (Uint*)imax_a->val;
     Uint *b_head = (Uint*)imax_b->val;
     Uint *c_head = (Uint*)result->val;
+
+    printf("<<IMAX>>\n");
 
     // Select Column of A(=Row of B)
     for (a_col_blk = 0, a_col_blk_iter = 0; a_col_blk < A_col_size; a_col_blk += A_col_blk_size, a_col_blk_iter += 1) {
@@ -516,9 +532,9 @@ void mm(IMAXDenseMatrix *result, IMAXDenseMatrix *imax_a, IMAXDenseMatrix *imax_
 //EMAX5A drain_dirty_lmm
 }
 
-void relu(float *result, float *a, int size) {
-    for (int i = 0; i < size; i++) {
-        result[i] = (a[i] > 0) ? a[i] : 0;
+void relu(DenseMatrix *result, DenseMatrix *a) {
+    for (int i = 0; i < (a->row_size * a->col_size); i++) {
+        result->val[i] = (a->val[i] > 0) ? a->val[i] : 0;
     }
 }
 

@@ -8,9 +8,9 @@
 
 int main(int argc, char **argv) {
     SparseMatrix sp;
+    DenseMatrix m;
     HiddenLayer result;
     struct timespec t0, t1, t2;
-    float *m;
     int i, j, k;
     #ifdef EMAX6
         Uchar *membase = NULL;
@@ -31,17 +31,16 @@ int main(int argc, char **argv) {
 
     sp.nnz = row_nnz * row;
     sp.row_size = row;
-    sp.row_p = (int *)malloc(sizeof(int) * (row + 1));
     sp.col_size = row;
-    sp.col_p = (int *)malloc(sizeof(int) * sp.nnz);
-    sp.val = (float *)malloc(sizeof(float) * sp.nnz);
+    allocSparseMatrix(&sp);
 
-    m = (float *)malloc(sizeof(float) * row * out_size);
+    m.row_size = row;
+    m.col_size = 100;
+    allocDenseMatrix(&m);
 
-    result.weight = (float *)malloc(sizeof(float) * row * out_size);
-    memset(result.weight, 0, sizeof(float) * row * out_size);
-    result.dim_in = row;
-    result.dim_out = out_size;
+    result.row_size = row;
+    result.col_size = out_size;
+    allocDenseMatrix(&result);
 
     #ifdef SAME_DISTANCE
     for (i = 0; i < row; i++) {
@@ -87,9 +86,9 @@ int main(int argc, char **argv) {
 
     for (i = 0; i < row * out_size; i++) {
         if (i % 2)
-            m[i] = 0.0F;
+            m.val[i] = 0.0F;
         else
-            m[i] = 1.0F;
+            m.val[i] = 1.0F;
     }
 
     #ifdef EMAX6
@@ -105,9 +104,9 @@ int main(int argc, char **argv) {
         imax_dense_format_init(&imax_r, row, out_size, imax_sp.row_padded_size, imax_m.col_padded_size, imax_sp.row_blk_size, imax_m.col_blk_size);
         imax_dense_format_init(&imax_r2, out_size, out_size, imax_m.row_padded_size, imax_m.col_padded_size, imax_m.row_blk_size, imax_m.col_blk_size);
         imax_dense_format_init(&imax_r3, row, out_size, imax_sp.row_padded_size, imax_m.col_padded_size, imax_m.row_blk_size, imax_m.col_blk_size);
-        imax_spmm_allocation(membase, &imax_sp, &imax_m, &imax_r);
+        imax_spmm_allocation(&membase, &imax_sp, &imax_m, &imax_r, 1, 1, 1);
         timespec_get(&t1, TIME_UTC);
-        convert_imax_dense_format(&imax_m, m);
+        convert_imax_dense_format(&imax_m, &m);
         timespec_get(&t2, TIME_UTC);
         printf("Convert to IMAX_MM: %lf usec.\n", cal_time(&t2, &t1));
         printf("<<<IMAX>>>\n");
@@ -116,10 +115,10 @@ int main(int argc, char **argv) {
         get_nanosec(0);
         show_nanosec();
         timespec_get(&t1, TIME_UTC);
-        convert_dense_format(result.weight, &imax_r);
+        convert_dense_format(&result, &imax_r);
         timespec_get(&t2, TIME_UTC);
         printf("Convert to MM: %lf usec.\n", cal_time(&t2, &t1));
-        imax_mm_allocation(membase, &imax_r, &imax_r2, &imax_r3);
+        imax_mm_allocation(&membase, &imax_r, &imax_r2, &imax_r3, 1, 1, 1);
         printf("<<<IMAX>>>\n");
         reset_nanosec();
         mm(&imax_r3, &imax_r, &imax_r2, 0);
@@ -129,13 +128,11 @@ int main(int argc, char **argv) {
         timespec_get(&t0, TIME_UTC);
         #ifdef USE_CUDA
             sendSparseMatrixToGPU(&sp);
-            float *gm, *gr;
-            sendDenseMatrixToGPU(&gm, m);
-            spmm(&gr, &sp, m, out_size) ;
-            sendDenseMatrixToCPU(result.weight, gr);
-            freeGPUDenseMatrix(gm);
-        #else 
-            spmm(result.weight, &sp, m, out_size);
+            sendDenseMatrixToGPU(&m);
+        #endif
+        spmm(&result, &sp, &m);
+        #ifdef USE_CUDA
+            sendDenseMatrixToCPU(&result);
         #endif
         timespec_get(&t2, TIME_UTC);
     #endif
