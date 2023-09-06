@@ -18,6 +18,13 @@ typedef struct { Ull u[2]; } Dll;
 #endif
 #endif
 
+enum { SPMM, MM, RELU, SOFTMAX, NUM_CLASS };
+#ifdef EMAX6
+unsigned long long all_nanosec[NUM_CLASS][8];
+#else
+unsigned long long all_nanosec[NUM_CLASS];
+#endif
+
 #define KERNEL_MODE_1 1
 #define KERNEL_MODE_2 2
 #define LMM_SIZE 0x4000
@@ -97,6 +104,10 @@ void freeGPUDenseMatrix(DenseMatrix *matrix);
 void freeGPUSparseMatrix(SparseMatrix *sp_matrix);
 void freeDenseMatrix(DenseMatrix *matrix);
 void freeSparseMatrix(SparseMatrix *sp_matrix);
+void createCusparse();
+void createCublase();
+void destroyCusparse();
+void destroyCublas();
 #if __cplusplus
 }
 #endif

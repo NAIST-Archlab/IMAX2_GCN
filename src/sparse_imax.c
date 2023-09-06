@@ -1,6 +1,7 @@
 #ifdef EMAX6
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <math.h>
 #include "../include/emax6.h"
 #include "../include/emax6lib.c"
@@ -118,7 +119,7 @@ void spmm(IMAXDenseMatrix *result, IMAXSparseMatrix *imax_sp_matrix, IMAXDenseMa
     Uint *c_head = (Uint*)result->val;
 
     printf("<<IMAX>>\n");
-
+    reset_nanosec();
     // Select Column of A(=Row of B)
     for (a_col_blk = 0, a_col_blk_iter = 0; a_col_blk < A_col_size; a_col_blk += A_col_blk_size, a_col_blk_iter += 1) {
         a_sub_row_head = (Uint*)imax_sp_sub[a_col_blk_iter]->row_num;
@@ -342,6 +343,9 @@ void spmm(IMAXDenseMatrix *result, IMAXSparseMatrix *imax_sp_matrix, IMAXDenseMa
         }
     }
 //EMAX5A drain_dirty_lmm
+    get_nanosec(0);
+    for (int i = 0; i < 8; i++) all_nanosec[SPMM][i] += nanosec[i];
+    show_nanosec();
 }
 
 void mm(IMAXDenseMatrix *result, IMAXDenseMatrix *imax_a, IMAXDenseMatrix *imax_b) {
@@ -391,7 +395,7 @@ void mm(IMAXDenseMatrix *result, IMAXDenseMatrix *imax_a, IMAXDenseMatrix *imax_
     Uint *c_head = (Uint*)result->val;
 
     printf("<<IMAX>>\n");
-
+    reset_nanosec();
     // Select Column of A(=Row of B)
     for (a_col_blk = 0, a_col_blk_iter = 0; a_col_blk < A_col_size; a_col_blk += A_col_blk_size, a_col_blk_iter += 1) {
         // Select Row of A(=Row of C)
@@ -530,6 +534,9 @@ void mm(IMAXDenseMatrix *result, IMAXDenseMatrix *imax_a, IMAXDenseMatrix *imax_
         }
     }
 //EMAX5A drain_dirty_lmm
+    get_nanosec(0);
+    for (int i = 0; i < 8; i++) all_nanosec[MM][i] += nanosec[i];
+    show_nanosec();
 }
 
 void relu(DenseMatrix *result, DenseMatrix *a) {

@@ -135,9 +135,13 @@ void propagation(GCNNetwork *network) {
     #endif
 
     printf("Propagation...\n");
+
+    #ifdef USE_CUDA
+        createCusparse();
+        createCublase();
+    #endif
     int layer_cnt = 0;
     while (p != NULL) {
-        printf("Layer %d\n", ++layer_cnt);
         out_size = network->graph->matrix.row_size * p->hidden_layer.matrix.col_size;
         r_spmm.row_size = network->graph->matrix.row_size;
         r_spmm.col_size = p->latent_vectors.matrix.col_size;
@@ -155,7 +159,7 @@ void propagation(GCNNetwork *network) {
             convert_imax_dense_format(&h, &(p->latent_vectors.matrix));
         #endif
 
-        printf("SpMM\n");
+        printf("Layer %d: SpMM\n", ++layer_cnt);
         timespec_get(&t1, TIME_UTC);
         #ifdef EMAX6
             spmm(&imax_r_spmm, &network->graph->imax_matrix, &h);
@@ -173,7 +177,7 @@ void propagation(GCNNetwork *network) {
             convert_imax_dense_format(&w, &(p->hidden_layer.matrix));
             convert_imax_dense_format(&imax_r_spmm, &r_spmm);
         #endif
-        printf("MM\n");
+        printf("Layer %d: MM\n", layer_cnt);
         timespec_get(&t1, TIME_UTC);
         #ifdef EMAX6
             mm(&imax_r_mm, &imax_r_spmm, &w);
@@ -189,7 +193,7 @@ void propagation(GCNNetwork *network) {
         #if defined(EMAX6)
             convert_dense_format(&r_mm, &imax_r_mm);
         #endif
-        printf("ReLU\n");
+        printf("Layer %d: ReLU\n", layer_cnt);
         timespec_get(&t1, TIME_UTC);
         relu(last_weight, &r_mm);
         timespec_get(&t2, TIME_UTC);
@@ -207,9 +211,24 @@ void propagation(GCNNetwork *network) {
     softmax(&(network->layers->result_layer));
     timespec_get(&t2, TIME_UTC);
     double softmax_time = cal_time(&t2, &t1);
+    #ifdef USE_CUDA
+        destroyCusparse();
+        destroyCublas();
+    #endif
 
     printf("SpMM: %lf, MM: %lf, ReLu: %lf, Softmax: %lf usec.\n", spmm_time, mm_time, relu_time, softmax_time);
     printf("Propagation: %lf usec.\n", spmm_time + mm_time + relu_time + softmax_time);
+    #ifndef EMAX6
+        all_nanosec[SPMM] += (Ull) spmm_time*1000;
+        all_nanosec[MM] += (Ull) mm_time*1000;
+        all_nanosec[RELU] += (Ull) relu_time*1000;
+        all_nanosec[SOFTMAX] += (Ull) softmax_time*1000;
+    #else
+        all_nanosec[RELU][0] += (Ull) relu_time*1000;
+        all_nanosec[RELU][7] += (Ull) relu_time*1000;
+        all_nanosec[SOFTMAX][0] += (Ull) softmax_time*1000;
+        all_nanosec[SOFTMAX][7] += (Ull) softmax_time*1000;
+    #endif
 }
 
 void softmax(HiddenLayer *result) {

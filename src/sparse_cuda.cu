@@ -118,16 +118,37 @@ void freeDenseMatrix(DenseMatrix *matrix) {
     freeGPUDenseMatrix(matrix);
 }
 
+cusparseHandle_t cusparse_handle;
+cublasHandle_t cublas_handle;
+
+extern "C"
+void createCusparse() {
+    CHECK_CUSPARSE(cusparseCreate(&cusparse_handle));
+}
+
+extern "C"
+void createCublase() {
+    CHECK_CUBLAS(cublasCreate(&cublas_handle));
+}
+
+extern "C"
+void destroyCusparse() {
+    CHECK_CUSPARSE(cusparseDestroy(cusparse_handle));
+}
+
+extern "C"
+void destroyCublas() {
+    CHECK_CUBLAS(cublasDestroy(cublas_handle));
+}
+
 extern "C"
 void spmm(DenseMatrix *result, SparseMatrix *sp_matrix, DenseMatrix *matrix) {
     struct timespec t1, t2;
-    cusparseHandle_t handle;
     cusparseSpMatDescr_t Adescr;
     cusparseDnMatDescr_t Bdescr;
     cusparseDnMatDescr_t Cdescr;
 
     printf("<<CUDA>>\n");
-    CHECK_CUSPARSE(cusparseCreate(&handle));
 
     CHECK_CUSPARSE(
         cusparseCreateCsr(&Adescr, 
@@ -158,7 +179,7 @@ void spmm(DenseMatrix *result, SparseMatrix *sp_matrix, DenseMatrix *matrix) {
 
     timespec_get(&t1, TIME_UTC);
     CHECK_CUSPARSE(
-        cusparseSpMM_bufferSize(handle, 
+        cusparseSpMM_bufferSize(cusparse_handle, 
         CUSPARSE_OPERATION_NON_TRANSPOSE, CUSPARSE_OPERATION_NON_TRANSPOSE, 
         (void*)&alpha, Adescr, Bdescr, (void*)&beta, Cdescr, 
         CUDA_R_32F, CUSPARSE_SPMM_ALG_DEFAULT, &buffer_size)
@@ -166,14 +187,14 @@ void spmm(DenseMatrix *result, SparseMatrix *sp_matrix, DenseMatrix *matrix) {
 
     CHECK(cudaMalloc(&buffer, buffer_size));
     CHECK_CUSPARSE(
-        cusparseSpMM_preprocess(handle, 
+        cusparseSpMM_preprocess(cusparse_handle, 
         CUSPARSE_OPERATION_NON_TRANSPOSE, CUSPARSE_OPERATION_NON_TRANSPOSE, 
         (void*)&alpha, Adescr, Bdescr, (void*)&beta, Cdescr, 
         CUDA_R_32F, CUSPARSE_SPMM_ALG_DEFAULT, buffer)
     );
 
     CHECK_CUSPARSE(
-        cusparseSpMM(handle, 
+        cusparseSpMM(cusparse_handle, 
         CUSPARSE_OPERATION_NON_TRANSPOSE, CUSPARSE_OPERATION_NON_TRANSPOSE, 
         (void*)&alpha, Adescr, Bdescr, (void*)&beta, Cdescr, 
         CUDA_R_32F, CUSPARSE_SPMM_ALG_DEFAULT, buffer)
@@ -187,23 +208,20 @@ void spmm(DenseMatrix *result, SparseMatrix *sp_matrix, DenseMatrix *matrix) {
     CHECK_CUSPARSE(cusparseDestroySpMat(Adescr));
     CHECK_CUSPARSE(cusparseDestroyDnMat(Bdescr));
     CHECK_CUSPARSE(cusparseDestroyDnMat(Cdescr));
-    CHECK_CUSPARSE(cusparseDestroy(handle));
 }
 
 extern "C"
 void mm(DenseMatrix *result, DenseMatrix *a, DenseMatrix *b) {
     struct timespec t1, t2;
-    cublasHandle_t handle;
 
     printf("<<CUDA>>\n");
-    CHECK_CUBLAS(cublasCreate(&handle));
 
     float alpha = 1;
     float beta = 0;
 
     timespec_get(&t1, TIME_UTC);
     CHECK_CUBLAS(
-        cublasSgemm(handle,
+        cublasSgemm(cublas_handle,
             CUBLAS_OP_N, CUBLAS_OP_N,
             b->col_size, a->row_size, a->col_size,
             &alpha, b->cuda_val, b->col_size, a->cuda_val, a->col_size, 
@@ -214,8 +232,6 @@ void mm(DenseMatrix *result, DenseMatrix *a, DenseMatrix *b) {
     timespec_get(&t2, TIME_UTC);
 
     printf("cuBLAS MM: %lf usec.\n", cal_time(&t2, &t1));
-
-    CHECK_CUBLAS(cublasDestroy(handle));
 }
 
 __global__

@@ -1,6 +1,7 @@
 #include "../include/emax6.h"
 #include "./include/layer.h"
 #include "./include/utils.h"
+#include "./include/sparse.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -20,12 +21,21 @@ int main(int argc, char **argv) {
     char tmp_filename[100];
     Ull version, sizeEdgeTy, nv, f_dim_in, ne;
     Uint f_dim_out;
-    Uint *vertices, *mask;
+    int from, to;
+    Uint *vertices;
 
     struct timespec t1, t2;
 
-    if (argc < 3) {
-        printf("Usage: %s weight graph\n", argv[0]);
+    if (argc < 5) {
+        printf("Usage: %s weight graph from to\n", argv[0]);
+        return 1;
+    }
+
+    if((from = atoi(argv[3])) < 0) {
+        return 1;
+    }
+
+    if((to = atoi(argv[4])) < 0) {
         return 1;
     }
 
@@ -67,17 +77,7 @@ int main(int argc, char **argv) {
     fread(&nv, sizeof(Ull), 1, fp_graph);
     fread(&ne, sizeof(Ull), 1, fp_graph);
 
-    /*
-    printf("Reading Mask now...\n");
-    Uint mv, anv;
-    fscanf(fp_mask, "%ld %ld", &mv, &anv);
-    mask = (Uint *) malloc(sizeof(Uint) * nv);
-    for (int i = 0; i < nv; i++) {
-        fscanf(fp_mask, "%ld", &mask[i]);
-    }
-    */
-
-    int new_nv = 3000;
+    int new_nv = to - from;
     Ull *vertices_tmp = (Ull *)malloc(sizeof(Ull) * (nv + 1));
     fread(vertices_tmp, sizeof(Ull), (nv + 1), fp_graph);
     vertices = (Uint *)malloc(sizeof(Uint) * (new_nv + 1));
@@ -88,20 +88,19 @@ int main(int argc, char **argv) {
     fread(edges_tmp, sizeof(Uint), ne, fp_graph);
 
     int cnt = 0;
-    for (int i = 0; i < new_nv; i++) {
+    for (int i = from; i < to; i++) {
         int row_nnz = 0;
         for (int j = vertices_tmp[i]; j < vertices_tmp[i+1]; j++) {
-            //if ((mask[edges_tmp[j]] != 0) && (mask[i] != 0)) {
-            if ((edges_tmp[j] < new_nv) && (i < new_nv)) {
-                edges_tmp2[cnt] = edges_tmp[j];
+            if ((edges_tmp[j] < to) && (edges_tmp[j] >=from)) {
+                edges_tmp2[cnt] = edges_tmp[j] - from;
                 cnt++;
                 row_nnz++;
             }
         }
         if (row_nnz) {
-            vertices[i+1] = vertices[i] + row_nnz;
+            vertices[i+1-from] = vertices[i-from] + row_nnz;
         } else {
-            vertices[i+1] = vertices[i];
+            vertices[i+1-from] = vertices[i-from];
         }
     }
 
@@ -155,6 +154,7 @@ int main(int argc, char **argv) {
         tmp_weight.row_size = dim_in;
         tmp_weight.col_size = dim_out;
         allocDenseMatrix(&tmp_weight);
+        fseek(fp_weight, sizeof(float) * dim_out * from, SEEK_CUR);
         fread(tmp_weight.val, sizeof(float), dim_in * dim_out, fp_weight);
         #ifdef USE_CUDA
             sendDenseMatrixToGPU(&tmp_weight);
@@ -171,6 +171,7 @@ int main(int argc, char **argv) {
 
     printf("Reading Features now...\n");
     fscanf(fp_dims, "%lld %d\n", &f_dim_in, &f_dim_out);
+    fseek(fp_feats, sizeof(float) * f_dim_out * from, SEEK_CUR);
     fread(network.layers->latent_vectors.matrix.val, sizeof(float), new_nv * f_dim_out, fp_feats);
     #ifdef USE_CUDA
         sendDenseMatrixToGPU(&(network.layers->latent_vectors.matrix));
@@ -191,6 +192,49 @@ int main(int argc, char **argv) {
     printf("Result\n");
     print_weight(&(network.layers->result_layer));
     printf("Propagation Done\n");
+    #ifdef EMAX6
+        printf("SpMM usec: ARM:%d DRAIN:%d CONF:%d REGV:%d RANGE:%d LOAD:%d EXEC:%d total:%d\n",
+            (Uint)(all_nanosec[SPMM][0]/1000),
+            (Uint)(all_nanosec[SPMM][1]/1000),
+            (Uint)(all_nanosec[SPMM][2]/1000),
+            (Uint)(all_nanosec[SPMM][3]/1000),
+            (Uint)(all_nanosec[SPMM][4]/1000),
+            (Uint)(all_nanosec[SPMM][5]/1000),
+            (Uint)(all_nanosec[SPMM][6]/1000),
+            (Uint)(all_nanosec[SPMM][7]/1000));
+        printf("MM usec: ARM:%d DRAIN:%d CONF:%d REGV:%d RANGE:%d LOAD:%d EXEC:%d total:%d\n",
+            (Uint)(all_nanosec[MM][0]/1000),
+            (Uint)(all_nanosec[MM][1]/1000),
+            (Uint)(all_nanosec[MM][2]/1000),
+            (Uint)(all_nanosec[MM][3]/1000),
+            (Uint)(all_nanosec[MM][4]/1000),
+            (Uint)(all_nanosec[MM][5]/1000),
+            (Uint)(all_nanosec[MM][6]/1000),
+            (Uint)(all_nanosec[MM][7]/1000));
+        printf("ReLU usec: ARM:%d DRAIN:%d CONF:%d REGV:%d RANGE:%d LOAD:%d EXEC:%d total:%d\n",
+            (Uint)(all_nanosec[RELU][0]/1000),
+            (Uint)(all_nanosec[RELU][1]/1000),
+            (Uint)(all_nanosec[RELU][2]/1000),
+            (Uint)(all_nanosec[RELU][3]/1000),
+            (Uint)(all_nanosec[RELU][4]/1000),
+            (Uint)(all_nanosec[RELU][5]/1000),
+            (Uint)(all_nanosec[RELU][6]/1000),
+            (Uint)(all_nanosec[RELU][7]/1000));
+        printf("Softmax usec: ARM:%d DRAIN:%d CONF:%d REGV:%d RANGE:%d LOAD:%d EXEC:%d total:%d\n",
+            (Uint)(all_nanosec[SOFTMAX][0]/1000),
+            (Uint)(all_nanosec[SOFTMAX][1]/1000),
+            (Uint)(all_nanosec[SOFTMAX][2]/1000),
+            (Uint)(all_nanosec[SOFTMAX][3]/1000),
+            (Uint)(all_nanosec[SOFTMAX][4]/1000),
+            (Uint)(all_nanosec[SOFTMAX][5]/1000),
+            (Uint)(all_nanosec[SOFTMAX][6]/1000),
+            (Uint)(all_nanosec[SOFTMAX][7]/1000));
+    #else
+        printf("SpMM usec: total:%d\n", (Uint)(all_nanosec[SPMM]/1000));
+        printf("MM usec: total:%d\n", (Uint)(all_nanosec[MM]/1000));
+        printf("ReLU usec: total:%d\n", (Uint)(all_nanosec[RELU]/1000));
+        printf("Softmax usec: total:%d\n", (Uint)(all_nanosec[SOFTMAX]/1000));
+    #endif
 
     fclose(fp_graph);
     fclose(fp_weight);
