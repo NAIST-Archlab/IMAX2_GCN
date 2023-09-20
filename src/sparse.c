@@ -1,12 +1,13 @@
 #include "../include/sparse.h"
+#include <stdlib.h>
 #if !(defined(EMAX6) || defined(USE_CUDA))
 #include <stdio.h>
-#include <stdlib.h>
 #ifdef USE_MP
 #include <omp.h>
 #endif
 
 void spmm(DenseMatrix *result, SparseMatrix *sp_matrix, DenseMatrix *matrix) {
+    printf("<<CPU>>\n");
     #ifdef USE_MP
     #pragma omp parallel for
     #endif
@@ -24,6 +25,7 @@ void spmm(DenseMatrix *result, SparseMatrix *sp_matrix, DenseMatrix *matrix) {
 }
 
 void mm(DenseMatrix *result, DenseMatrix *a, DenseMatrix *b) {
+    printf("<<CPU>>\n");
     #ifdef USE_MP
     #pragma omp parallel for
     #endif
@@ -39,6 +41,7 @@ void mm(DenseMatrix *result, DenseMatrix *a, DenseMatrix *b) {
 }
 
 void relu(DenseMatrix *result, DenseMatrix *a) {
+    printf("<<CPU>>\n");
     #ifdef USE_MP
     #pragma omp parallel for
     #endif

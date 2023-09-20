@@ -6,7 +6,6 @@
 #include <string.h>
 
 #ifdef EMAX6
-Uchar is_sp_allocated = 0;
 Uchar *membase = NULL;
 #endif
 
@@ -14,9 +13,10 @@ void print_weight(HiddenLayer *result) {
     Ull i, j;
     char ry_row = 0;
 
+    printf("Size: (%d,%d)\n", result->matrix.row_size, result->matrix.col_size);
     printf("[\n");
     for (i = 0; i < result->matrix.row_size; i++) {
-        if (i > 100 && (i < result->matrix.row_size - 50) && ry_row != 1) {
+        if (i > 100 && (i < result->matrix.row_size - 30) && ry_row != 1) {
             printf("\t.\n\t.\n\t.\n");
             ry_row = 1;
         } else if (i > (result->matrix.row_size - 30) || ry_row == 0) {
@@ -27,11 +27,10 @@ void print_weight(HiddenLayer *result) {
                     printf("... ");
                     ry_col = 1;
                 } else if (j > (result->matrix.col_size - 3) || ry_col == 0) {
-                    if (result->matrix.val[i * result->matrix.col_size + j] != 0)
-                        printf("%f ", result->matrix.val[i * result->matrix.col_size + j]);
-                    else
-                        printf("0 ");
+                    printf("%10.6f ", result->matrix.val[i * result->matrix.col_size + j]);
                 }
+                //if (isnan(result->matrix.val[i * result->matrix.col_size + j])) {printf("NaN\n");}
+                //if (isinf(result->matrix.val[i * result->matrix.col_size + j])) {printf("Inf\n");}
             }
             printf("]\n");
         }
@@ -131,38 +130,54 @@ void propagation(GCNNetwork *network) {
     int out_size;
     struct timespec t1, t2;
     #ifdef EMAX6
-        IMAXDenseMatrix h, w, imax_r_spmm, imax_r_mm;
+        IMAXDenseMatrix h, w, imax_r_spmm, imax_r_mm, imax_dump;
     #endif
 
     printf("Propagation...\n");
 
     #ifdef USE_CUDA
+        timespec_get(&t1, TIME_UTC);
         createCusparse();
+        timespec_get(&t2, TIME_UTC);
+        spmm_time += cal_time(&t2, &t1);
+        timespec_get(&t1, TIME_UTC);
         createCublase();
+        timespec_get(&t2, TIME_UTC);
+        mm_time += cal_time(&t2, &t1);
     #endif
     int layer_cnt = 0;
+	#ifdef EMAX6
+		imax_sparse_allocation(&membase, &(network->graph->imax_matrix));
+	#endif
     while (p != NULL) {
         out_size = network->graph->matrix.row_size * p->hidden_layer.matrix.col_size;
         r_spmm.row_size = network->graph->matrix.row_size;
         r_spmm.col_size = p->latent_vectors.matrix.col_size;
-        r_mm.row_size = network->graph->matrix.row_size;
+        r_mm.row_size = p->latent_vectors.matrix.row_size;
         r_mm.col_size = p->hidden_layer.matrix.col_size;
         allocDenseMatrix(&r_spmm); allocDenseMatrix(&r_mm);
         
         #ifdef EMAX6
             imax_dense_format_init_from_sparse(&h, &network->graph->imax_matrix, p->latent_vectors.matrix.col_size, 8);
-            imax_dense_format_init(&imax_r_spmm, network->graph->imax_matrix.row_size, h.col_size, network->graph->imax_matrix.row_padded_size, h.col_padded_size, network->graph->imax_matrix.row_blk_size, h.col_blk_size);
-            imax_spmm_allocation(&membase, &network->graph->imax_matrix, &h, &imax_r_spmm, (is_sp_allocated) ? 0 : 1, 1, 1);
-            int col_blk_num = (network->graph->imax_matrix.col_padded_size / network->graph->imax_matrix.col_blk_size);
-            if (!is_sp_allocated) membase = membase + (Ull)((network->graph->imax_matrix.nnz * 2) + (network->graph->imax_matrix.row_padded_size * col_blk_num * 2)*sizeof(Uint));
-            is_sp_allocated = 1;
+            imax_dense_format_init(&imax_r_spmm, h.row_size, h.col_size, h.row_padded_size, h.col_padded_size, h.row_blk_size, h.col_blk_size);
+            //imax_dense_format_init(&w, imax_r_spmm.col_size, p->hidden_layer.matrix.col_size, imax_r_spmm.col_padded_size, p->hidden_layer.matrix.col_size + imax_r_spmm.col_blk_size - (p->hidden_layer.matrix.col_size%imax_r_spmm.col_blk_size), imax_r_spmm.row_blk_size, imax_r_spmm.col_blk_size);
+            imax_dense_format_init(&w, imax_r_spmm.col_size, p->hidden_layer.matrix.col_size, imax_r_spmm.col_padded_size, p->hidden_layer.matrix.col_size + imax_r_spmm.col_blk_size - (p->hidden_layer.matrix.col_size%imax_r_spmm.col_blk_size), MM_H, imax_r_spmm.col_blk_size);
+            imax_dense_format_init(&imax_r_mm, imax_r_spmm.row_size, w.col_size, imax_r_spmm.row_padded_size, w.col_padded_size, imax_r_spmm.row_blk_size, w.col_blk_size);
+            imax_dense_format_init(&imax_dump, imax_r_spmm.row_size, w.col_size, imax_r_spmm.row_padded_size, w.col_padded_size, imax_r_spmm.row_blk_size, w.col_blk_size);
+            imax_dense_allocation(&membase, &h);
+            imax_dense_allocation(&membase, &w);
+            imax_dense_allocation(&membase, &imax_r_spmm);
+            imax_dense_allocation(&membase, &imax_r_mm);
+            imax_dense_allocation(&membase, &imax_dump);
             convert_imax_dense_format(&h, &(p->latent_vectors.matrix));
+            convert_imax_dense_format(&w, &(p->hidden_layer.matrix));
         #endif
 
         printf("Layer %d: SpMM\n", ++layer_cnt);
+        HiddenLayer t;
         timespec_get(&t1, TIME_UTC);
         #ifdef EMAX6
-            spmm(&imax_r_spmm, &network->graph->imax_matrix, &h);
+            spmm(&imax_r_spmm, &(network->graph->imax_matrix), &h);
         #else
             spmm(&r_spmm, &(network->graph->matrix), &(p->latent_vectors.matrix));
         #endif
@@ -171,12 +186,12 @@ void propagation(GCNNetwork *network) {
 
         #ifdef EMAX6
             convert_dense_format(&r_spmm, &imax_r_spmm);
-            imax_dense_format_init(&w, p->hidden_layer.matrix.row_size, p->hidden_layer.matrix.col_size, imax_r_spmm.col_padded_size, h.col_padded_size, imax_r_spmm.col_blk_size, h.col_blk_size);
-            imax_dense_format_init(&imax_r_mm, h.row_size, w.col_size, h.row_padded_size, w.col_padded_size, h.row_blk_size, w.col_blk_size);
-            imax_mm_allocation(&membase, &imax_r_spmm, &w, &imax_r_mm, 1, 1, 1);
-            convert_imax_dense_format(&w, &(p->hidden_layer.matrix));
-            convert_imax_dense_format(&imax_r_spmm, &r_spmm);
+        #elif defined(USE_CUDA)
+            sendDenseMatrixToCPU(&r_spmm);
         #endif
+        t.matrix = r_spmm;
+        print_weight(&t);
+
         printf("Layer %d: MM\n", layer_cnt);
         timespec_get(&t1, TIME_UTC);
         #ifdef EMAX6
@@ -187,15 +202,23 @@ void propagation(GCNNetwork *network) {
         timespec_get(&t2, TIME_UTC);
         mm_time += cal_time(&t2, &t1);
 
+        #if defined(EMAX6)
+            convert_dense_format(&r_mm, &imax_r_mm);
+        #elif defined(USE_CUDA)
+            sendDenseMatrixToCPU(&r_mm);
+        #endif
+        t.matrix = r_mm;
+        print_weight(&t);
+
+
         if (p->next == NULL) last_weight = &(network->layers->result_layer.matrix);
         else last_weight = &(p->next->latent_vectors.matrix);
 
-        #if defined(EMAX6)
-            convert_dense_format(&r_mm, &imax_r_mm);
-        #endif
         printf("Layer %d: ReLU\n", layer_cnt);
         timespec_get(&t1, TIME_UTC);
         relu(last_weight, &r_mm);
+        //t.matrix = *last_weight;
+        //print_weight(&t);
         timespec_get(&t2, TIME_UTC);
         #ifdef USE_CUDA
             if (p->next == NULL) sendDenseMatrixToCPU(last_weight);
@@ -203,6 +226,13 @@ void propagation(GCNNetwork *network) {
         relu_time += cal_time(&t2, &t1);
 
         freeDenseMatrix(&r_spmm);freeDenseMatrix(&r_mm);
+		#ifdef EMAX6
+			imax_dense_deallocation(&membase, &h);
+			imax_dense_deallocation(&membase, &w);
+			imax_dense_deallocation(&membase, &imax_r_spmm);
+			imax_dense_deallocation(&membase, &imax_r_mm);
+            imax_dense_allocation(&membase, &imax_dump);
+		#endif
         p = p->next;
     }
 

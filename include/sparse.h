@@ -28,6 +28,8 @@ unsigned long long all_nanosec[NUM_CLASS];
 #define KERNEL_MODE_1 1
 #define KERNEL_MODE_2 2
 #define LMM_SIZE 0x4000
+#define MAX_COL_SIZE 0x800
+#define MM_H 32
 
 typedef struct sparse_matrix {
     int nnz;      // Number of Non-zero values
@@ -51,7 +53,8 @@ typedef struct dense_matrix {
 #ifdef EMAX6
 typedef struct sparse_matrix_sub_imax2 {
     int nnz;
-    int *row_nnz;
+    int nnz_row_blk_size;
+    Uint *row_nnz;
     Uint *row_num;
     Uint *col_num;
     Uint *val;
@@ -66,6 +69,7 @@ typedef struct sparse_matrix_imax2 {
     int row_blk_size;
     int col_blk_size;
     int col_blk_min;
+    int nnz_row_blk_size;
     int nnz_col_blk_size;
     IMAXSparseMatrixSub **sub;
 } IMAXSparseMatrix;
@@ -87,7 +91,7 @@ void sysinit(Uchar **membase, Uint memsize, Uint alignment);
 void imax_add_alloc(Uchar **membase, Uint memsize, Uint alignment);
 void mem_release(Uchar **membase, Uint memsize);
 #endif
-#if defined(USE_CUDA)
+#ifdef USE_CUDA
 #if __cplusplus
 extern "C" {
 #endif
@@ -118,10 +122,10 @@ void allocDenseMatrix(DenseMatrix *matrix);
 void freeDenseMatrix(DenseMatrix *matrix);
 #endif
 
-#if !defined(EMAX6) && !defined(USE_CUDA)
-    void spmm(DenseMatrix *result, SparseMatrix *sp_matrix, DenseMatrix *matrix);
-    void mm(DenseMatrix *result, DenseMatrix *a, DenseMatrix *b);
-    void relu(DenseMatrix *result, DenseMatrix *a);
+#if !(defined(EMAX6) || defined(USE_CUDA))
+void spmm(DenseMatrix *result, SparseMatrix *sp_matrix, DenseMatrix *matrix);
+void mm(DenseMatrix *result, DenseMatrix *a, DenseMatrix *b);
+void relu(DenseMatrix *result, DenseMatrix *a);
 #endif
 
 #endif

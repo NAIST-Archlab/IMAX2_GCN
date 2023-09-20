@@ -181,8 +181,8 @@ int main(int argc, char **argv) {
     #ifdef EMAX6
         printf("Transform to IMAX Format..\n");
         timespec_get(&t1, TIME_UTC);
-        imax_sparse_format_init(&network.graph->imax_matrix, network.graph->matrix.row_size, network.graph->matrix.col_size, 46, 8 * NCHIP);
-        convert_imax_sparse_format(&network.graph->imax_matrix, &network.graph->matrix);
+        imax_sparse_format_init(&(network.graph->imax_matrix), network.graph->matrix.row_size, network.graph->matrix.col_size, 46, 8 * NCHIP);
+        convert_imax_sparse_format(&(network.graph->imax_matrix), &(network.graph->matrix));
         timespec_get(&t2, TIME_UTC);
         printf("Transform %lf usec.\n", cal_time(&t2, &t1));
     #endif

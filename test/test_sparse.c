@@ -104,7 +104,11 @@ int main(int argc, char **argv) {
         imax_dense_format_init(&imax_r, row, out_size, imax_sp.row_padded_size, imax_m.col_padded_size, imax_sp.row_blk_size, imax_m.col_blk_size);
         imax_dense_format_init(&imax_r2, out_size, out_size, imax_m.row_padded_size, imax_m.col_padded_size, imax_m.row_blk_size, imax_m.col_blk_size);
         imax_dense_format_init(&imax_r3, row, out_size, imax_sp.row_padded_size, imax_m.col_padded_size, imax_m.row_blk_size, imax_m.col_blk_size);
-        imax_spmm_allocation(&membase, &imax_sp, &imax_m, &imax_r, 1, 1, 1);
+        imax_sparse_allocation(&membase, &imax_sp);
+        imax_dense_allocation(&membase, &imax_m);
+        imax_dense_allocation(&membase, &imax_r);
+        imax_dense_allocation(&membase, &imax_r2);
+        imax_dense_allocation(&membase, &imax_r3);
         timespec_get(&t1, TIME_UTC);
         convert_imax_dense_format(&imax_m, &m);
         timespec_get(&t2, TIME_UTC);
