@@ -1,4 +1,8 @@
-#include "../include/emax6.h"
+#if defined(EMAX7)
+#include "../conv-c2d/emax7.h"
+#elif defined(EMAX6)
+#include "../conv-c2c/emax6.h"
+#endif
 #include "./include/layer.h"
 #include "./include/utils.h"
 #include "./include/sparse.h"
@@ -178,10 +182,10 @@ int main(int argc, char **argv) {
     #endif
     fclose(fp_feats);
 
-    #ifdef EMAX6
+    #if defined(EMAX6) || defined(EMAX7)
         printf("Transform to IMAX Format..\n");
         timespec_get(&t1, TIME_UTC);
-        imax_sparse_format_init(&(network.graph->imax_matrix), network.graph->matrix.row_size, network.graph->matrix.col_size, 46, 8 * NCHIP);
+        imax_sparse_format_init(&(network.graph->imax_matrix), network.graph->matrix.row_size, network.graph->matrix.col_size, SPMM_H, 8 * NCHIP);
         convert_imax_sparse_format(&(network.graph->imax_matrix), &(network.graph->matrix));
         timespec_get(&t2, TIME_UTC);
         printf("Transform %lf usec.\n", cal_time(&t2, &t1));
@@ -192,7 +196,7 @@ int main(int argc, char **argv) {
     printf("Result\n");
     print_weight(&(network.layers->result_layer));
     printf("Propagation Done\n");
-    #ifdef EMAX6
+    #if defined(EMAX6) || defined(EMAX7)
         printf("SpMM usec: ARM:%d DRAIN:%d CONF:%d REGV:%d RANGE:%d LOAD:%d EXEC:%d total:%d\n",
             (Uint)(all_nanosec[SPMM][0]/1000),
             (Uint)(all_nanosec[SPMM][1]/1000),

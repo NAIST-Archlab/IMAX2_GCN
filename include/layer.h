@@ -1,11 +1,15 @@
 #ifndef __LAYER_H__
 #define __LAYER_H__
-#include "emax6.h"
+#if defined(EMAX7)
+#include "../conv-c2d/emax7.h"
+#elif defined(EMAX6)
+#include "../conv-c2c/emax6.h"
+#endif
 #include "sparse.h"
 
 typedef struct sparse_graph {
     SparseMatrix matrix;
-    #ifdef EMAX6
+    #if defined(EMAX6) || defined(EMAX7)
     IMAXSparseMatrix imax_matrix;
     #endif
 } SparseGraph;

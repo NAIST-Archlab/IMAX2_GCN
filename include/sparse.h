@@ -1,7 +1,11 @@
 #ifndef __SPARSE_H__
 #define __SPARSE_H__
-#ifdef EMAX6
-#include "emax6.h"
+#if defined(EMAX7) || defined(EMAX6)
+#if defined(EMAX7)
+#include "../conv-c2d/emax7.h"
+#elif defined(EMAX6)
+#include "../conv-c2c/emax6.h"
+#endif
 #else
 #ifndef UTYPEDEF
 #define UTYPEDEF
@@ -19,7 +23,7 @@ typedef struct { Ull u[2]; } Dll;
 #endif
 
 enum { SPMM, MM, RELU, SOFTMAX, NUM_CLASS };
-#ifdef EMAX6
+#if defined(EMAX6) || defined(EMAX7)
 unsigned long long all_nanosec[NUM_CLASS][8];
 #else
 unsigned long long all_nanosec[NUM_CLASS];
@@ -29,7 +33,13 @@ unsigned long long all_nanosec[NUM_CLASS];
 #define KERNEL_MODE_2 2
 #define LMM_SIZE 0x4000
 #define MAX_COL_SIZE 0x800
+#ifdef UNIT32
+#define MM_H 16
+#define SPMM_H 20
+#else
 #define MM_H 32
+#define SPMM_H 46
+#endif
 
 typedef struct sparse_matrix {
     int nnz;      // Number of Non-zero values
@@ -50,7 +60,7 @@ typedef struct dense_matrix {
     float *cuda_val; // for CUDA
 } DenseMatrix;
 
-#ifdef EMAX6
+#if defined(EMAX6) || defined(EMAX7)
 typedef struct sparse_matrix_sub_imax2 {
     int nnz;
     int nnz_row_blk_size;
@@ -87,9 +97,9 @@ typedef struct dense_matrix_imax2 {
 void spmm(IMAXDenseMatrix *result, IMAXSparseMatrix *imax_sp_matrix, IMAXDenseMatrix *matrix);
 void mm(IMAXDenseMatrix *result, IMAXDenseMatrix *imax_a, IMAXDenseMatrix *imax_b);
 void relu(DenseMatrix *result, DenseMatrix *a);
-void sysinit(Uchar **membase, Uint memsize, Uint alignment);
-void imax_add_alloc(Uchar **membase, Uint memsize, Uint alignment);
-void mem_release(Uchar **membase, Uint memsize);
+Uchar* sysinit(Uint memsize, Uint alignment);
+void imemcpy(Uint *dst, Uint *src, int words);
+void xmax_bzero(Uint *dst, int words);
 #endif
 #ifdef USE_CUDA
 #if __cplusplus
@@ -122,7 +132,7 @@ void allocDenseMatrix(DenseMatrix *matrix);
 void freeDenseMatrix(DenseMatrix *matrix);
 #endif
 
-#if !(defined(EMAX6) || defined(USE_CUDA))
+#if !(defined(EMAX6) || defined(EMAX7) || defined(USE_CUDA))
 void spmm(DenseMatrix *result, SparseMatrix *sp_matrix, DenseMatrix *matrix);
 void mm(DenseMatrix *result, DenseMatrix *a, DenseMatrix *b);
 void relu(DenseMatrix *result, DenseMatrix *a);

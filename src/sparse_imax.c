@@ -1,26 +1,37 @@
-#ifdef EMAX6
+#if defined(EMAX6) || defined(EMAX7)
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include "../include/emax6.h"
-#include "../include/emax6lib.c"
+#if defined(EMAX7)
+#include "../conv-c2d/emax7.h"
+#include "../conv-c2d/emax7lib.c"
+#elif defined(EMAX6)
+#include "../conv-c2c/emax6.h"
+#include "../conv-c2c/emax6lib.c"
+#endif
 #include "../include/sparse.h"
 
-void sysinit(Uchar **membase, Uint memsize, Uint alignment) {
-#if defined(ARMZYNQ) && defined(EMAX6)
-  if (emax6_open() == NULL) {exit(1);}
-  *membase = emax_info.ddr_mmap;
-  printf("%lx\n", *membase);
-  {int i; for (i=0; i<(memsize+sizeof(Dll)-1)/sizeof(Dll); i++) *((Dll*)*membase+i)=0;}
-  *membase += memsize; 
-  *membase += sizeof(Dll);
-#elif __linux__ == 1
-  posix_memalign(membase, alignment, memsize);
+Uchar *membase = NULL;
 
+Uchar* sysinit(Uint memsize, Uint alignment) {
+#if defined(ARMZYNQ) && defined(EMAX6)
+  if (emax6_open() == NULL) 
+    exit(1);
+  membase = emax_info.ddr_mmap;
+  {int i; for (i=0; i<(memsize+sizeof(Dll)-1)/sizeof(Dll); i++) *((Dll*)membase+i)=0;}
+#elif defined(ARMZYNQ) && defined(EMAX7)
+  if (emax7_open() == NULL) 
+    exit(1);
+  membase = emax_info[0].ddr_mmap;
+  {int i; for (i=0; i<(memsize+sizeof(Dll)-1)/sizeof(Dll); i++) *((Dll*)membase+i)=0;}
+#elif __linux__ == 1
+  posix_memalign(&membase, alignment, memsize);
 #else
-  *membase = (void*)malloc(memsize+alignment);
-  if ((Ull)*membase & (Ull)(alignment-1)) {*membase = (void*)(((Ull)*membase & ~(Ull)(alignment-1))+alignment);}
+  if (membase != NULL) {return membase;}
+  membase = (void*)malloc(memsize+alignment);
+  prev = membase;
+  if ((Ull)membase & (Ull)(alignment-1)) {membase = (void*)(((Ull)membase & ~(Ull)(alignment-1))+alignment);}
 #endif
 
 #if !defined(ARMZYNQ) && defined(EMAX6)
@@ -30,8 +41,17 @@ void sysinit(Uchar **membase, Uint memsize, Uint alignment) {
   emax_info.reg_mmap = emax_info.reg_phys;
   emax_info.lmm_phys = LMM_BASE2_PHYS;
   emax_info.lmm_mmap = emax_info.lmm_phys;
-  emax_info.ddr_phys = *membase;
+  emax_info.ddr_phys = membase;
   emax_info.ddr_mmap = emax_info.ddr_phys;
+#elif !defined(ARMZYNQ) && defined(EMAX7)
+  emax_info[0].dma_phys = DMA_BASE2_PHYS; /* defined in emax6lib.h */
+  emax_info[0].dma_mmap = emax_info[0].dma_phys;
+  emax_info[0].reg_phys = REG_BASE2_PHYS; /* defined in emax6lib.h */
+  emax_info[0].reg_mmap = emax_info[0].reg_phys;
+  emax_info[0].lmm_phys = LMM_BASE2_PHYS;
+  emax_info[0].lmm_mmap = emax_info[0].lmm_phys;
+  emax_info[0].ddr_phys = membase;
+  emax_info[0].ddr_mmap = emax_info[0].ddr_phys;
 #endif
 #if (defined(ARMSIML) || defined(ARMZYNQ)) && defined(EMAX6)
   emax6.dma_ctrl  = emax_info.dma_mmap;
@@ -49,29 +69,133 @@ void sysinit(Uchar **membase, Uint memsize, Uint alignment) {
   ((struct reg_ctrl*)emax6.reg_ctrl)->i[0].adtr = emax_info.ddr_mmap - emax_info.lmm_phys;
   ((struct reg_ctrl*)emax6.reg_ctrl)->i[0].dmrp = 0LL;
 #endif
-}
-
-void imax_add_alloc(Uchar **membase, Uint memsize, Uint alignment) {
-#if defined(ARMZYNQ) && defined(EMAX6)
-  {int i; for (i=0; i<(memsize+sizeof(Dll)-1)/sizeof(Dll); i++) *((Dll*)*membase+i)=0;}
-  *membase += memsize; 
-  *membase += sizeof(Dll);
-#elif __linux__ == 1
-  posix_memalign(membase, alignment, memsize);
-#else
-  *membase = (void*)malloc(memsize+alignment);
-  if ((Ull)*membase & (Ull)(alignment-1)) {*membase = (void*)(((Ull)*membase & ~(Ull)(alignment-1))+alignment);}
+#if (defined(ARMSIML) || defined(ARMZYNQ)) && defined(EMAX7)
+  emax7[0].dma_ctrl  = emax_info[0].dma_mmap;
+  emax7[0].reg_ctrl  = emax_info[0].reg_mmap;
+  ((struct reg_ctrl*)emax7[0].reg_ctrl)->i[0].cmd = CMD_RESET;
+#if defined(ARMZYNQ)
+  usleep(1);
 #endif
+  switch (((struct reg_ctrl*)emax7[0].reg_ctrl)->i[0].stat>>8 & 0xf) {
+  case  3:EMAX_DEPTH = 64;break;
+  case  2:EMAX_DEPTH = 32;break;
+  case  1:EMAX_DEPTH = 16;break;
+  default:EMAX_DEPTH =  8;break;
+  }
+  ((struct reg_ctrl*)emax7[0].reg_ctrl)->i[0].adtr = emax_info[0].ddr_mmap - emax_info[0].lmm_phys;
+  ((struct reg_ctrl*)emax7[0].reg_ctrl)->i[0].dmrp = 0LL;
+#endif
+  return membase;
 }
 
-void mem_release(Uchar **membase, Uint memsize) {
-  #if defined(ARMZYNQ) && defined(EMAX6)
-    {int i; for (i=((memsize+sizeof(Dll)-1)/sizeof(Dll))-1; i >=0; i--) *((Dll*)*membase+i)=0;}
-    *membase -= memsize; 
-    *membase -= sizeof(Dll);
-  #else
-    if(*membase != NULL) {memset(*membase,0,memsize);}
-  #endif
+void imemcpy(Uint *dst, Uint *src, int words) {
+  union {
+    Uint i[4];
+    Ull  l[2];
+    Dll  d;
+  } buf;
+
+  Uint loop, i;
+  if (words >= 1 && ((Ull)dst & sizeof(Uint))) { /* 4B-access odd */
+    *dst++ = *src++;
+    words--;
+  }
+  if (words >= 2 && ((Ull)dst & sizeof(Ull))) { /* 8B-access odd */
+    if ((Ull)src & sizeof(Uint)) {
+      buf.i[0] = *src++;
+      buf.i[1] = *src++;
+      *(Ull*)dst = buf.l[0];
+    }
+    else {
+      *(Ull*)dst = *(Ull*)src;
+      src += sizeof(Ull)/sizeof(Uint);
+    }
+    dst += sizeof(Ull)/sizeof(Uint);
+    words-=2;
+  }
+
+  if (loop = words/(sizeof(Dll)/sizeof(Uint))) {
+    if ((Ull)src & sizeof(Uint)) {
+      for(i=0; i<loop; i++) {
+	buf.i[0] = *src++;
+	buf.i[1] = *src++;
+	buf.i[2] = *src++;
+	buf.i[3] = *src++;
+	*(Dll*)dst = buf.d;
+	dst += sizeof(Dll)/sizeof(Uint);
+      }
+    }
+    else if ((Ull)src & sizeof(Ull)) {
+      for(i=0; i<loop; i++) {
+	buf.l[0] = *(Ull*)src;src += sizeof(Ull)/sizeof(Uint);
+	buf.l[1] = *(Ull*)src;src += sizeof(Ull)/sizeof(Uint);
+	*(Dll*)dst = buf.d;
+	dst += sizeof(Dll)/sizeof(Uint);
+      }
+    }
+    else {
+      for(i=0; i<loop; i++) {
+	*(Dll*)dst = *(Dll*)src;
+	src += sizeof(Dll)/sizeof(Uint);
+	dst += sizeof(Dll)/sizeof(Uint);
+      }
+    }
+    words -= loop*(sizeof(Dll)/sizeof(Uint));
+  }
+
+  if (words >= 2) { /* 8B-access */
+    if ((Ull)src & sizeof(Uint)) {
+      buf.i[0] = *src++;
+      buf.i[1] = *src++;
+      *(Ull*)dst = buf.l[0];
+    }
+    else {
+      *(Ull*)dst = *(Ull*)src;
+      src += sizeof(Ull)/sizeof(Uint);
+    }
+    dst += sizeof(Ull)/sizeof(Uint);
+    words-=2;
+  }
+  if (words >= 1) { /* 4B-access */
+    *dst++ = *src++;
+    words--;
+  }
+}
+
+void xmax_bzero(Uint *dst, int words) {
+  Uint loop, i;
+  if (words >= 1 && ((Ull)dst & sizeof(Uint))) { /* 4B-access odd */
+    *dst++ = 0;
+    words--;
+  }
+  if (words >= 2 && ((Ull)dst & sizeof(Ull))) { /* 8B-access odd */
+    *(Ull*)dst = 0;
+    dst += sizeof(Ull)/sizeof(Uint);
+    words-=2;
+  }
+
+  if (loop = words/(sizeof(Dll)/sizeof(Uint))) {
+    for(i=0; i<loop; i++) {
+#if __AARCH64EL__ == 1
+      *((Dll*)dst) = 0;
+#else
+      ((Dll*)dst)->u[0] = 0;
+      ((Dll*)dst)->u[1] = 0;
+#endif
+      dst += sizeof(Dll)/sizeof(Uint);
+    }
+    words -= loop*(sizeof(Dll)/sizeof(Uint));
+  }
+
+  if (words >= 2) { /* 8B-access */
+    *(Ull*)dst = 0;
+    dst += sizeof(Ull)/sizeof(Uint);
+    words-=2;
+  }
+  if (words >= 1) { /* 4B-access */
+    *dst++ = 0;
+    words--;
+  }
 }
 
 void spmm(IMAXDenseMatrix *result, IMAXSparseMatrix *imax_sp_matrix, IMAXDenseMatrix *matrix) {
@@ -108,7 +232,6 @@ void spmm(IMAXDenseMatrix *result, IMAXSparseMatrix *imax_sp_matrix, IMAXDenseMa
     Ull B_blk_size = B_row_blk_size * B_col_blk_size;
     Ull C_blk_size = A_row_blk_size * B_col_blk_size;
     Ull A_row_blk_size_mul_2 = A_row_blk_size*2;
-    //Ull A_row_blk_size_mul_8_2 = A_row_blk_size*8*2;
     Ull A_row_blk_size_mul_8_2 = A_nnz_row_size*8*2;
     Ull A_row_size_mul_W_4_2 = (W*4*2*A_row_blk_size)<<32|((W*4*2*B_row_blk_size)&0xffffffff);
 
@@ -116,21 +239,31 @@ void spmm(IMAXDenseMatrix *result, IMAXSparseMatrix *imax_sp_matrix, IMAXDenseMa
     Uint *a0, *a_col_index0;
     Uint *b[NCHIP], *b0[NCHIP], *b1[NCHIP], *b2[NCHIP], *b3[NCHIP];
     Uint *c0[NCHIP], *c00[NCHIP], *c01[NCHIP], *c02[NCHIP], *c03[NCHIP];
-    Uint *a_row_index;
     Ull A_nnz_size = 0;
     Ull a_col_blk = 0;
     Ull a_col_blk_iter = 0;
+
     IMAXSparseMatrixSub **imax_sp_sub = imax_sp_matrix->sub;
-    Uint *a_sub_col_head, *a_sub_head, *a_sub_nnz_head, *a_sub_row_head;
+    Uint *a_sub_col_head, *a_sub_head, *a_sub_nnz_head, *a_sub_row_head, *a_row_index;
     Uint *b_head = (Uint*)matrix->val;
     Uint *c_head = (Uint*)result->val;
+    #ifdef EMAX7
+        int LANE = 0;
+    #endif
+    printf("Dense Input  Head: %08x_%08x\n", (Uint)((Ull)b_head >> 32), (Uint)b_head);
+    printf("Dense Input  Head: %08x_%08x\n", (Uint)((Ull)c_head >> 32), (Uint)c_head);
 
     printf("<<IMAX>>\n");
     printf("Orig(%d,%d)x(%d,%d)=(%d,%d) Padded(%d,%d)x(%d,%d)=(%d,%d)\n", 
         imax_sp_matrix->row_size, imax_sp_matrix->col_size, matrix->row_size, matrix->col_size, result->row_size, result->col_size,
         imax_sp_matrix->row_padded_size, imax_sp_matrix->col_padded_size, matrix->row_padded_size, matrix->col_padded_size, result->row_padded_size, result->col_padded_size);
+    
 
-    reset_nanosec();
+    #ifdef EMAX7
+        reset_nanosec(0);
+    #else
+        reset_nanosec();
+    #endif
     // Select Column of A(=Row of B)
     for (a_col_blk = 0, a_col_blk_iter = 0; a_col_blk < A_col_size; a_col_blk += A_col_blk_size, a_col_blk_iter += 1) {
         A_nnz_blk_size = imax_sp_sub[a_col_blk_iter]->nnz;
@@ -141,25 +274,21 @@ void spmm(IMAXDenseMatrix *result, IMAXSparseMatrix *imax_sp_matrix, IMAXDenseMa
         a_sub_nnz_head = (Uint*)imax_sp_sub[a_col_blk_iter]->row_nnz;
         a_sub_col_head = (Uint*)imax_sp_sub[a_col_blk_iter]->col_num;
         a_sub_head = (Uint*)imax_sp_sub[a_col_blk_iter]->val;
-        //for (int i = 0; i < A_nnz_blk_size; i++) printf("%f, ", *(float*)&a_sub_head[i]);
+        printf("Sparse Input col[%03d] row_num Head: %08x_%08x\n", a_col_blk_iter, (Uint)((Ull)a_sub_row_head >> 32), (Uint)a_sub_row_head);
+        printf("Sparse Input col[%03d] row_nnz Head: %08x_%08x\n", a_col_blk_iter, (Uint)((Ull)a_sub_nnz_head >> 32), (Uint)a_sub_nnz_head);
+        printf("Sparse Input col[%03d] col_num Head: %08x_%08x\n", a_col_blk_iter, (Uint)((Ull)a_sub_col_head >> 32), (Uint)a_sub_col_head);
+        printf("Sparse Input col[%03d]     val Head: %08x_%08x\n", a_col_blk_iter, (Uint)((Ull)a_sub_head >> 32), (Uint)a_sub_head);
 
         // Select Row of A(=Row of C)
         for (a_row_blk = 0, end_sum = 0; a_row_blk < A_row_size; a_row_blk += A_row_blk_size, end_sum += A_nnz_size * A_row_blk_size) { // A_row_blk
-            //if ((A_nnz_size = a_sub_nnz_head[a_row_blk]) == 0) continue;
-
-            // Select Column Block of of None-zero values of A
-            //for (nnz_col_blk = 0; nnz_col_blk < A_nnz_size; nnz_col_blk += A_nnz_col_blk_size) {
             // Select Row Block of of None-zero values of A
             for (nnz_row_blk = 0; nnz_row_blk < A_nnz_row_size; nnz_row_blk += A_nnz_row_blk_size) {
-                //for (k = 0; k < A_nnz_col_blk_size / 2; k++) a[k] = (Uint*)a_sub_head + end_sum + (nnz_col_blk * A_row_blk_size) + (2 * k * A_row_blk_size);
-                //for (k = 0; k < A_nnz_col_blk_size / 2; k++) a_col_index[k] = (Uint*)a_sub_col_head + end_sum + (nnz_col_blk * A_row_blk_size) + (2 * k * A_row_blk_size);
                 a_row_index = (Uint*)a_sub_row_head + a_row_blk + nnz_row_blk;
                 for (k = 0; k < A_nnz_col_blk_size / 2; k++) a[k] = (Uint*)a_sub_head + nnz_row_blk*2 + (2 * k * A_nnz_row_size);
                 for (k = 0; k < A_nnz_col_blk_size / 2; k++) a_col_index[k] = (Uint*)a_sub_col_head + nnz_row_blk*2 + (2 * k * A_nnz_row_size);
 
                 // Select Column of B(= Column of C)
                 for (b_col_blk = 0; b_col_blk < B_col_size / NCHIP; b_col_blk += B_col_blk_size) {
-    //printf("%d %d %d %d\n", A_col_blk_size, A_row_blk_size, A_nnz_row_blk_size, B_col_blk_size);
                     for (CHIP = 0; CHIP < NCHIP; CHIP++) {
                         b[CHIP] = (Uint*)b_head + a_col_blk * B_col_size + (CHIP * B_col_size / NCHIP + b_col_blk) * B_row_blk_size;
                         b0[CHIP] = (Uint*)b[CHIP];
@@ -251,6 +380,32 @@ void spmm(IMAXDenseMatrix *result, IMAXSparseMatrix *imax_sp_matrix, IMAXDenseMa
                                 mop(OP_LDR, 3, &BR[rp2][1][1], (Ull)b2[CHIP], (Ull)offset, MSK_W1, (Ull)b[CHIP], B_blk_size, 0, 0, (Ull)NULL, B_blk_size);                             \
                                 mop(OP_LDR, 3, &BR[rp2][1][0], (Ull)b3[CHIP], (Ull)offset, MSK_W1, (Ull)b[CHIP], B_blk_size, 0, 0, (Ull)NULL, B_blk_size)
 
+                    #define spmm_core1_last_end_32(r, rm1, rm2, idx0, idx1, idx_base) \
+                                exe(OP_FMA, &AR[r][0], AR[rm1][0], EXP_H3210, BR[rm2][2][1], EXP_H3232, BR[rm1][0][1], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);                                          \
+                                exe(OP_FMA, &AR[r][1], AR[rm1][1], EXP_H3210, BR[rm2][2][1], EXP_H3232, BR[rm1][0][0], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);                                          \
+                                exe(OP_FMA, &AR[r][2], AR[rm1][2], EXP_H3210, BR[rm2][2][1], EXP_H3232, BR[rm1][1][1], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);                                          \
+                                exe(OP_FMA, &AR[r][3], AR[rm1][3], EXP_H3210, BR[rm2][2][1], EXP_H3232, BR[rm1][1][0], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);                                          \
+                                mop(OP_LDR, 3, &BR[r][1][1], (Ull)a_col_index[idx0], (Ull)rofs, MSK_W1, (Ull)a_col_index[idx_base], A_nnz_blk_size, 0, 0, (Ull)NULL, A_nnz_blk_size); \
+                                mop(OP_LDR, 3, &BR[r][1][0], (Ull)a_col_index[idx1], (Ull)rofs, MSK_W1, (Ull)a_col_index[idx_base], A_nnz_blk_size, 0, 0, (Ull)NULL, A_nnz_blk_size);
+
+                    #define spmm_core1_last_start_32(rp2, rp1, r, rm1, a_col, offset, a_idx_base) \
+                                exe(OP_ADD, &r0, BR[rm1][1][1], EXP_H3210, cofs1, EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);                                                \
+                                exe(OP_ADD, &r1, BR[rm1][1][0], EXP_H3210, cofs1, EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);                                                \
+                                mop(OP_LDR, 3, &BR[rp1][0][1], (Ull)b0[CHIP], (Ull)offset, MSK_W0, (Ull)b[CHIP], B_blk_size, 0, 0, (Ull)NULL, B_blk_size);                             \
+                                mop(OP_LDR, 3, &BR[rp1][0][0], (Ull)b1[CHIP], (Ull)offset, MSK_W0, (Ull)b[CHIP], B_blk_size, 0, 0, (Ull)NULL, B_blk_size);                             \
+                                mop(OP_LDR, 3, &BR[rp1][1][1], (Ull)b2[CHIP], (Ull)offset, MSK_W0, (Ull)b[CHIP], B_blk_size, 0, 0, (Ull)NULL, B_blk_size);                             \
+                                mop(OP_LDR, 3, &BR[rp1][1][0], (Ull)b3[CHIP], (Ull)offset, MSK_W0, (Ull)b[CHIP], B_blk_size, 0, 0, (Ull)NULL, B_blk_size);                             \
+                                mop(OP_LDR, 3, &BR[rp1][2][1], (Ull)a[a_col], (Ull)rofs, MSK_W1, (Ull)a[a_idx_base], A_nnz_blk_size, 0, 0, (Ull)NULL, A_nnz_blk_size); \
+                                exe(OP_FMA, &AR[rp2][0], AR[rm1][0], EXP_H3210, BR[rp1][2][1], EXP_H1010, BR[rp1][0][1], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);                         \
+                                exe(OP_FMA, &AR[rp2][1], AR[rm1][1], EXP_H3210, BR[rp1][2][1], EXP_H1010, BR[rp1][0][0], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);                         \
+                                exe(OP_FMA, &AR[rp2][2], AR[rm1][2], EXP_H3210, BR[rp1][2][1], EXP_H1010, BR[rp1][1][1], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);                         \
+                                exe(OP_FMA, &AR[rp2][3], AR[rm1][3], EXP_H3210, BR[rp1][2][1], EXP_H1010, BR[rp1][1][0], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);                         \
+                                mop(OP_LDR, 3, &BR[rp2][0][1], (Ull)b0[CHIP], (Ull)offset, MSK_W1, (Ull)b[CHIP], B_blk_size, 0, 0, (Ull)NULL, B_blk_size);                             \
+                                mop(OP_LDR, 3, &BR[rp2][0][0], (Ull)b1[CHIP], (Ull)offset, MSK_W1, (Ull)b[CHIP], B_blk_size, 0, 0, (Ull)NULL, B_blk_size);                             \
+                                mop(OP_LDR, 3, &BR[rp2][1][1], (Ull)b2[CHIP], (Ull)offset, MSK_W1, (Ull)b[CHIP], B_blk_size, 0, 0, (Ull)NULL, B_blk_size);                             \
+                                mop(OP_LDR, 3, &BR[rp2][1][0], (Ull)b3[CHIP], (Ull)offset, MSK_W1, (Ull)b[CHIP], B_blk_size, 0, 0, (Ull)NULL, B_blk_size)
+
+
                     #define spmm_final(r, rm1, offset) \
                                 mop(OP_LDR, 3, &BR[r][0][1], (Ull)c00[CHIP], (Ull)offset, MSK_W0, (Ull)c0[CHIP], C_blk_size, 0, 1, (Ull)NULL, C_blk_size); \
                                 mop(OP_LDR, 3, &BR[r][1][1], (Ull)c01[CHIP], (Ull)offset, MSK_W0, (Ull)c0[CHIP], C_blk_size, 0, 1, (Ull)NULL, C_blk_size); \
@@ -266,10 +421,9 @@ void spmm(IMAXDenseMatrix *result, IMAXSparseMatrix *imax_sp_matrix, IMAXDenseMa
                                 mop(OP_STR, 3, &AR[r][3], (Ull)offset, (Ull)c03[CHIP], MSK_D0, (Ull)c0[CHIP], C_blk_size, 0, 1, (Ull)NULL, C_blk_size)
 
 //EMAX5A begin spmm1 mapdist=0
-                    for (CHIP=0;CHIP<NCHIP;CHIP++) { /* will be parallelized by multi-chip (M/#chip) */
+                    for (CHIP=0;CHIP<NCHIP;CHIP++) {
                         for (INIT1=1,LOOP1=B_col_blk_size/(W*2),cofs=cofs_init;LOOP1--;INIT1=0) {
                             for (INIT0=1,LOOP0=A_nnz_row_blk_size,rofs=rofs_init;LOOP0--;INIT0=0) {
-                            //for (INIT0=1,LOOP0=A_row_blk_size,rofs=rofs_init;LOOP0--;INIT0=0) {
                                 exe(OP_ADD, &cofs,            cofs, EXP_H3210,     INIT0?A_row_size_mul_W_4_2:0, EXP_H3210, 0LL, EXP_H3210, OP_NOP,                  0LL, OP_NOP, 0LL);
                                 exe(OP_ADD, &rofs, INIT0?rofs:rofs, EXP_H3210, (1*8LL)<<32|((1*4LL)&0xffffffff), EXP_H3210, 0LL, EXP_H3210, OP_AND, 0xffffffffffffffffLL, OP_NOP, 0LL);
                                 exe(OP_ADD, &cofs1,           cofs, EXP_H1010, 0, EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
@@ -288,7 +442,6 @@ void spmm(IMAXDenseMatrix *result, IMAXSparseMatrix *imax_sp_matrix, IMAXDenseMa
                                 mop(OP_LDR, 3, &BR[3][1][1], (Ull)b2[CHIP], (Ull)r0, MSK_W0, (Ull)b[CHIP], B_blk_size, 0, 0, (Ull)NULL, B_blk_size);
                                 mop(OP_LDR, 3, &BR[3][1][0], (Ull)b3[CHIP], (Ull)r0, MSK_W0, (Ull)b[CHIP], B_blk_size, 0, 0, (Ull)NULL, B_blk_size);
                                 mop(OP_LDR, 3, &BR[3][2][1], (Ull)a[0], (Ull)rofs, MSK_W1, (Ull)a[0], A_nnz_blk_size, 0, 0, (Ull)NULL, A_nnz_blk_size);
-                                //printf("%f ,", *(float*)&BR[3][2][1]);
 
                                 exe(OP_FML, &AR[4][0], BR[3][2][1], EXP_H1010, BR[3][0][1], EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
                                 exe(OP_FML, &AR[4][1], BR[3][2][1], EXP_H1010, BR[3][0][0], EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
@@ -314,9 +467,16 @@ void spmm(IMAXDenseMatrix *result, IMAXSparseMatrix *imax_sp_matrix, IMAXDenseMa
                                 spmm_core1           (18, 17,             r2);
                                 spmm_core1_load      (19, 18, 17,  7,     r3,      0);
                                 spmm_core1           (20, 19,             r3);
-                                spmm_core1_end       (21, 20, 19,  8,  9, 10, 11,  8);
 
+                                //#if UNIT32
+                                spmm_core1_last_end_32  (21, 20, 19, 8, 9,     8);
+                                spmm_core1_last_start_32(24, 23, 22, 21,  8, r0,      8);
+                                spmm_core1_load         (25, 24, 23,      9, r1,      8);
+                                spmm_core1              (26, 25,             r1);
+                                //#else
+                                /*
                                 spmm_core1_start     (24, 23, 22, 21,  8, r0,      8);
+                                spmm_core1_end       (21, 20, 19,  8,  9, 10, 11,  8);
                                 spmm_core1_load      (25, 24, 23,      9, r1,      8);
                                 spmm_core1           (26, 25,             r1);
                                 spmm_core1_load      (27, 26, 25,     10, r2,      8);
@@ -348,20 +508,28 @@ void spmm(IMAXDenseMatrix *result, IMAXSparseMatrix *imax_sp_matrix, IMAXDenseMa
                                 spmm_core1           (56, 55,             r1);
                                 spmm_core1_load      (57, 56, 55,     22, r2,     16);
                                 spmm_core1           (58, 57,             r2);
+                                */
+                                //#endif
 
+                                //#ifdef UNIT32
+                                exe(OP_FMA, &AR[27][0], AR[26][0], EXP_H3210, BR[25][2][1], EXP_H3232, BR[26][0][1], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
+                                exe(OP_FMA, &AR[27][1], AR[26][1], EXP_H3210, BR[25][2][1], EXP_H3232, BR[26][0][0], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
+                                exe(OP_FMA, &AR[27][2], AR[26][2], EXP_H3210, BR[25][2][1], EXP_H3232, BR[26][1][1], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
+                                exe(OP_FMA, &AR[27][3], AR[26][3], EXP_H3210, BR[25][2][1], EXP_H3232, BR[26][1][0], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
+                                mop(OP_LDWR, 1, &BR[27][0][1], (Ull)a_row_index, (Ull)rofs, MSK_W0, (Ull)a_row_index, A_nnz_row_size, 0, 0, (Ull)NULL, A_nnz_row_size);
+                                exe(OP_ADD, &r0, BR[27][0][1], EXP_H3210, oofs, EXP_H3210, 0LL, EXP_H3210, OP_AND, 0xffffffffLL, OP_NOP, 0LL);
+                                spmm_final(30, 27, r0);
+                                //#else
+                                /*
                                 exe(OP_FMA, &AR[59][0], AR[58][0], EXP_H3210, BR[57][2][1], EXP_H3232, BR[58][0][1], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
                                 exe(OP_FMA, &AR[59][1], AR[58][1], EXP_H3210, BR[57][2][1], EXP_H3232, BR[58][0][0], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
                                 exe(OP_FMA, &AR[59][2], AR[58][2], EXP_H3210, BR[57][2][1], EXP_H3232, BR[58][1][1], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
                                 exe(OP_FMA, &AR[59][3], AR[58][3], EXP_H3210, BR[57][2][1], EXP_H3232, BR[58][1][0], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
-                                //mop(OP_LDWR, 1, &BR[59][0][1], (Ull)a_row_index, (Ull)rofs, MSK_W0, (Ull)a_row_index, A_row_blk_size, 0, 0, (Ull)NULL, A_row_blk_size);
-                                //printf("a\n");
                                 mop(OP_LDWR, 1, &BR[59][0][1], (Ull)a_row_index, (Ull)rofs, MSK_W0, (Ull)a_row_index, A_nnz_row_size, 0, 0, (Ull)NULL, A_nnz_row_size);
                                 exe(OP_ADD, &r0, BR[59][0][1], EXP_H3210, oofs, EXP_H3210, 0LL, EXP_H3210, OP_AND, 0xffffffffLL, OP_NOP, 0LL);
-                                //printf("%f %d %d %d %d %d %d\n", *(float*)&AR[59][0], (Uint)r0, (Uint)BR[59][0][1], (Uint)rofs, a_row_blk, A_nnz_row_size, A_nnz_row_blk_size);
-                                //printf("Dense Input  Head: %08x_%08x\n", (Uint)((Ull)a_sub_row_head >> 32), (Uint)a_sub_row_head);
-                                //printf("Dense Input  Head: %08x_%08x\n", (Uint)((Ull)a_row_index >> 32), (Uint)a_row_index);
                                 spmm_final(62, 59, r0);
-                                //printf("c\n");
+                                */
+                                //#endif
                             }
                         }
                     }
@@ -370,13 +538,16 @@ void spmm(IMAXDenseMatrix *result, IMAXSparseMatrix *imax_sp_matrix, IMAXDenseMa
             }
         }
     }
-    //printf("\n");
 //EMAX5A drain_dirty_lmm
-    get_nanosec(0);
-    for (int i = 0; i < 8; i++) all_nanosec[SPMM][i] += nanosec[i];
-    //for(int j = 0; j < 100; j++) {printf("%f, ", *(float*)&result->val[j]); }
-    //exit(1);
-    show_nanosec();
+    #ifdef EMAX7
+        get_nanosec(0, 0);
+        for (int i = 0; i < 8; i++) all_nanosec[SPMM][i] += nanosec[0][i];
+        show_nanosec(0);
+    #else
+        get_nanosec(0);
+        for (int i = 0; i < 8; i++) all_nanosec[SPMM][i] += nanosec[i];
+        show_nanosec();
+    #endif
 }
 
 void mm(IMAXDenseMatrix *result, IMAXDenseMatrix *imax_a, IMAXDenseMatrix *imax_b) {
@@ -408,11 +579,10 @@ void mm(IMAXDenseMatrix *result, IMAXDenseMatrix *imax_a, IMAXDenseMatrix *imax_
     //if (A_col_blk_size != B_row_blk_size) return;
     //else if (B_col_blk_size != C_col_blk_size) return;
     //else if (A_row_blk_size != C_row_blk_size) return;
-    if (A_col_size != B_row_size) return;
     //else if (A_col_size != B_row_size) return;
+    if (A_col_size != B_row_size) return;
     else if (B_col_size != C_col_size) return;
     else if (A_row_size != C_row_size) return;
-    //exit(1);
 
     Ull cofs_init = (0-W*4*2*B_row_blk_size)<<32|((0-W*4*2*C_row_blk_size)&0xffffffff);
     Ull rofs_init = (0-1*8LL)<<32|((0-1*8LL)&0xffffffff);
@@ -439,8 +609,13 @@ void mm(IMAXDenseMatrix *result, IMAXDenseMatrix *imax_a, IMAXDenseMatrix *imax_
         imax_a->row_padded_size, imax_a->col_padded_size, imax_b->row_padded_size, imax_b->col_padded_size, result->row_padded_size, result->col_padded_size,
         imax_a->row_blk_size, imax_a->col_blk_size, imax_b->row_blk_size, imax_b->col_blk_size,result->row_blk_size, result->col_blk_size
     );
-    reset_nanosec();
-    //exit(1);
+    #ifdef EMAX7
+        int LANE = 0;
+        reset_nanosec(0);
+    #else
+        reset_nanosec();
+    #endif
+
     // Select Row of A(=Row of C)
     for (a_row_blk = 0; a_row_blk < A_row_size; a_row_blk += A_row_blk_size) {
         // Select Column of B(= Column of C)
@@ -493,13 +668,12 @@ void mm(IMAXDenseMatrix *result, IMAXDenseMatrix *imax_a, IMAXDenseMatrix *imax_
                                 mop(OP_STR, 3, &AR[r][3], (Ull)oofs, (Ull)c03[CHIP], MSK_D0, (Ull)c0[CHIP], C_blk_size, 0, 1, (Ull)NULL, C_blk_size)
                 
 //EMAX5A begin sgemm1 mapdist=0
-                    for (CHIP=0;CHIP<NCHIP;CHIP++) { /* will be parallelized by multi-chip (M/#chip) */
+                    for (CHIP=0;CHIP<NCHIP;CHIP++) {
                         for (INIT1=1,LOOP1=A_row_blk_size/NCHIP,rofs=rofs_init;LOOP1--;INIT1=0) {
                             for (INIT0=1,LOOP0=B_col_blk_size/(W*2),cofs=cofs_init;LOOP0--;INIT0=0) {
                                 exe(OP_ADD, &cofs, INIT0?cofs:cofs, EXP_H3210, BC_W_blk_size, EXP_H3210, 0LL, EXP_H3210, OP_AND, 0xffffffffffffffffLL, OP_NOP, 0LL);
                                 exe(OP_ADD, &rofs, rofs, EXP_H3210, INIT0?(1*8LL)<<32|((1*8LL)&0xffffffff):0, EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
-                                exe(OP_ADD, &oofs, rofs, EXP_H3210, cofs, EXP_H3210, 0LL, EXP_H3210, OP_AND, 0x00000000ffffffffLL, OP_NOP, 0LL);
-                                //printf("asdfaf %d %d %lx %d %d %d %d\n", (Uint)rofs, (Uint)cofs, (Ull)a[0][CHIP], b_row, a_col_blk, b_col_blk, a_row_blk);
+                                exe(OP_ADD, &oofs, rofs, EXP_H3210, cofs, EXP_H1010, 0LL, EXP_H3210, OP_AND, 0x00000000ffffffffLL, OP_NOP, 0LL);
 
                                 mop(OP_LDR,  3, &BR[1][0][1], (Ull)b0[0],      (Ull)cofs, MSK_W1, (Ull)b0[0], B_blk_size, 0, 0, (Ull)NULL, B_blk_size);
                                 mop(OP_LDR,  3, &BR[1][0][0], (Ull)b1[0],      (Ull)cofs, MSK_W1, (Ull)b0[0], B_blk_size, 0, 0, (Ull)NULL, B_blk_size);
@@ -527,15 +701,17 @@ void mm(IMAXDenseMatrix *result, IMAXDenseMatrix *imax_a, IMAXDenseMatrix *imax_
                                 sgemm_core1_0(15, 14, 13);
                                 sgemm_core1_0(16, 15, 14);
                                 sgemm_core1_0(17, 16, 15);
+
+                                //#ifdef UNIT32
+                                sgemm_final(30, 17);
+                                //#else
+                                /*
                                 sgemm_core1_0(18, 17, 16);
                                 sgemm_core1_0(19, 18, 17);
 
                                 sgemm_core1_0(20, 19, 18);
                                 sgemm_core1_0(21, 20, 19);
                                 sgemm_core1_0(22, 21, 20);
-                                //printf("Orig(%d,%d)x(%d,%d)=(%d,%d) Padded(%d,%d)x(%d,%d)=(%d,%d)\n", 
-                                    //imax_a->row_size, imax_a->col_size, imax_b->row_size, imax_b->col_size, result->row_size, result->col_size,
-                                    //imax_a->row_padded_size, imax_a->col_padded_size, imax_b->row_padded_size, imax_b->col_padded_size, result->row_padded_size, result->col_padded_size);
                                 sgemm_core1_0(23, 22, 21);
                                 sgemm_core1_0(24, 23, 22);
                                 sgemm_core1_0(25, 24, 23);
@@ -548,51 +724,64 @@ void mm(IMAXDenseMatrix *result, IMAXDenseMatrix *imax_a, IMAXDenseMatrix *imax_
                                 sgemm_core1_0(31, 30, 29);
                                 sgemm_core1_0(32, 31, 30);
                                 sgemm_core1_0(33, 32, 31);
-                                //printf("%f %lx %lx %u\n", *(float*)&AR[33][0], (Ull)a[31][CHIP], (Ull)a0[CHIP], (Uint)rofs);
-                                //printf("%f %lx %lx %u\n", *(float*)&BR[10][2][1], (Ull)a[31][CHIP], (Ull)a0[CHIP], (Uint)rofs);
-                                //sgemm_core1_0(35, 34, 32);
-                                //sgemm_core1_0(36, 35, 33);
-                                //sgemm_core1_0(37, 36, 34);
-                                //sgemm_core1_0(38, 37, 35);
-                                //sgemm_core1_0(39, 38, 36);
+                                sgemm_core1_0(35, 34, 32);
+                                sgemm_core1_0(36, 35, 33);
+                                sgemm_core1_0(37, 36, 34);
+                                sgemm_core1_0(38, 37, 35);
+                                sgemm_core1_0(39, 38, 36);
 
-                                //sgemm_core1_0(40, 39, 37);
-                                //sgemm_core1_0(41, 40, 38);
-                                //sgemm_core1_0(42, 41, 39);
-                                //sgemm_core1_0(43, 42, 40);
-                                //sgemm_core1_0(44, 43, 41);
-                                //sgemm_core1_0(45, 44, 42);
-                                //sgemm_core1_0(46, 45, 43);
-                                //sgemm_core1_0(47, 46, 44);
-                                //sgemm_core1_0(48, 47, 45);
-                                //sgemm_core1_0(49, 48, 46);
+                                sgemm_core1_0(40, 39, 37);
+                                sgemm_core1_0(41, 40, 38);
+                                sgemm_core1_0(42, 41, 39);
+                                sgemm_core1_0(43, 42, 40);
+                                sgemm_core1_0(44, 43, 41);
+                                sgemm_core1_0(45, 44, 42);
+                                sgemm_core1_0(46, 45, 43);
+                                sgemm_core1_0(47, 46, 44);
+                                sgemm_core1_0(48, 47, 45);
+                                sgemm_core1_0(49, 48, 46);
 
-                                //sgemm_core1_0(50, 49, 47);
-                                //sgemm_core1_0(51, 50, 48);
-                                //sgemm_core1_0(52, 51, 49);
-                                //sgemm_core1_0(53, 52, 50);
-                                //sgemm_core1_0(54, 53, 51);
-                                //sgemm_core1_0(55, 54, 52);
-                                //sgemm_core1_0(56, 55, 53);
-                                //sgemm_core1_0(57, 56, 54);
-                                //sgemm_core1_0(58, 57, 55);
-                                //sgemm_core1_0(59, 58, 56);
+                                sgemm_core1_0(50, 49, 47);
+                                sgemm_core1_0(51, 50, 48);
+                                sgemm_core1_0(52, 51, 49);
+                                sgemm_core1_0(53, 52, 50);
+                                sgemm_core1_0(54, 53, 51);
+                                sgemm_core1_0(55, 54, 52);
+                                sgemm_core1_0(56, 55, 53);
+                                sgemm_core1_0(57, 56, 54);
+                                sgemm_core1_0(58, 57, 55);
+                                sgemm_core1_0(59, 58, 56);
 
                                 sgemm_final(62, 33);
+                                */
+                                //#endif
+                                // for debug
+                                //printf("DEBUG %d %d %lx %d %d %d %d\n", (Uint)rofs, (Uint)cofs, (Ull)a[0][CHIP], b_row, a_col_blk, b_col_blk, a_row_blk);
+                                //printf("%f %lx %lx %u\n", *(float*)&AR[33][0], (Ull)a[31][CHIP], (Ull)a0[CHIP], (Uint)rofs);
+                                //printf("%f %lx %lx %u\n", *(float*)&BR[10][2][1], (Ull)a[31][CHIP], (Ull)a0[CHIP], (Uint)rofs);
+                                //printf("Orig(%d,%d)x(%d,%d)=(%d,%d) Padded(%d,%d)x(%d,%d)=(%d,%d)\n", 
+                                    //imax_a->row_size, imax_a->col_size, imax_b->row_size, imax_b->col_size, result->row_size, result->col_size,
+                                    //imax_a->row_padded_size, imax_a->col_padded_size, imax_b->row_padded_size, imax_b->col_padded_size, result->row_padded_size, result->col_padded_size);
                             }
                         }
                     }
 //EMAX5A end
                 }
-    //if ((imax_a->col_size == 16) && (a_col_blk > 16)) exit(1);
             }
         }
     }
 //EMAX5A drain_dirty_lmm
-    get_nanosec(0);
-    for (int i = 0; i < 8; i++) all_nanosec[MM][i] += nanosec[i];
+    #ifdef EMAX7
+        get_nanosec(0, 0);
+        for (int i = 0; i < 8; i++) all_nanosec[MM][i] += nanosec[0][i];
+        show_nanosec(0);
+    #else
+        get_nanosec(0);
+        for (int i = 0; i < 8; i++) all_nanosec[MM][i] += nanosec[i];
+        show_nanosec();
+    #endif
+    //if ((imax_a->col_size == 16) && (a_col_blk > 16)) exit(1);
     //if (imax_a->col_size == 16) exit(1);
-    show_nanosec();
 }
 
 void relu(DenseMatrix *result, DenseMatrix *a) {

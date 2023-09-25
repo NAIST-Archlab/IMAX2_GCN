@@ -3,7 +3,8 @@ src/*-*.*
 *.gch
 imax_gcn
 test_sparse
-*.emax6*
+*.emax*
+conv-c2d/
 data/
 data_backup/
 .DS_Store
