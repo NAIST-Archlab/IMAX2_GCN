@@ -64,6 +64,7 @@ typedef struct dense_matrix {
 typedef struct sparse_matrix_sub_imax2 {
     int nnz;
     int nnz_row_blk_size;
+    Uint *row_blk;
     Uint *row_nnz;
     Uint *row_num;
     Uint *col_num;

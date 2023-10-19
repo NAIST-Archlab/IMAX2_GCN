@@ -181,6 +181,12 @@ void propagation(GCNNetwork *network) {
         printf("Layer %d: MM\n", layer_cnt);
         timespec_get(&t1, TIME_UTC);
         #if defined(EMAX6) || defined(EMAX7)
+            //float one = 1;
+            //for (int i = 0; i < w.row_padded_size; i++) {for (int j = 0; j < w.col_padded_size; j++) {w.val[(j/2)*2*w.col_padded_size+(i*2)+(j%2)] = 0;}}
+            //for (int i = 0; i < imax_r_spmm.row_padded_size; i++) {for (int j = 0; j < imax_r_spmm.col_padded_size; j++) {w.val[(j/2)*2*imax_r_spmm.col_padded_size+(i*2)+(j%2)] = 0;}}
+            //for (int i = 0; i < w.row_size; i++) {for (int j = 0; j < w.col_size; j++) {w.val[(j/2)*2*w.col_padded_size+(i*2)+(j%2)] = *(Uint*)&one;}}
+            ////for (int i = 0; i < imax_r_spmm.row_padded_size; i++){for (int j = 0; j < imax_r_spmm.col_padded_size; j++) {if (i == j) {imax_r_spmm.val[(j/2)*2*imax_r_spmm.col_padded_size+(i*2)+(j%2)] = *(Uint*)&one;} else {imax_r_spmm.val[(j/2)*2*imax_r_spmm.col_padded_size+(i*2)+(j%2)] = 0;}}}
+            //for (int i = 0; i < imax_r_spmm.row_size; i++){for (int j = 0; j < imax_r_spmm.col_size; j++) {imax_r_spmm.val[(j/2)*2*imax_r_spmm.col_padded_size+(i*2)+(j%2)] = *(Uint*)&one;}}
             mm(&imax_r_mm, &imax_r_spmm, &w);
         #else
             mm(&r_mm, &r_spmm, &(p->hidden_layer.matrix));
@@ -219,6 +225,7 @@ void propagation(GCNNetwork *network) {
 			//imax_dense_deallocation(&imax_r_mm);
             //imax_dense_deallocation(&imax_dump);
 		//#endif
+        //exit(1);
         p = p->next;
     }
 

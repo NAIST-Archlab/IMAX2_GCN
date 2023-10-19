@@ -11,3 +11,4 @@ data_backup/
 .vscode
 *.cpu*
 *.gpu*
+test_dense

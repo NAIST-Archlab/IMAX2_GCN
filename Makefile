@@ -4,6 +4,7 @@
 ##          kim.dohyun.kg7@is.naist.jp ##
 PROGRAM := imax_gcn
 TEST_SPARSE_PROGRAM := test_sparse
+TEST_DENSE_PROGRAM := test_dense
 SRC_DIR := src
 TEST_DIR := test
 INCLUDE := ./include/
@@ -21,6 +22,7 @@ UNIT32 := 1
 EMAX_VER := 7
 EMAX_DEFINE := -DEMAX6 -DDEBUG -DUSE_MP -DNCHIP=$(NCHIP)
 TEST_OBJS := $(TEST_SRCS:.c=.o)
+TEST_DENSE_OBJS := test/test_dense.o
 HEADERS := $(CONV)/emax6.h $(INCLUDE)/layer.h $(INCLUDE)/options.h $(INCLUDE)/sparse.h $(INCLUDE)/utils.h
 ifeq ($(EMAX_VER), 7)
 CONV := ./conv-c2d
@@ -128,6 +130,17 @@ $(TEST_SPARSE_PROGRAM).emax$(EMAX_VER): $(OBJS_EMAX) $(TEST_OBJS)
 
 $(TEST_SPARSE_PROGRAM).emax$(EMAX_VER)+dma: $(OBJS_EMAX) $(TEST_OBJS)
 	$(CC) $(OBJS_EMAX) $(TEST_OBJS) -o $(TEST_SPARSE_PROGRAM).emax$(EMAX_VER)+dma $(LDFLAGS) $(CFLAGS_EMAX_DMA)
+endif
+
+$(TEST_DENSE_PROGRAM): $(OBJS) $(TEST_DENSE_OBJS)
+	$(CC) $(OBJS) $(TEST_DENSE_OBJS) -o $(TEST_DENSE_PROGRAM) $(LDFLAGS) $(CFLAGS)
+
+ifeq ($(ARM), 1)
+$(TEST_DENSE_PROGRAM).emax$(EMAX_VER): $(OBJS_EMAX) $(TEST_DENSE_OBJS)
+	$(CC) $(OBJS_EMAX) $(TEST_DENSE_OBJS) -o $(TEST_DENSE_PROGRAM).emax$(EMAX_VER) $(LDFLAGS) $(CFLAGS_EMAX)
+
+$(TEST_DENSE_PROGRAM).emax$(EMAX_VER)+dma: $(OBJS_EMAX) $(TEST_DENSE_OBJS)
+	$(CC) $(OBJS_EMAX) $(TEST_DENSE_OBJS) -o $(TEST_DENSE_PROGRAM).emax$(EMAX_VER)+dma $(LDFLAGS) $(CFLAGS_EMAX_DMA)
 endif
 
 CONV_EXE := ./conv-c2c/conv-c2c
