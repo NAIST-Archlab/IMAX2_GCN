@@ -218,13 +218,6 @@ void propagation(GCNNetwork *network) {
         relu_time += cal_time(&t2, &t1);
 
         freeDenseMatrix(&r_spmm);freeDenseMatrix(&r_mm);
-        //#if defined(EMAX6) || defined(EMAX7)
-			//imax_dense_deallocation(&h);
-			//imax_dense_deallocation(&w);
-			//imax_dense_deallocation(&imax_r_spmm);
-			//imax_dense_deallocation(&imax_r_mm);
-            //imax_dense_deallocation(&imax_dump);
-		//#endif
         //exit(1);
         p = p->next;
     }

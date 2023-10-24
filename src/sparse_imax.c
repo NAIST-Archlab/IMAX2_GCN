@@ -247,7 +247,7 @@ void spmm(IMAXDenseMatrix *result, IMAXSparseMatrix *imax_sp_matrix, IMAXDenseMa
     Ull a_col_blk = 0;
     Ull a_col_blk_iter = 0;
 
-    IMAXSparseMatrixSub **imax_sp_sub = imax_sp_matrix->sub;
+    IMAXSparseMatrixSub *imax_sp_sub = imax_sp_matrix->sub;
     Uint *a_sub_col_head, *a_sub_head, *a_sub_nnz_head, *a_sub_row_head, *a_row_index, *a_row_blk_head;
     Uint *b_head = (Uint*)matrix->val;
     Uint *c_head = (Uint*)result->val;
@@ -270,19 +270,18 @@ void spmm(IMAXDenseMatrix *result, IMAXSparseMatrix *imax_sp_matrix, IMAXDenseMa
     #endif
     // Select Column of A(=Row of B)
     for (a_col_blk = 0, a_col_blk_iter = 0; a_col_blk < A_col_size; a_col_blk += A_col_blk_size, a_col_blk_iter += 1) {
-        A_nnz_blk_size = imax_sp_sub[a_col_blk_iter]->nnz;
-        A_nnz_row_blk_size = imax_sp_sub[a_col_blk_iter]->nnz_row_blk_size;
+        A_nnz_blk_size = imax_sp_sub[a_col_blk_iter].nnz;
+        A_nnz_row_blk_size = imax_sp_sub[a_col_blk_iter].nnz_row_blk_size;
         A_row_blk_size_mul_8_2 = A_nnz_row_blk_size*8*2;
-        a_sub_head = (Uint*)imax_sp_sub[a_col_blk_iter]->val;
-        a_sub_row_head = (Uint*)imax_sp_sub[a_col_blk_iter]->row_num;
-        a_sub_nnz_head = (Uint*)imax_sp_sub[a_col_blk_iter]->row_nnz;
-        a_sub_col_head = (Uint*)imax_sp_sub[a_col_blk_iter]->col_num;
-        a_row_blk_head = (Uint*)imax_sp_sub[a_col_blk_iter]->row_blk;
-        printf("%u %u %u\n", A_row_blk_size_mul_8_2, B_blk_size, C_blk_size);
+        a_sub_head = (Uint*)imax_sp_sub[a_col_blk_iter].val;
+        a_sub_row_head = (Uint*)imax_sp_sub[a_col_blk_iter].row_num;
+        a_sub_nnz_head = (Uint*)imax_sp_sub[a_col_blk_iter].row_nnz;
+        a_sub_col_head = (Uint*)imax_sp_sub[a_col_blk_iter].col_num;
+        a_row_blk_head = (Uint*)imax_sp_sub[a_col_blk_iter].row_blk;
         printf("Sparse Input col[%03d] row_num Head: %08x_%08x\n", a_col_blk_iter, (Uint)((Ull)a_sub_row_head >> 32), (Uint)a_sub_row_head);
         printf("Sparse Input col[%03d] row_nnz Head: %08x_%08x\n", a_col_blk_iter, (Uint)((Ull)a_sub_nnz_head >> 32), (Uint)a_sub_nnz_head);
         printf("Sparse Input col[%03d] col_num Head: %08x_%08x\n", a_col_blk_iter, (Uint)((Ull)a_sub_col_head >> 32), (Uint)a_sub_col_head);
-        printf("Sparse Input col[%03d]     val Head: %08x_%08x\n", a_col_blk_iter, (Uint)((Ull)a_sub_head >> 32), (Uint)a_sub_head);
+        printf("Sparse Input col[%03d]     val Head: %08x_%08x\n", a_col_blk_iter, (Uint)((Ull)    a_sub_head >> 32), (Uint)    a_sub_head);
         printf("Sparse Input col[%03d] row_blk Head: %08x_%08x\n", a_col_blk_iter, (Uint)((Ull)a_row_blk_head >> 32), (Uint)a_row_blk_head);
 
         // Select Row of A(=Row of C)
