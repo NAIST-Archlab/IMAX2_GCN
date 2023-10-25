@@ -282,7 +282,6 @@ void spmm(IMAXDenseMatrix *result, IMAXSparseMatrix *imax_sp_matrix, IMAXDenseMa
         printf("Sparse Input col[%03d] row_nnz Head: %08x_%08x\n", a_col_blk_iter, (Uint)((Ull)a_sub_nnz_head >> 32), (Uint)a_sub_nnz_head);
         printf("Sparse Input col[%03d] col_num Head: %08x_%08x\n", a_col_blk_iter, (Uint)((Ull)a_sub_col_head >> 32), (Uint)a_sub_col_head);
         printf("Sparse Input col[%03d]     val Head: %08x_%08x\n", a_col_blk_iter, (Uint)((Ull)    a_sub_head >> 32), (Uint)    a_sub_head);
-        printf("Sparse Input col[%03d] row_blk Head: %08x_%08x\n", a_col_blk_iter, (Uint)((Ull)a_row_blk_head >> 32), (Uint)a_row_blk_head);
 
         // Select Row of A(=Row of C)
         for (a_row_blk=0,a_row_blk_iter=0,end_sum=0; a_row_blk < A_row_size; a_row_blk += A_row_blk_size, a_row_blk_iter += 1, end_sum += A_nnz_row_size*A_nnz_col_blk_size) { // A_row_blk

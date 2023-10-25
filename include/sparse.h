@@ -42,57 +42,58 @@ unsigned long long all_nanosec[NUM_CLASS];
 #endif
 
 typedef struct sparse_matrix {
-    int nnz;      // Number of Non-zero values
-    int col_size; // column size
-    int row_size; // row size
-    int *row_p;   // row pointer
-    int *col_p;   // col pointer
-    float *val;   // value of each index/Floating
+    int         nnz; // Number of Non-zero values
+    int    col_size; // column size
+    int    row_size; // row size
+    int      *row_p; // row pointer
+    int      *col_p; // col pointer
+    float      *val; // value of each index/Floating
     int *cuda_row_p; // for CUDA
     int *cuda_col_p; // for CUDA
     float *cuda_val; // for CUDA
 } SparseMatrix;
 
 typedef struct dense_matrix {
-    int row_size;
-    int col_size;
-    float *val;
-    float *cuda_val; // for CUDA
+    int   row_size;  // row size
+    int   col_size;  // column size
+    float      *val; // values
+    float *cuda_val; // values for CUDA
 } DenseMatrix;
 
 #if defined(EMAX6) || defined(EMAX7)
 typedef struct sparse_matrix_sub_imax2 {
-    int nnz;
-    int nnz_row_blk_size;
-    Uint *row_blk;
-    Uint *row_nnz;
-    Uint *row_num;
-    Uint *col_num;
-    Uint *val;
+    int              nnz; // Number of Non-zero values in a sub matrix
+    int nnz_row_blk_size; // Size of row in Non-zero values block
+    Uint        *row_blk; // Start index of each row block in Non-zero values block
+    Uint        *row_nnz; // Number of Non-zero values in each row
+    Uint        *row_num; // Number of row in each non-zero values block
+    Uint        *col_num; // Number of column in each non-zero values
+    Uint            *val; // value of each column
 } IMAXSparseMatrixSub;
 
 typedef struct sparse_matrix_imax2 {
-    int nnz;
-    int row_size;
-    int col_size;
-    int row_padded_size;
-    int col_padded_size;
-    int row_blk_size;
-    int col_blk_size;
-    int col_blk_min;
-    int nnz_row_blk_size;
-    int nnz_col_blk_size;
-    IMAXSparseMatrixSub *sub;
+    int                  nnz; // Number of Non-zero values
+    int             mem_size; // Size of memory
+    int             row_size; // real row size
+    int             col_size; // real column size
+    int      row_padded_size; // row size padded
+    int      col_padded_size; // column size padded
+    int         row_blk_size; // Size of row each block
+    int         col_blk_size; // Size of column each block
+    int          col_blk_min; // Minimum size of column each block
+    int     nnz_row_blk_size; // Size of row in Non-zero values block
+    int     nnz_col_blk_size; // Size of column in Non-zero values block
+    IMAXSparseMatrixSub *sub; // Sub matrix
 } IMAXSparseMatrix;
 
 typedef struct dense_matrix_imax2 {
-    int row_size;
-    int col_size;
-    int row_padded_size;
-    int col_padded_size;
-    int row_blk_size;
-    int col_blk_size;
-    Uint *val;
+    int        row_size; // real row size
+    int        col_size; // real column size
+    int row_padded_size; // row size padded
+    int col_padded_size; // column size padded
+    int    row_blk_size; // Size of row each block
+    int    col_blk_size; // Size of column each block
+    Uint           *val; // values
 } IMAXDenseMatrix;
 
 void spmm(IMAXDenseMatrix *result, IMAXSparseMatrix *imax_sp_matrix, IMAXDenseMatrix *matrix);
@@ -120,7 +121,7 @@ void freeGPUSparseMatrix(SparseMatrix *sp_matrix);
 void freeDenseMatrix(DenseMatrix *matrix);
 void freeSparseMatrix(SparseMatrix *sp_matrix);
 void createCusparse();
-void createCublase();
+void createCublas();
 void destroyCusparse();
 void destroyCublas();
 #if __cplusplus

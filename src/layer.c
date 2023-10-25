@@ -135,7 +135,7 @@ void propagation(GCNNetwork *network) {
         timespec_get(&t2, TIME_UTC);
         spmm_time += cal_time(&t2, &t1);
         timespec_get(&t1, TIME_UTC);
-        createCublase();
+        createCublas();
         timespec_get(&t2, TIME_UTC);
         mm_time += cal_time(&t2, &t1);
     #endif
@@ -151,7 +151,6 @@ void propagation(GCNNetwork *network) {
         #if defined(EMAX6) || defined(EMAX7)
             imax_dense_format_init_from_sparse(&h, &network->graph->imax_matrix, p->latent_vectors.matrix.col_size, 8);
             imax_dense_format_init(&imax_r_spmm, h.row_size, h.col_size, h.row_padded_size, h.col_padded_size, h.row_blk_size, h.col_blk_size);
-            //imax_dense_format_init(&w, imax_r_spmm.col_size, p->hidden_layer.matrix.col_size, imax_r_spmm.col_padded_size, p->hidden_layer.matrix.col_size + imax_r_spmm.col_blk_size - (p->hidden_layer.matrix.col_size%imax_r_spmm.col_blk_size), imax_r_spmm.row_blk_size, imax_r_spmm.col_blk_size);
             imax_dense_format_init(&w, imax_r_spmm.col_size, p->hidden_layer.matrix.col_size, imax_r_spmm.col_padded_size, p->hidden_layer.matrix.col_size + imax_r_spmm.col_blk_size - (p->hidden_layer.matrix.col_size%imax_r_spmm.col_blk_size), MM_H, imax_r_spmm.col_blk_size);
             imax_dense_format_init(&imax_r_mm, imax_r_spmm.row_size, w.col_size, imax_r_spmm.row_padded_size, w.col_padded_size, imax_r_spmm.row_blk_size, w.col_blk_size);
             imax_gcn_allocation(&network->graph->imax_matrix, &h, &imax_r_spmm, &w, &imax_r_mm);

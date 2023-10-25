@@ -113,10 +113,12 @@ int main(int argc, char **argv) {
         #ifdef USE_CUDA
             sendSparseMatrixToGPU(&sp);
             sendDenseMatrixToGPU(&m);
+            createCusparse();
         #endif
         spmm(&result, &sp, &m);
         #ifdef USE_CUDA
             sendDenseMatrixToCPU(&result);
+            destroyCusparse();
         #endif
         timespec_get(&t2, TIME_UTC);
     #endif
@@ -124,7 +126,17 @@ int main(int argc, char **argv) {
     print_weight(&result);
     printf("nnz val: %d\n", row_nnz);
     printf("nnz total: %d\n", sp.nnz);
-    printf("SpMM: %lf usec.\n", cal_time(&t2, &t0));
+    #if defined(EMAX6) || defined(EMAX7)
+        printf("SpMM usec: ARM:%d DRAIN:%d CONF:%d REGV:%d RANGE:%d LOAD:%d EXEC:%d total:%d\n",
+            (Uint)(all_nanosec[SPMM][0]/1000),
+            (Uint)(all_nanosec[SPMM][1]/1000),
+            (Uint)(all_nanosec[SPMM][2]/1000),
+            (Uint)(all_nanosec[SPMM][3]/1000),
+            (Uint)(all_nanosec[SPMM][4]/1000),
+            (Uint)(all_nanosec[SPMM][5]/1000),
+            (Uint)(all_nanosec[SPMM][6]/1000),
+            (Uint)(all_nanosec[SPMM][7]/1000));
+    #endif
 
     return 0;
 }

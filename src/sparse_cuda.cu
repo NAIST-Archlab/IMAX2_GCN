@@ -127,7 +127,7 @@ void createCusparse() {
 }
 
 extern "C"
-void createCublase() {
+void createCublas() {
     CHECK_CUBLAS(cublasCreate(&cublas_handle));
 }
 

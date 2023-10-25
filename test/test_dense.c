@@ -53,32 +53,34 @@ int main(int argc, char **argv) {
     }
     #if defined(EMAX6) || defined(EMAX7)
         IMAXDenseMatrix imax_m1, imax_m2, imax_r;
-        timespec_get(&t0, TIME_UTC);
         imax_dense_format_init(&imax_m1, row, row, row, row, row, 16);
         imax_dense_format_init(&imax_m2, row, out_size, row, out_size, 16, 16);
         imax_dense_format_init(&imax_r, row, out_size, row, out_size, row, 16);
         imax_m1.val = (Uint*) malloc(sizeof(Uint) * row * row);
         imax_m2.val = (Uint*) malloc(sizeof(Uint) * row * out_size);
         imax_r.val = (Uint*) malloc(sizeof(Uint) * row * out_size);
-        timespec_get(&t1, TIME_UTC);
         convert_imax_dense_format(&imax_m1, &m1);
         convert_imax_dense_format(&imax_m2, &m2);
         convert_imax_dense_format(&imax_r, &result.matrix);
+        timespec_get(&t0, TIME_UTC);
         mm(&imax_r, &imax_m1, &imax_m2);
+        timespec_get(&t1, TIME_UTC);
         convert_dense_format(&result.matrix, &imax_r);
         convert_dense_format(&m1, &imax_m1);
         convert_dense_format(&m2, &imax_m2);
-    //#else
-        //timespec_get(&t0, TIME_UTC);
-        //#ifdef USE_CUDA
-            //sendSparseMatrixToGPU(&sp);
-            //sendDenseMatrixToGPU(&m);
-        //#endif
-        //spmm(&result, &sp, &m);
-        //#ifdef USE_CUDA
-            //sendDenseMatrixToCPU(&result);
-        //#endif
-        //timespec_get(&t2, TIME_UTC);
+    #else
+        #ifdef USE_CUDA
+            createCublas();
+            sendDenseMatrixToGPU(&m1);
+            sendDenseMatrixToGPU(&m2);
+        #endif
+        timespec_get(&t0, TIME_UTC);
+        mm(&result.matrix, &m1, &m2);
+        timespec_get(&t1, TIME_UTC);
+        #ifdef USE_CUDA
+            sendDenseMatrixToCPU(&result.matrix);
+            destroyCublas();
+        #endif
     #endif
 
     print_weight(&result);

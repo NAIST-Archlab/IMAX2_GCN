@@ -8,7 +8,7 @@
 #include "sparse.h"
 
 typedef struct sparse_graph {
-    SparseMatrix matrix;
+    SparseMatrix          matrix;
     #if defined(EMAX6) || defined(EMAX7)
     IMAXSparseMatrix imax_matrix;
     #endif
@@ -19,17 +19,17 @@ typedef struct hidden_layer {
 } HiddenLayer;
 
 typedef struct gcn_layer {
-    HiddenLayer hidden_layer; 
-    HiddenLayer latent_vectors;
-    HiddenLayer result_layer;
-    struct gcn_layer *prev;
-    struct gcn_layer *next;
+    HiddenLayer    hidden_layer; 
+    HiddenLayer  latent_vectors;
+    HiddenLayer    result_layer;
+    struct gcn_layer      *prev;
+    struct gcn_layer      *next;
 } GCNLayer;
 
 typedef struct gcn_network {
-    int num_layers;
+    int     num_layers;
     SparseGraph *graph;
-    GCNLayer *layers;
+    GCNLayer   *layers;
 } GCNNetwork;
 
 void print_weight(HiddenLayer *result);
