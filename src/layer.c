@@ -1,3 +1,8 @@
+// EMAX6/7 GCN Test Program            //
+// layer.c                             //
+//         Copyright (C) 2023 by NAIST //
+//          Primary writer: Dohyun Kim //
+//          kim.dohyun.kg7@is.naist.jp //
 #include "../include/layer.h"
 #include "../include/utils.h"
 #include <math.h>

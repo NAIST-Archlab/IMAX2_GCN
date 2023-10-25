@@ -1,3 +1,8 @@
+// EMAX6/7 GCN Test Program            //
+// sparse_cuda.c                       //
+//         Copyright (C) 2023 by NAIST //
+//          Primary writer: Dohyun Kim //
+//          kim.dohyun.kg7@is.naist.jp //
 #ifdef USE_CUDA
 #include <cuda.h>
 #include <cusparse_v2.h>

@@ -1,3 +1,8 @@
+// EMAX6/7 GCN Test Program            //
+// sparse.c                            //
+//         Copyright (C) 2023 by NAIST //
+//          Primary writer: Dohyun Kim //
+//          kim.dohyun.kg7@is.naist.jp //
 #include "../include/sparse.h"
 #include <stdlib.h>
 #if !(defined(EMAX6) || defined(EMAX7) || defined(USE_CUDA))

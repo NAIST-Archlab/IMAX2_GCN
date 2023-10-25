@@ -1,3 +1,8 @@
+// EMAX6/7 GCN Test Program            //
+// layer.h                             //
+//         Copyright (C) 2023 by NAIST //
+//          Primary writer: Dohyun Kim //
+//          kim.dohyun.kg7@is.naist.jp //
 #ifndef __LAYER_H__
 #define __LAYER_H__
 #if defined(EMAX7)

@@ -1,3 +1,8 @@
+// EMAX6/7 GCN Test Program            //
+// sparse_imax.c                       //
+//         Copyright (C) 2023 by NAIST //
+//          Primary writer: Dohyun Kim //
+//          kim.dohyun.kg7@is.naist.jp //
 #if defined(EMAX6) || defined(EMAX7)
 #include <stdio.h>
 #include <stdlib.h>
@@ -282,6 +287,7 @@ void spmm(IMAXDenseMatrix *result, IMAXSparseMatrix *imax_sp_matrix, IMAXDenseMa
         printf("Sparse Input col[%03d] row_nnz Head: %08x_%08x\n", a_col_blk_iter, (Uint)((Ull)a_sub_nnz_head >> 32), (Uint)a_sub_nnz_head);
         printf("Sparse Input col[%03d] col_num Head: %08x_%08x\n", a_col_blk_iter, (Uint)((Ull)a_sub_col_head >> 32), (Uint)a_sub_col_head);
         printf("Sparse Input col[%03d]     val Head: %08x_%08x\n", a_col_blk_iter, (Uint)((Ull)    a_sub_head >> 32), (Uint)    a_sub_head);
+        printf("%u %u %u\n", A_row_blk_size_mul_8_2, B_blk_size, C_blk_size);
 
         // Select Row of A(=Row of C)
         for (a_row_blk=0,a_row_blk_iter=0,end_sum=0; a_row_blk < A_row_size; a_row_blk += A_row_blk_size, a_row_blk_iter += 1, end_sum += A_nnz_row_size*A_nnz_col_blk_size) { // A_row_blk
@@ -441,10 +447,9 @@ void spmm(IMAXDenseMatrix *result, IMAXSparseMatrix *imax_sp_matrix, IMAXDenseMa
                                 exe(OP_ADD, &r1, BR[1][1][0], EXP_H3210, cofs1, EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
                                 exe(OP_ADD, &r2, BR[1][2][1], EXP_H3210, cofs1, EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
                                 exe(OP_ADD, &r3, BR[1][2][0], EXP_H3210, cofs1, EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
-                                //printf("%u %u %u %u %u %lx %lx %lx %lx %u\n", (Uint)r0, (Uint)rofs, (Uint)cofs, a_row_blk, nnz_row_blk, a_row_index, a[0], b[CHIP], c0[CHIP], A_nnz_row_size);
-                                //printf("%u %u %u %u %u %lx %lx %lx %lx %u\n", (Uint)r1, (Uint)rofs, (Uint)cofs, a_row_blk, nnz_row_blk, a_row_index, a[0], b[CHIP], c0[CHIP], A_nnz_row_size);
-                                //printf("%u %u %u %u %u %lx %lx %lx %lx %u\n", (Uint)r2, (Uint)rofs, (Uint)cofs, a_row_blk, nnz_row_blk, a_row_index, a[0], b[CHIP], c0[CHIP], A_nnz_row_size);
-                                //printf("%u %u %u %u %u %lx %lx %lx %lx %u\n", (Uint)r3, (Uint)rofs, (Uint)cofs, a_row_blk, nnz_row_blk, a_row_index, a[0], b[CHIP], c0[CHIP], A_nnz_row_size);
+
+                                // TODO: 横並びのユニット全部合わせて64KiBなので、おそらくメモリ容量オーバーしてる
+                                // もうちょっと小さくしたら治ったけど、構造的にa[0]のロードを上の段に持っていけそうなので試してみる
                                 mop(OP_LDR, 3, &BR[3][0][1], (Ull)b0[CHIP], (Ull)r0, MSK_W0, (Ull)b[CHIP], B_blk_size, 0, 0, (Ull)NULL, B_blk_size);
                                 mop(OP_LDR, 3, &BR[3][0][0], (Ull)b1[CHIP], (Ull)r0, MSK_W0, (Ull)b[CHIP], B_blk_size, 0, 0, (Ull)NULL, B_blk_size);
                                 mop(OP_LDR, 3, &BR[3][1][1], (Ull)b2[CHIP], (Ull)r0, MSK_W0, (Ull)b[CHIP], B_blk_size, 0, 0, (Ull)NULL, B_blk_size);
@@ -467,10 +472,6 @@ void spmm(IMAXDenseMatrix *result, IMAXSparseMatrix *imax_sp_matrix, IMAXDenseMa
                                 spmm_core1_load      ( 9,  8,  7,  3,     r3,      0);
                                 spmm_core1           (10,  9,             r3);
                                 spmm_core1_end       (11, 10,  9,  4,  5,  6,  7,  0);
-                                //printf("%u %u %u %u %u %lx %lx %lx %lx %u\n", (Uint)r0, (Uint)rofs, (Uint)cofs, a_row_blk, nnz_row_blk, a_row_index, a[0], b[CHIP], c0[CHIP], A_nnz_row_size);
-                                //printf("%u %u %u %u %u %lx %lx %lx %lx %u\n", (Uint)r1, (Uint)rofs, (Uint)cofs, a_row_blk, nnz_row_blk, a_row_index, a[0], b[CHIP], c0[CHIP], A_nnz_row_size);
-                                //printf("%u %u %u %u %u %lx %lx %lx %lx %u\n", (Uint)r2, (Uint)rofs, (Uint)cofs, a_row_blk, nnz_row_blk, a_row_index, a[0], b[CHIP], c0[CHIP], A_nnz_row_size);
-                                //printf("%u %u %u %u %u %lx %lx %lx %lx %u\n", (Uint)r3, (Uint)rofs, (Uint)cofs, a_row_blk, nnz_row_blk, a_row_index, a[0], b[CHIP], c0[CHIP], A_nnz_row_size);
 
                                 spmm_core1_start     (14, 13, 12, 11,  4, r0,      0);
                                 spmm_core1_load      (15, 14, 13,  5,     r1,      0);
@@ -482,10 +483,6 @@ void spmm(IMAXDenseMatrix *result, IMAXSparseMatrix *imax_sp_matrix, IMAXDenseMa
 
                                 //#if UNIT32
                                 spmm_core1_last_end_32  (21, 20, 19, 8, 9,     8);
-                                //printf("%u %u %u %u %u %lx %lx %lx %lx %u\n", (Uint)r0, (Uint)rofs, (Uint)cofs, a_row_blk, nnz_row_blk, a_row_index, a[0], b[CHIP], c0[CHIP], A_nnz_row_size);
-                                //printf("%u %u %u %u %u %lx %lx %lx %lx %u\n", (Uint)r1, (Uint)rofs, (Uint)cofs, a_row_blk, nnz_row_blk, a_row_index, a[0], b[CHIP], c0[CHIP], A_nnz_row_size);
-                                //printf("%u %u %u %u %u %lx %lx %lx %lx %u\n", (Uint)r2, (Uint)rofs, (Uint)cofs, a_row_blk, nnz_row_blk, a_row_index, a[0], b[CHIP], c0[CHIP], A_nnz_row_size);
-                                //printf("%u %u %u %u %u %lx %lx %lx %lx %u\n", (Uint)r3, (Uint)rofs, (Uint)cofs, a_row_blk, nnz_row_blk, a_row_index, a[0], b[CHIP], c0[CHIP], A_nnz_row_size);
                                 spmm_core1_last_start_32(24, 23, 22, 21,  8, r0,      8);
                                 spmm_core1_load         (25, 24, 23,      9, r1,      8);
                                 spmm_core1              (26, 25,             r1);
@@ -534,8 +531,6 @@ void spmm(IMAXDenseMatrix *result, IMAXSparseMatrix *imax_sp_matrix, IMAXDenseMa
                                 exe(OP_FMA, &AR[27][3], AR[26][3], EXP_H3210, BR[25][2][1], EXP_H3232, BR[26][1][0], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
                                 mop(OP_LDWR, 1, &BR[27][0][1], (Ull)a_row_index, (Ull)rofs, MSK_W0, (Ull)a_row_index, A_nnz_row_size, 0, 0, (Ull)NULL, A_nnz_row_blk_size);
                                 exe(OP_ADD, &r0, BR[27][0][1], EXP_H3210, oofs, EXP_H3210, 0LL, EXP_H3210, OP_AND, 0xffffffffLL, OP_NOP, 0LL);
-                                //printf("%u %u %u %u %u %u %lx %lx %lx %lx %u\n", (Uint)r0, (Uint)rofs, (Uint)cofs, (Uint) BR[27][0][1], a_row_blk, nnz_row_blk, a_row_index, a[0], b[CHIP], c0[CHIP], A_nnz_row_size);
-                                //printf("%u %u %u\n", a_row_blk_head[a_row_blk_iter+1], a_row_blk_head[a_row_blk_iter], A_nnz_row_blk_size);
                                 spmm_final(30, 27, r0);
                                 //#else
                                 /*
@@ -770,13 +765,6 @@ void mm(IMAXDenseMatrix *result, IMAXDenseMatrix *imax_a, IMAXDenseMatrix *imax_
                                 sgemm_final(62, 48);
                                 */
                                 //#endif
-                                // for debug
-                                //printf("DEBUG %d %d %lx %d %d %d %d\n", (Uint)rofs, (Uint)cofs, (Ull)a[0][CHIP], b_row, a_col_blk, b_col_blk, a_row_blk);
-                                //printf("%f %lx %lx %u\n", *(float*)&AR[33][0], (Ull)a[31][CHIP], (Ull)a0[CHIP], (Uint)rofs);
-                                //printf("%f %lx %lx %u\n", *(float*)&BR[10][2][1], (Ull)a[31][CHIP], (Ull)a0[CHIP], (Uint)rofs);
-                                //printf("Orig(%d,%d)x(%d,%d)=(%d,%d) Padded(%d,%d)x(%d,%d)=(%d,%d)\n", 
-                                    //imax_a->row_size, imax_a->col_size, imax_b->row_size, imax_b->col_size, result->row_size, result->col_size,
-                                    //imax_a->row_padded_size, imax_a->col_padded_size, imax_b->row_padded_size, imax_b->col_padded_size, result->row_padded_size, result->col_padded_size);
                             }
                         }
                     }

@@ -1,3 +1,8 @@
+// EMAX6/7 GCN Test Program            //
+// utils.h                             //
+//         Copyright (C) 2023 by NAIST //
+//          Primary writer: Dohyun Kim //
+//          kim.dohyun.kg7@is.naist.jp //
 #ifndef __UTILS_H__
 #define __UTILS_H__
 #include "sparse.h"

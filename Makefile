@@ -1,6 +1,6 @@
-## EMAX5/6 Application Simulator       ##
-##   Copyright (C) 2023 by NAIST UNIV. ##
-##              Primary writer: D.Kim  ##
+## EMAX6/7 GCN Test Program            ##
+##         Copyright (C) 2023 by NAIST ##
+##          Primary writer: Dohyun Kim ##
 ##          kim.dohyun.kg7@is.naist.jp ##
 PROGRAM := imax_gcn
 TEST_SPARSE_PROGRAM := test_sparse
@@ -74,6 +74,7 @@ CFLAGS  := -O1 -Wall -Wno-unknown-pragmas -funroll-loops -fopenmp -fcommon -I$(I
 endif
 LDFLAGS := -L/usr/lib64 -L/usr/local/lib -lm -lrt -lX11 -lXext
 CFLAGS_EMAX  := -O1 -Wall -Wno-unknown-pragmas -funroll-loops -fopenmp -fcommon -I$(INCLUDE) -I$(CONV) -DARMZYNQ $(EMAX_DEFINE)
+CFLAGS_EMAX_NC  := -O1 -Wall -Wno-unknown-pragmas -funroll-loops -fopenmp -fcommon -I$(INCLUDE) -I$(CONV) -DARMZYNQ $(EMAX_DEFINE)
 CFLAGS_EMAX_DMA  := -O1 -Wall -Wno-unknown-pragmas -funroll-loops -fopenmp -fcommon -I$(INCLUDE) -I$(CONV) -DARMZYNQ -DFPDDMA $(EMAX_DEFINE)
 SRCS_EMAX := $(filter-out $(SRC_DIR)/sparse_imax.c, $(SRCS)) $(SRC_DIR)/sparse_imax-emax$(EMAX_VER).c
 OBJS_EMAX := $(SRCS_EMAX:.c=.o)
@@ -119,6 +120,9 @@ $(PROGRAM).emax$(EMAX_VER): $(OBJS_EMAX) $(MAIN_OBJS)
 
 $(PROGRAM).emax$(EMAX_VER)+dma: $(OBJS_EMAX) $(MAIN_OBJS)
 	$(CC) $(OBJS_EMAX) $(MAIN_OBJS) -o $(PROGRAM).emax$(EMAX_VER)+dma $(LDFLAGS) $(CFLAGS_EMAX_DMA)
+
+$(PROGRAM).emax$(EMAX_VER)+nc: $(OBJS) $(MAIN_OBJS)
+	$(CC) $(OBJS) $(MAIN_OBJS) -o $(PROGRAM).emax$(EMAX_VER)+nc $(LDFLAGS) $(CFLAGS_EMAX_NC)
 endif
 
 $(TEST_SPARSE_PROGRAM): $(OBJS) $(TEST_SPARSE_OBJS)
@@ -130,6 +134,9 @@ $(TEST_SPARSE_PROGRAM).emax$(EMAX_VER): $(OBJS_EMAX) $(TEST_SPARSE_OBJS)
 
 $(TEST_SPARSE_PROGRAM).emax$(EMAX_VER)+dma: $(OBJS_EMAX) $(TEST_SPARSE_OBJS)
 	$(CC) $(OBJS_EMAX) $(TEST_SPARSE_OBJS) -o $(TEST_SPARSE_PROGRAM).emax$(EMAX_VER)+dma $(LDFLAGS) $(CFLAGS_EMAX_DMA)
+
+$(TEST_SPARSE_PROGRAM).emax$(EMAX_VER)+nc: $(OBJS) $(TEST_SPARSE_OBJS)
+	$(CC) $(OBJS) $(TEST_SPARSE_OBJS) -o $(TEST_SPARSE_PROGRAM).emax$(EMAX_VER)+nc $(LDFLAGS) $(CFLAGS_EMAX_NC)
 endif
 
 $(TEST_DENSE_PROGRAM): $(OBJS) $(TEST_DENSE_OBJS)
@@ -141,6 +148,9 @@ $(TEST_DENSE_PROGRAM).emax$(EMAX_VER): $(OBJS_EMAX) $(TEST_DENSE_OBJS)
 
 $(TEST_DENSE_PROGRAM).emax$(EMAX_VER)+dma: $(OBJS_EMAX) $(TEST_DENSE_OBJS)
 	$(CC) $(OBJS_EMAX) $(TEST_DENSE_OBJS) -o $(TEST_DENSE_PROGRAM).emax$(EMAX_VER)+dma $(LDFLAGS) $(CFLAGS_EMAX_DMA)
+
+$(TEST_DENSE_PROGRAM).emax$(EMAX_VER)+nc: $(OBJS) $(TEST_DENSE_OBJS)
+	$(CC) $(OBJS) $(TEST_DENSE_OBJS) -o $(TEST_DENSE_PROGRAM).emax$(EMAX_VER)+nc $(LDFLAGS) $(CFLAGS_EMAX_NC)
 endif
 
 CONV_EXE := ./conv-c2c/conv-c2c

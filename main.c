@@ -1,3 +1,8 @@
+// EMAX6/7 GCN Test Program            //
+// main.c                              //
+//         Copyright (C) 2023 by NAIST //
+//          Primary writer: Dohyun Kim //
+//          kim.dohyun.kg7@is.naist.jp //
 #if defined(EMAX7)
 #include "../conv-c2d/emax7.h"
 #elif defined(EMAX6)

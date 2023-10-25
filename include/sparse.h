@@ -1,3 +1,8 @@
+// EMAX6/7 GCN Test Program            //
+// sparse.c                            //
+//         Copyright (C) 2023 by NAIST //
+//          Primary writer: Dohyun Kim //
+//          kim.dohyun.kg7@is.naist.jp //
 #ifndef __SPARSE_H__
 #define __SPARSE_H__
 #if defined(EMAX7) || defined(EMAX6)
