@@ -37,7 +37,7 @@ unsigned long long all_nanosec[NUM_CLASS];
 #define KERNEL_MODE_1 1
 #define KERNEL_MODE_2 2
 #define LMM_SIZE 0x4000
-#define MAX_COL_SIZE 0x800
+#define MAX_COL_SIZE 0x400 // LMMのサイズの最大値にすると構造上問題が発生するため、1/2にしている
 #ifdef UNIT32
 #define MM_H 16
 #define SPMM_H 20
@@ -83,11 +83,10 @@ typedef struct sparse_matrix_imax2 {
     int             col_size; // real column size
     int      row_padded_size; // row size padded
     int      col_padded_size; // column size padded
-    int         row_blk_size; // Size of row each block
-    int         col_blk_size; // Size of column each block
-    int          col_blk_min; // Minimum size of column each block
-    int     nnz_row_blk_size; // Size of row in Non-zero values block
-    int     nnz_col_blk_size; // Size of column in Non-zero values block
+    int         blk_row_size; // Size of row each block
+    int         blk_col_size; // Size of column each block
+    int          blk_min_col; // Minimum size of column each block
+    int     nnz_blk_col_size; // Size of column in Non-zero values block
     IMAXSparseMatrixSub *sub; // Sub matrix
 } IMAXSparseMatrix;
 
@@ -96,8 +95,8 @@ typedef struct dense_matrix_imax2 {
     int        col_size; // real column size
     int row_padded_size; // row size padded
     int col_padded_size; // column size padded
-    int    row_blk_size; // Size of row each block
-    int    col_blk_size; // Size of column each block
+    int    blk_row_size; // Size of row each block
+    int    blk_col_size; // Size of column each block
     Uint           *val; // values
 } IMAXDenseMatrix;
 

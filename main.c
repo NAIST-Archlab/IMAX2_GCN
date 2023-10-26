@@ -173,17 +173,17 @@ int main(int argc, char **argv) {
         allocDenseMatrix(&tmp_vectors);
         add_gcn_layer(&network, tmp_weight, tmp_vectors);
     }
-    network.layers->result_layer.matrix.row_size = new_nv;
-    network.layers->result_layer.matrix.col_size = dim_out;
-    allocDenseMatrix(&(network.layers->result_layer.matrix));
+    network.layers->result_layer.row_size = new_nv;
+    network.layers->result_layer.col_size = dim_out;
+    allocDenseMatrix(&(network.layers->result_layer));
     print_layers(&network);
 
     printf("Reading Features now...\n");
     fscanf(fp_dims, "%lld %d\n", &f_dim_in, &f_dim_out);
     fseek(fp_feats, sizeof(float) * f_dim_out * from, SEEK_CUR);
-    fread(network.layers->latent_vectors.matrix.val, sizeof(float), new_nv * f_dim_out, fp_feats);
+    fread(network.layers->latent_vectors.val, sizeof(float), new_nv * f_dim_out, fp_feats);
     #ifdef USE_CUDA
-        sendDenseMatrixToGPU(&(network.layers->latent_vectors.matrix));
+        sendDenseMatrixToGPU(&(network.layers->latent_vectors));
     #endif
     fclose(fp_feats);
 

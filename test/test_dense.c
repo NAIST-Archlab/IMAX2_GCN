@@ -38,9 +38,9 @@ int main(int argc, char **argv) {
     m2.col_size = out_size;
     allocDenseMatrix(&m2);
 
-    result.matrix.row_size = row;
-    result.matrix.col_size = out_size;
-    allocDenseMatrix(&result.matrix);
+    result.row_size = row;
+    result.col_size = out_size;
+    allocDenseMatrix(&result);
 
     for (i = 0; i < row; i++) {
         for (j = 0; j < row; j++) {
@@ -66,11 +66,11 @@ int main(int argc, char **argv) {
         imax_r.val = (Uint*) malloc(sizeof(Uint) * row * out_size);
         convert_imax_dense_format(&imax_m1, &m1);
         convert_imax_dense_format(&imax_m2, &m2);
-        convert_imax_dense_format(&imax_r, &result.matrix);
+        convert_imax_dense_format(&imax_r, &result);
         timespec_get(&t0, TIME_UTC);
         mm(&imax_r, &imax_m1, &imax_m2);
         timespec_get(&t1, TIME_UTC);
-        convert_dense_format(&result.matrix, &imax_r);
+        convert_dense_format(&result, &imax_r);
         convert_dense_format(&m1, &imax_m1);
         convert_dense_format(&m2, &imax_m2);
     #else
@@ -80,10 +80,10 @@ int main(int argc, char **argv) {
             sendDenseMatrixToGPU(&m2);
         #endif
         timespec_get(&t0, TIME_UTC);
-        mm(&result.matrix, &m1, &m2);
+        mm(&result, &m1, &m2);
         timespec_get(&t1, TIME_UTC);
         #ifdef USE_CUDA
-            sendDenseMatrixToCPU(&result.matrix);
+            sendDenseMatrixToCPU(&result);
             destroyCublas();
         #endif
     #endif

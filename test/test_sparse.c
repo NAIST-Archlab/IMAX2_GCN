@@ -40,9 +40,9 @@ int main(int argc, char **argv) {
     m.col_size = 100;
     allocDenseMatrix(&m);
 
-    result.matrix.row_size = row;
-    result.matrix.col_size = out_size;
-    allocDenseMatrix(&result.matrix);
+    result.row_size = row;
+    result.col_size = out_size;
+    allocDenseMatrix(&result);
 
     #ifdef SAME_DISTANCE
     for (i = 0; i < row; i++) {
@@ -103,9 +103,9 @@ int main(int argc, char **argv) {
         timespec_get(&t2, TIME_UTC);
         printf("Convert to IMAX_SpM: %lf usec.\n", cal_time(&t2, &t1));
         imax_dense_format_init_from_sparse(&imax_m, &imax_sp, out_size, 8 * NCHIP);
-        imax_dense_format_init(&imax_r, row, out_size, imax_sp.row_padded_size, imax_m.col_padded_size, imax_sp.row_blk_size, imax_m.col_blk_size);
-        imax_dense_format_init(&imax_r2, row, out_size, imax_sp.row_padded_size, imax_m.col_padded_size, imax_sp.row_blk_size, imax_m.col_blk_size);
-        imax_dense_format_init(&imax_r3, row, out_size, imax_sp.row_padded_size, imax_m.col_padded_size, imax_sp.row_blk_size, imax_m.col_blk_size);
+        imax_dense_format_init(&imax_r, row, out_size, imax_sp.row_padded_size, imax_m.col_padded_size, imax_sp.blk_row_size, imax_m.blk_row_size);
+        imax_dense_format_init(&imax_r2, row, out_size, imax_sp.row_padded_size, imax_m.col_padded_size, imax_sp.blk_row_size, imax_m.blk_row_size);
+        imax_dense_format_init(&imax_r3, row, out_size, imax_sp.row_padded_size, imax_m.col_padded_size, imax_sp.blk_row_size, imax_m.blk_row_size);
         imax_gcn_allocation(&imax_sp, &imax_m, &imax_r, &imax_r2, &imax_r3);
         timespec_get(&t1, TIME_UTC);
         convert_imax_dense_format(&imax_m, &m);

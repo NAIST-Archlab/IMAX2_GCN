@@ -14,21 +14,21 @@ void print_weight(HiddenLayer *result) {
     Ull i, j;
     char ry_row = 0;
 
-    printf("Size: (%d,%d)\n", result->matrix.row_size, result->matrix.col_size);
+    printf("Size: (%d,%d)\n", result->row_size, result->col_size);
     printf("[\n");
-    for (i = 0; i < result->matrix.row_size; i++) {
-        if (i > 100 && (i < result->matrix.row_size - 30) && ry_row != 1) {
+    for (i = 0; i < result->row_size; i++) {
+        if (i > 100 && (i < result->row_size - 30) && ry_row != 1) {
             printf("\t.\n\t.\n\t.\n");
             ry_row = 1;
-        } else if (i > (result->matrix.row_size - 30) || ry_row == 0) {
+        } else if (i > (result->row_size - 30) || ry_row == 0) {
             char ry_col = 0;
             printf("\t[ ");
-            for (j = 0; j < result->matrix.col_size; j++) {
-                if (j > 2 && j < (result->matrix.col_size - 3) && ry_col != 1) {
+            for (j = 0; j < result->col_size; j++) {
+                if (j > 2 && j < (result->col_size - 3) && ry_col != 1) {
                     printf("... ");
                     ry_col = 1;
-                } else if (j > (result->matrix.col_size - 3) || ry_col == 0) {
-                    printf("%10.6f ", result->matrix.val[i * result->matrix.col_size + j]);
+                } else if (j > (result->col_size - 3) || ry_col == 0) {
+                    printf("%10.6f ", result->val[i * result->col_size + j]);
                 }
             }
             printf("]\n");
@@ -91,8 +91,8 @@ void print_layers(GCNNetwork *network) {
     GCNLayer *p = network->layers;
 
     while (p != NULL) {
-        printf("Vectors: %d * %d\n", p->latent_vectors.matrix.row_size, p->latent_vectors.matrix.col_size);
-        printf("Weight: %d * %d\n", p->hidden_layer.matrix.row_size, p->hidden_layer.matrix.col_size);
+        printf("Vectors: %d * %d\n", p->latent_vectors.row_size, p->latent_vectors.col_size);
+        printf("Weight: %d * %d\n", p->hidden_layer.row_size, p->hidden_layer.col_size);
         p = p->next;
     }
 }
@@ -112,14 +112,14 @@ void add_gcn_layer(GCNNetwork *network, DenseMatrix weight, DenseMatrix vectors)
     }
 
     layer->next = NULL;
-    layer->hidden_layer.matrix.row_size = weight.row_size;
-    layer->hidden_layer.matrix.col_size = weight.col_size;
-    layer->hidden_layer.matrix.val = weight.val;
-    layer->hidden_layer.matrix.cuda_val = weight.cuda_val;
-    layer->latent_vectors.matrix.row_size = vectors.row_size;
-    layer->latent_vectors.matrix.col_size = vectors.col_size;
-    layer->latent_vectors.matrix.val = vectors.val;
-    layer->latent_vectors.matrix.cuda_val = vectors.cuda_val;
+    layer->hidden_layer.row_size = weight.row_size;
+    layer->hidden_layer.col_size = weight.col_size;
+    layer->hidden_layer.val = weight.val;
+    layer->hidden_layer.cuda_val = weight.cuda_val;
+    layer->latent_vectors.row_size = vectors.row_size;
+    layer->latent_vectors.col_size = vectors.col_size;
+    layer->latent_vectors.val = vectors.val;
+    layer->latent_vectors.cuda_val = vectors.cuda_val;
 }
 
 void propagation(GCNNetwork *network) {
@@ -146,21 +146,21 @@ void propagation(GCNNetwork *network) {
     #endif
     int layer_cnt = 0;
     while (p != NULL) {
-        out_size = network->graph->matrix.row_size * p->hidden_layer.matrix.col_size;
+        out_size = network->graph->matrix.row_size * p->hidden_layer.col_size;
         r_spmm.row_size = network->graph->matrix.row_size;
-        r_spmm.col_size = p->latent_vectors.matrix.col_size;
-        r_mm.row_size = p->latent_vectors.matrix.row_size;
-        r_mm.col_size = p->hidden_layer.matrix.col_size;
+        r_spmm.col_size = p->latent_vectors.col_size;
+        r_mm.row_size = p->latent_vectors.row_size;
+        r_mm.col_size = p->hidden_layer.col_size;
         allocDenseMatrix(&r_spmm); allocDenseMatrix(&r_mm);
         
         #if defined(EMAX6) || defined(EMAX7)
-            imax_dense_format_init_from_sparse(&h, &network->graph->imax_matrix, p->latent_vectors.matrix.col_size, 8);
-            imax_dense_format_init(&imax_r_spmm, h.row_size, h.col_size, h.row_padded_size, h.col_padded_size, h.row_blk_size, h.col_blk_size);
-            imax_dense_format_init(&w, imax_r_spmm.col_size, p->hidden_layer.matrix.col_size, imax_r_spmm.col_padded_size, p->hidden_layer.matrix.col_size + imax_r_spmm.col_blk_size - (p->hidden_layer.matrix.col_size%imax_r_spmm.col_blk_size), MM_H, imax_r_spmm.col_blk_size);
-            imax_dense_format_init(&imax_r_mm, imax_r_spmm.row_size, w.col_size, imax_r_spmm.row_padded_size, w.col_padded_size, imax_r_spmm.row_blk_size, w.col_blk_size);
+            imax_dense_format_init_from_sparse(&h, &network->graph->imax_matrix, p->latent_vectors.col_size, 8);
+            imax_dense_format_init(&imax_r_spmm, h.row_size, h.col_size, h.row_padded_size, h.col_padded_size, h.blk_row_size, h.blk_col_size);
+            imax_dense_format_init(&w, imax_r_spmm.col_size, p->hidden_layer.col_size, imax_r_spmm.col_padded_size, p->hidden_layer.col_size + imax_r_spmm.blk_col_size - (p->hidden_layer.col_size%imax_r_spmm.blk_col_size), MM_H, imax_r_spmm.blk_col_size);
+            imax_dense_format_init(&imax_r_mm, imax_r_spmm.row_size, w.col_size, imax_r_spmm.row_padded_size, w.col_padded_size, imax_r_spmm.blk_row_size, w.blk_col_size);
             imax_gcn_allocation(&network->graph->imax_matrix, &h, &imax_r_spmm, &w, &imax_r_mm);
-            convert_imax_dense_format(&h, &(p->latent_vectors.matrix));
-            convert_imax_dense_format(&w, &(p->hidden_layer.matrix));
+            convert_imax_dense_format(&h, &(p->latent_vectors));
+            convert_imax_dense_format(&w, &(p->hidden_layer));
         #endif
 
         printf("Layer %d: SpMM\n", ++layer_cnt);
@@ -169,7 +169,7 @@ void propagation(GCNNetwork *network) {
         #if defined(EMAX6) || defined(EMAX7)
             spmm(&imax_r_spmm, &(network->graph->imax_matrix), &h);
         #else
-            spmm(&r_spmm, &(network->graph->matrix), &(p->latent_vectors.matrix));
+            spmm(&r_spmm, &(network->graph->matrix), &(p->latent_vectors));
         #endif
         timespec_get(&t2, TIME_UTC);
         spmm_time += cal_time(&t2, &t1);
@@ -179,21 +179,14 @@ void propagation(GCNNetwork *network) {
         #elif defined(USE_CUDA)
             sendDenseMatrixToCPU(&r_spmm);
         #endif
-        t.matrix = r_spmm;
-        print_weight(&t);
+        print_weight(&r_spmm);
 
         printf("Layer %d: MM\n", layer_cnt);
         timespec_get(&t1, TIME_UTC);
         #if defined(EMAX6) || defined(EMAX7)
-            //float one = 1;
-            //for (int i = 0; i < w.row_padded_size; i++) {for (int j = 0; j < w.col_padded_size; j++) {w.val[(j/2)*2*w.col_padded_size+(i*2)+(j%2)] = 0;}}
-            //for (int i = 0; i < imax_r_spmm.row_padded_size; i++) {for (int j = 0; j < imax_r_spmm.col_padded_size; j++) {w.val[(j/2)*2*imax_r_spmm.col_padded_size+(i*2)+(j%2)] = 0;}}
-            //for (int i = 0; i < w.row_size; i++) {for (int j = 0; j < w.col_size; j++) {w.val[(j/2)*2*w.col_padded_size+(i*2)+(j%2)] = *(Uint*)&one;}}
-            ////for (int i = 0; i < imax_r_spmm.row_padded_size; i++){for (int j = 0; j < imax_r_spmm.col_padded_size; j++) {if (i == j) {imax_r_spmm.val[(j/2)*2*imax_r_spmm.col_padded_size+(i*2)+(j%2)] = *(Uint*)&one;} else {imax_r_spmm.val[(j/2)*2*imax_r_spmm.col_padded_size+(i*2)+(j%2)] = 0;}}}
-            //for (int i = 0; i < imax_r_spmm.row_size; i++){for (int j = 0; j < imax_r_spmm.col_size; j++) {imax_r_spmm.val[(j/2)*2*imax_r_spmm.col_padded_size+(i*2)+(j%2)] = *(Uint*)&one;}}
             mm(&imax_r_mm, &imax_r_spmm, &w);
         #else
-            mm(&r_mm, &r_spmm, &(p->hidden_layer.matrix));
+            mm(&r_mm, &r_spmm, &(p->hidden_layer));
         #endif
         timespec_get(&t2, TIME_UTC);
         mm_time += cal_time(&t2, &t1);
@@ -203,18 +196,15 @@ void propagation(GCNNetwork *network) {
         #elif defined(USE_CUDA)
             sendDenseMatrixToCPU(&r_mm);
         #endif
-        t.matrix = r_mm;
-        print_weight(&t);
+        print_weight(&r_mm);
 
 
-        if (p->next == NULL) last_weight = &(network->layers->result_layer.matrix);
-        else last_weight = &(p->next->latent_vectors.matrix);
+        if (p->next == NULL) last_weight = &(network->layers->result_layer);
+        else last_weight = &(p->next->latent_vectors);
 
         printf("Layer %d: ReLU\n", layer_cnt);
         timespec_get(&t1, TIME_UTC);
         relu(last_weight, &r_mm);
-        //t.matrix = *last_weight;
-        //print_weight(&t);
         timespec_get(&t2, TIME_UTC);
         #ifdef USE_CUDA
             if (p->next == NULL) sendDenseMatrixToCPU(last_weight);
@@ -222,7 +212,6 @@ void propagation(GCNNetwork *network) {
         relu_time += cal_time(&t2, &t1);
 
         freeDenseMatrix(&r_spmm);freeDenseMatrix(&r_mm);
-        //exit(1);
         p = p->next;
     }
 
@@ -252,17 +241,17 @@ void propagation(GCNNetwork *network) {
 }
 
 void softmax(HiddenLayer *result) {
-    for (int i = 0; i < result->matrix.row_size; i++) {
-        float max = max_in_array(&(result->matrix.val[i * result->matrix.col_size]), result->matrix.col_size);
+    for (int i = 0; i < result->row_size; i++) {
+        float max = max_in_array(&(result->val[i * result->col_size]), result->col_size);
         float log_max = log(max);
         float sum = 0;
 
         if (max <= 1) log_max = 0;
-        for (int j = 0; j < result->matrix.col_size; j++) {
-            sum += exp(result->matrix.val[i * result->matrix.col_size + j] + log_max);
+        for (int j = 0; j < result->col_size; j++) {
+            sum += exp(result->val[i * result->col_size + j] + log_max);
         }
-        for (int j = 0; j < result->matrix.col_size; j++) {
-            result->matrix.val[i * result->matrix.col_size + j] = exp(result->matrix.val[i * result->matrix.col_size + j] + log_max) / sum;
+        for (int j = 0; j < result->col_size; j++) {
+            result->val[i * result->col_size + j] = exp(result->val[i * result->col_size + j] + log_max) / sum;
         }
     }
 }

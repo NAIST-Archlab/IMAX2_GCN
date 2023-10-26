@@ -19,9 +19,7 @@ typedef struct sparse_graph {
     #endif
 } SparseGraph;
 
-typedef struct hidden_layer {
-    DenseMatrix matrix;
-} HiddenLayer;
+typedef DenseMatrix HiddenLayer;
 
 typedef struct gcn_layer {
     HiddenLayer    hidden_layer; 
