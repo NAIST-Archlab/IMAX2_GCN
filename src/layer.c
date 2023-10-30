@@ -130,6 +130,9 @@ void propagation(GCNNetwork *network) {
     struct timespec t1, t2;
     #if defined(EMAX6) || defined(EMAX7)
         IMAXDenseMatrix h, w, imax_r_spmm, imax_r_mm, imax_dump;
+    #elif defined(USE_CUDA)
+        double cusparse_load = 0;
+        double cublas_load = 0;
     #endif
 
     printf("Propagation...\n");
@@ -138,13 +141,15 @@ void propagation(GCNNetwork *network) {
         timespec_get(&t1, TIME_UTC);
         createCusparse();
         timespec_get(&t2, TIME_UTC);
-        all_nanosec[SPMM][1] = (Ull) cal_time(&t2, &t1)*1000;
+        all_nanosec[SPMM][1] += (Ull) cal_time(&t2, &t1)*1000;
         spmm_time += cal_time(&t2, &t1);
+        cusparse_load = cal_time(&t2, &t1);
         timespec_get(&t1, TIME_UTC);
         createCublas();
         timespec_get(&t2, TIME_UTC);
-        all_nanosec[MM][1] = (Ull) cal_time(&t2, &t1)*1000;
+        all_nanosec[MM][1] += (Ull) cal_time(&t2, &t1)*1000;
         mm_time += cal_time(&t2, &t1);
+        cublas_load = cal_time(&t2, &t1);
     #endif
     int layer_cnt = 0;
     while (p != NULL) {
@@ -234,8 +239,8 @@ void propagation(GCNNetwork *network) {
         all_nanosec[RELU] += (Ull) relu_time*1000;
         all_nanosec[SOFTMAX] += (Ull) softmax_time*1000;
     #elif defined(USE_CUDA)
-        all_nanosec[SPMM][2] += all_nanosec[SPMM][0] + all_nanosec[SPMM][1];
-        all_nanosec[MM][2] += all_nanosec[MM][0] + all_nanosec[MM][1];
+        all_nanosec[SPMM][2] += (cusparse_load + spmm_time)*1000;
+        all_nanosec[MM][2] += (cublas_load + mm_time)*1000;
         all_nanosec[RELU][0] += (Ull) relu_time*1000;
         all_nanosec[SOFTMAX][0] += (Ull) softmax_time*1000;
         all_nanosec[RELU][2] += (Ull) relu_time*1000;

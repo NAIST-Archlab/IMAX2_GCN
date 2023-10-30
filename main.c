@@ -30,13 +30,13 @@ int main(int argc, char **argv) {
     char tmp_filename[100];
     Ull version, sizeEdgeTy, nv, f_dim_in, ne;
     Uint f_dim_out;
-    int from, to;
+    int from, to, iter=1;
     Uint *vertices;
 
     struct timespec t1, t2;
 
     if (argc < 5) {
-        printf("Usage: %s weight graph from to\n", argv[0]);
+        printf("Usage: %s weight graph from to (iter)\n", argv[0]);
         return 1;
     }
 
@@ -46,6 +46,10 @@ int main(int argc, char **argv) {
 
     if((to = atoi(argv[4])) < 0) {
         return 1;
+    }
+
+    if (argc > 5) {
+        if((iter = atoi(argv[5])) < 1) iter = 1;
     }
 
     if (!(fp_weight = fopen(argv[1], "rb"))) {
@@ -196,70 +200,70 @@ int main(int argc, char **argv) {
         printf("Transform %lf usec.\n", cal_time(&t2, &t1));
     #endif
 
-    propagation(&network);
+    for (int i = 0; i < iter; i++) {propagation(&network);}
 
     printf("Result\n");
     print_weight(&(network.layers->result_layer));
     printf("Propagation Done\n");
     #if defined(EMAX6) || defined(EMAX7)
         printf("SpMM usec: ARM:%d DRAIN:%d CONF:%d REGV:%d RANGE:%d LOAD:%d EXEC:%d total:%d\n",
-            (Uint)(all_nanosec[SPMM][0]/1000),
-            (Uint)(all_nanosec[SPMM][1]/1000),
-            (Uint)(all_nanosec[SPMM][2]/1000),
-            (Uint)(all_nanosec[SPMM][3]/1000),
-            (Uint)(all_nanosec[SPMM][4]/1000),
-            (Uint)(all_nanosec[SPMM][5]/1000),
-            (Uint)(all_nanosec[SPMM][6]/1000),
-            (Uint)(all_nanosec[SPMM][7]/1000));
+            (Uint)(all_nanosec[SPMM][0]/1000/iter),
+            (Uint)(all_nanosec[SPMM][1]/1000/iter),
+            (Uint)(all_nanosec[SPMM][2]/1000/iter),
+            (Uint)(all_nanosec[SPMM][3]/1000/iter),
+            (Uint)(all_nanosec[SPMM][4]/1000/iter),
+            (Uint)(all_nanosec[SPMM][5]/1000/iter),
+            (Uint)(all_nanosec[SPMM][6]/1000/iter),
+            (Uint)(all_nanosec[SPMM][7]/1000/iter));
         printf("MM usec: ARM:%d DRAIN:%d CONF:%d REGV:%d RANGE:%d LOAD:%d EXEC:%d total:%d\n",
-            (Uint)(all_nanosec[MM][0]/1000),
-            (Uint)(all_nanosec[MM][1]/1000),
-            (Uint)(all_nanosec[MM][2]/1000),
-            (Uint)(all_nanosec[MM][3]/1000),
-            (Uint)(all_nanosec[MM][4]/1000),
-            (Uint)(all_nanosec[MM][5]/1000),
-            (Uint)(all_nanosec[MM][6]/1000),
-            (Uint)(all_nanosec[MM][7]/1000));
+            (Uint)(all_nanosec[MM][0]/1000/iter),
+            (Uint)(all_nanosec[MM][1]/1000/iter),
+            (Uint)(all_nanosec[MM][2]/1000/iter),
+            (Uint)(all_nanosec[MM][3]/1000/iter),
+            (Uint)(all_nanosec[MM][4]/1000/iter),
+            (Uint)(all_nanosec[MM][5]/1000/iter),
+            (Uint)(all_nanosec[MM][6]/1000/iter),
+            (Uint)(all_nanosec[MM][7]/1000/iter));
         printf("ReLU usec: ARM:%d DRAIN:%d CONF:%d REGV:%d RANGE:%d LOAD:%d EXEC:%d total:%d\n",
-            (Uint)(all_nanosec[RELU][0]/1000),
-            (Uint)(all_nanosec[RELU][1]/1000),
-            (Uint)(all_nanosec[RELU][2]/1000),
-            (Uint)(all_nanosec[RELU][3]/1000),
-            (Uint)(all_nanosec[RELU][4]/1000),
-            (Uint)(all_nanosec[RELU][5]/1000),
-            (Uint)(all_nanosec[RELU][6]/1000),
-            (Uint)(all_nanosec[RELU][7]/1000));
+            (Uint)(all_nanosec[RELU][0]/1000/iter),
+            (Uint)(all_nanosec[RELU][1]/1000/iter),
+            (Uint)(all_nanosec[RELU][2]/1000/iter),
+            (Uint)(all_nanosec[RELU][3]/1000/iter),
+            (Uint)(all_nanosec[RELU][4]/1000/iter),
+            (Uint)(all_nanosec[RELU][5]/1000/iter),
+            (Uint)(all_nanosec[RELU][6]/1000/iter),
+            (Uint)(all_nanosec[RELU][7]/1000/iter));
         printf("Softmax usec: ARM:%d DRAIN:%d CONF:%d REGV:%d RANGE:%d LOAD:%d EXEC:%d total:%d\n",
-            (Uint)(all_nanosec[SOFTMAX][0]/1000),
-            (Uint)(all_nanosec[SOFTMAX][1]/1000),
-            (Uint)(all_nanosec[SOFTMAX][2]/1000),
-            (Uint)(all_nanosec[SOFTMAX][3]/1000),
-            (Uint)(all_nanosec[SOFTMAX][4]/1000),
-            (Uint)(all_nanosec[SOFTMAX][5]/1000),
-            (Uint)(all_nanosec[SOFTMAX][6]/1000),
-            (Uint)(all_nanosec[SOFTMAX][7]/1000));
+            (Uint)(all_nanosec[SOFTMAX][0]/1000/iter),
+            (Uint)(all_nanosec[SOFTMAX][1]/1000/iter),
+            (Uint)(all_nanosec[SOFTMAX][2]/1000/iter),
+            (Uint)(all_nanosec[SOFTMAX][3]/1000/iter),
+            (Uint)(all_nanosec[SOFTMAX][4]/1000/iter),
+            (Uint)(all_nanosec[SOFTMAX][5]/1000/iter),
+            (Uint)(all_nanosec[SOFTMAX][6]/1000/iter),
+            (Uint)(all_nanosec[SOFTMAX][7]/1000/iter));
     #elif defined(USE_CUDA)
         printf("SpMM usec: EXEC:%d CONF:%d total:%d\n",
-            (Uint)(all_nanosec[SPMM][0]/1000),
-            (Uint)(all_nanosec[SPMM][1]/1000),
-            (Uint)(all_nanosec[SPMM][2]/1000));
+            (Uint)(all_nanosec[SPMM][0]/1000/iter),
+            (Uint)(all_nanosec[SPMM][1]/1000/iter),
+            (Uint)(all_nanosec[SPMM][2]/1000/iter));
         printf("MM usec: EXEC:%d CONF:%d total:%d\n",
-            (Uint)(all_nanosec[MM][0]/1000),
-            (Uint)(all_nanosec[MM][1]/1000),
-            (Uint)(all_nanosec[MM][2]/1000));
+            (Uint)(all_nanosec[MM][0]/1000/iter),
+            (Uint)(all_nanosec[MM][1]/1000/iter),
+            (Uint)(all_nanosec[MM][2]/1000/iter));
         printf("ReLU usec: EXEC:%d CONF:%d total:%d\n",
-            (Uint)(all_nanosec[RELU][0]/1000),
-            (Uint)(all_nanosec[RELU][1]/1000),
-            (Uint)(all_nanosec[RELU][2]/1000));
+            (Uint)(all_nanosec[RELU][0]/1000/iter),
+            (Uint)(all_nanosec[RELU][1]/1000/iter),
+            (Uint)(all_nanosec[RELU][2]/1000/iter));
         printf("Softmax usec: EXEC:%d CONF:%d total:%d\n",
-            (Uint)(all_nanosec[SOFTMAX][0]/1000),
-            (Uint)(all_nanosec[SOFTMAX][1]/1000),
-            (Uint)(all_nanosec[SOFTMAX][2]/1000));
+            (Uint)(all_nanosec[SOFTMAX][0]/1000/iter),
+            (Uint)(all_nanosec[SOFTMAX][1]/1000/iter),
+            (Uint)(all_nanosec[SOFTMAX][2]/1000/iter));
     #else
-        printf("SpMM usec: total:%d\n", (Uint)(all_nanosec[SPMM]/1000));
-        printf("MM usec: total:%d\n", (Uint)(all_nanosec[MM]/1000));
-        printf("ReLU usec: total:%d\n", (Uint)(all_nanosec[RELU]/1000));
-        printf("Softmax usec: total:%d\n", (Uint)(all_nanosec[SOFTMAX]/1000));
+        printf("SpMM usec: total:%d\n", (Uint)(all_nanosec[SPMM]/1000/iter));
+        printf("MM usec: total:%d\n", (Uint)(all_nanosec[MM]/1000/iter));
+        printf("ReLU usec: total:%d\n", (Uint)(all_nanosec[RELU]/1000/iter));
+        printf("Softmax usec: total:%d\n", (Uint)(all_nanosec[SOFTMAX]/1000/iter));
     #endif
 
     fclose(fp_graph);
