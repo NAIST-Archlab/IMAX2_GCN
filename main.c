@@ -238,6 +238,23 @@ int main(int argc, char **argv) {
             (Uint)(all_nanosec[SOFTMAX][5]/1000),
             (Uint)(all_nanosec[SOFTMAX][6]/1000),
             (Uint)(all_nanosec[SOFTMAX][7]/1000));
+    #elif defined(USE_CUDA)
+        printf("SpMM usec: EXEC:%d CONF:%d total:%d\n",
+            (Uint)(all_nanosec[SPMM][0]/1000),
+            (Uint)(all_nanosec[SPMM][1]/1000),
+            (Uint)(all_nanosec[SPMM][2]/1000));
+        printf("MM usec: EXEC:%d CONF:%d total:%d\n",
+            (Uint)(all_nanosec[MM][0]/1000),
+            (Uint)(all_nanosec[MM][1]/1000),
+            (Uint)(all_nanosec[MM][2]/1000));
+        printf("ReLU usec: EXEC:%d CONF:%d total:%d\n",
+            (Uint)(all_nanosec[RELU][0]/1000),
+            (Uint)(all_nanosec[RELU][1]/1000),
+            (Uint)(all_nanosec[RELU][2]/1000));
+        printf("Softmax usec: EXEC:%d CONF:%d total:%d\n",
+            (Uint)(all_nanosec[SOFTMAX][0]/1000),
+            (Uint)(all_nanosec[SOFTMAX][1]/1000),
+            (Uint)(all_nanosec[SOFTMAX][2]/1000));
     #else
         printf("SpMM usec: total:%d\n", (Uint)(all_nanosec[SPMM]/1000));
         printf("MM usec: total:%d\n", (Uint)(all_nanosec[MM]/1000));

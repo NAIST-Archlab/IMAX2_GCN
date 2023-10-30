@@ -138,10 +138,12 @@ void propagation(GCNNetwork *network) {
         timespec_get(&t1, TIME_UTC);
         createCusparse();
         timespec_get(&t2, TIME_UTC);
+        all_nanosec[SPMM][1] = (Ull) cal_time(&t2, &t1)*1000;
         spmm_time += cal_time(&t2, &t1);
         timespec_get(&t1, TIME_UTC);
         createCublas();
         timespec_get(&t2, TIME_UTC);
+        all_nanosec[MM][1] = (Ull) cal_time(&t2, &t1)*1000;
         mm_time += cal_time(&t2, &t1);
     #endif
     int layer_cnt = 0;
@@ -198,7 +200,6 @@ void propagation(GCNNetwork *network) {
         #endif
         print_weight(&r_mm);
 
-
         if (p->next == NULL) last_weight = &(network->layers->result_layer);
         else last_weight = &(p->next->latent_vectors);
 
@@ -227,11 +228,18 @@ void propagation(GCNNetwork *network) {
 
     printf("SpMM: %lf, MM: %lf, ReLu: %lf, Softmax: %lf usec.\n", spmm_time, mm_time, relu_time, softmax_time);
     printf("Propagation: %lf usec.\n", spmm_time + mm_time + relu_time + softmax_time);
-    #if !(defined(EMAX6) || defined(EMAX7))
+    #if !(defined(EMAX6) || defined(EMAX7) || defined(USE_CUDA))
         all_nanosec[SPMM] += (Ull) spmm_time*1000;
         all_nanosec[MM] += (Ull) mm_time*1000;
         all_nanosec[RELU] += (Ull) relu_time*1000;
         all_nanosec[SOFTMAX] += (Ull) softmax_time*1000;
+    #elif defined(USE_CUDA)
+        all_nanosec[SPMM][2] += all_nanosec[SPMM][0] + all_nanosec[SPMM][1];
+        all_nanosec[MM][2] += all_nanosec[MM][0] + all_nanosec[MM][1];
+        all_nanosec[RELU][0] += (Ull) relu_time*1000;
+        all_nanosec[SOFTMAX][0] += (Ull) softmax_time*1000;
+        all_nanosec[RELU][2] += (Ull) relu_time*1000;
+        all_nanosec[SOFTMAX][2] += (Ull) softmax_time*1000;
     #else
         all_nanosec[RELU][0] += (Ull) relu_time*1000;
         all_nanosec[RELU][7] += (Ull) relu_time*1000;

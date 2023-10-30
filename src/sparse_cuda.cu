@@ -207,6 +207,7 @@ void spmm(DenseMatrix *result, SparseMatrix *sp_matrix, DenseMatrix *matrix) {
     CHECK(cudaDeviceSynchronize());
     timespec_get(&t2, TIME_UTC);
     printf("cuSPARSE SpMM: %lf usec.\n", cal_time(&t2, &t1));
+    all_nanosec[SPMM][0] += (unsigned long long) cal_time(&t2, &t1)*1000;
 
     CHECK(cudaFree(buffer));
     
@@ -235,6 +236,7 @@ void mm(DenseMatrix *result, DenseMatrix *a, DenseMatrix *b) {
     );
     CHECK(cudaDeviceSynchronize());
     timespec_get(&t2, TIME_UTC);
+    all_nanosec[MM][0] += (unsigned long long) cal_time(&t2, &t1)*1000;
 
     printf("cuBLAS MM: %lf usec.\n", cal_time(&t2, &t1));
 }

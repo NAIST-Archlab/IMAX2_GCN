@@ -17,9 +17,15 @@ void spmm(DenseMatrix *result, SparseMatrix *sp_matrix, DenseMatrix *matrix) {
     #pragma omp parallel for
     #endif
     for (int k = 0; k < matrix->col_size; k++) {
+        #ifdef USE_MP
+        #pragma omp parallel for
+        #endif
         for (int i = 0; i < sp_matrix->row_size; i++) {
             int col_index_of_index = sp_matrix->row_p[i];
             float sum = 0;
+            #ifdef USE_MP
+            #pragma omp parallel for reduction(+:sum)
+            #endif
             for (int j = col_index_of_index; j < sp_matrix->row_p[i + 1]; j++) {
                 int col_index = sp_matrix->col_p[j];
                 sum += sp_matrix->val[j] * matrix->val[col_index * matrix->col_size + k];
@@ -35,9 +41,15 @@ void mm(DenseMatrix *result, DenseMatrix *a, DenseMatrix *b) {
     #pragma omp parallel for
     #endif
     for (int i = 0; i < a->row_size; i++) {
-        for (int j = 0; j < a->col_size; j++) {
+        #ifdef USE_MP
+        #pragma omp parallel for
+        #endif
+        for (int j = 0; j < b->col_size; j++) {
             float sum = 0;
-            for (int k = 0; k < b->col_size; k++) {
+            #ifdef USE_MP
+            #pragma omp parallel for reduction(+:sum)
+            #endif
+            for (int k = 0; k < a->col_size; k++) {
                 sum += a->val[i * a->col_size + k] * b->val[k * b->col_size + j];
             }
             result->val[i * b->col_size + j] = sum;
