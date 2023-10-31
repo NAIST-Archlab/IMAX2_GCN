@@ -479,15 +479,14 @@ void spmm(IMAXDenseMatrix *result, IMAXSparseMatrix *imax_sp_matrix, IMAXDenseMa
                                 spmm_core1_load      (19, 18, 17,  7,     r3);
                                 spmm_core1           (20, 19,             r3);
 
-                                //#if UNIT32
+#ifdef UNIT32
                                 spmm_core1_last_end_32  (21, 20, 19, 8, 9,     8);
                                 spmm_core1_last_start_32(24, 23, 22, 21,  8, r0);
                                 spmm_core1_load         (25, 24, 23,      9, r1);
                                 spmm_core1              (26, 25,             r1);
-                                //#else
-                                /*
-                                spmm_core1_start     (24, 23, 22, 21,  8, r0);
+#else
                                 spmm_core1_end       (21, 20, 19,  8,  9, 10, 11,  8);
+                                spmm_core1_start     (24, 23, 22, 21,  8, r0);
                                 spmm_core1_load      (25, 24, 23,      9, r1);
                                 spmm_core1           (26, 25,             r1);
                                 spmm_core1_load      (27, 26, 25,     10, r2);
@@ -519,10 +518,9 @@ void spmm(IMAXDenseMatrix *result, IMAXSparseMatrix *imax_sp_matrix, IMAXDenseMa
                                 spmm_core1           (56, 55,             r1);
                                 spmm_core1_load      (57, 56, 55,     22, r2);
                                 spmm_core1           (58, 57,             r2);
-                                */
-                                //#endif
+#endif
 
-                                //#ifdef UNIT32
+#ifdef UNIT32
                                 exe(OP_FMA, &AR[27][0], AR[26][0], EXP_H3210, BR[25][2][1], EXP_H3232, BR[26][0][1], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
                                 exe(OP_FMA, &AR[27][1], AR[26][1], EXP_H3210, BR[25][2][1], EXP_H3232, BR[26][0][0], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
                                 exe(OP_FMA, &AR[27][2], AR[26][2], EXP_H3210, BR[25][2][1], EXP_H3232, BR[26][1][1], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
@@ -530,8 +528,7 @@ void spmm(IMAXDenseMatrix *result, IMAXSparseMatrix *imax_sp_matrix, IMAXDenseMa
                                 mop(OP_LDWR, 1, &BR[27][0][1], (Ull)a_row_index, (Ull)rofs, MSK_W0, (Ull)a_row_index, A_nnz_blk_row_size, 0, 0, (Ull)NULL, A_nnz_blk_row_size);
                                 exe(OP_ADD, &r0, BR[27][0][1], EXP_H3210, oofs, EXP_H3210, 0LL, EXP_H3210, OP_AND, 0xffffffffLL, OP_NOP, 0LL);
                                 spmm_final(30, 27, r0);
-                                //#else
-                                /*
+#else
                                 exe(OP_FMA, &AR[59][0], AR[58][0], EXP_H3210, BR[57][2][1], EXP_H3232, BR[58][0][1], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
                                 exe(OP_FMA, &AR[59][1], AR[58][1], EXP_H3210, BR[57][2][1], EXP_H3232, BR[58][0][0], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
                                 exe(OP_FMA, &AR[59][2], AR[58][2], EXP_H3210, BR[57][2][1], EXP_H3232, BR[58][1][1], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
@@ -539,8 +536,7 @@ void spmm(IMAXDenseMatrix *result, IMAXSparseMatrix *imax_sp_matrix, IMAXDenseMa
                                 mop(OP_LDWR, 1, &BR[59][0][1], (Ull)a_row_index, (Ull)rofs, MSK_W0, (Ull)a_row_index, A_nnz_row_size, 0, 0, (Ull)NULL, A_nnz_row_size);
                                 exe(OP_ADD, &r0, BR[59][0][1], EXP_H3210, oofs, EXP_H3210, 0LL, EXP_H3210, OP_AND, 0xffffffffLL, OP_NOP, 0LL);
                                 spmm_final(62, 59, r0);
-                                */
-                                //#endif
+#endif
                             }
                         }
                     }
@@ -722,10 +718,9 @@ void mm(IMAXDenseMatrix *result, IMAXDenseMatrix *imax_a, IMAXDenseMatrix *imax_
                                 sgemm_core1_0(16, 15, 14,  7);
                                 sgemm_core1_1(17, 16, 15, 15);
 
-                                //#ifdef UNIT32
+#ifdef UNIT32 
                                 sgemm_final(30, 17);
-                                //#else
-                                /*
+#else
                                 sgemm_core1_0(18, 17, 16, 8);
                                 sgemm_core1_1(19, 18, 17, 17);
 
@@ -744,25 +739,9 @@ void mm(IMAXDenseMatrix *result, IMAXDenseMatrix *imax_a, IMAXDenseMatrix *imax_
                                 sgemm_core1_1(31, 30, 29, 29);
                                 sgemm_core1_0(32, 31, 30, 15);
                                 sgemm_core1_1(33, 32, 31, 31);
-                                sgemm_core1_0(35, 34, 32, 16);
-                                sgemm_core1_1(36, 35, 33, 33);
-                                sgemm_core1_0(37, 36, 34, 17);
-                                sgemm_core1_1(38, 37, 35, 35);
-                                sgemm_core1_0(39, 38, 36, 18);
 
-                                sgemm_core1_1(40, 39, 37, 37);
-                                sgemm_core1_0(41, 40, 38, 19);
-                                sgemm_core1_1(42, 41, 39, 39);
-                                sgemm_core1_0(43, 42, 40, 20);
-                                sgemm_core1_1(44, 43, 41, 41);
-                                sgemm_core1_0(45, 44, 42, 21);
-                                sgemm_core1_1(46, 45, 43, 43);
-                                sgemm_core1_0(47, 46, 44, 22);
-                                sgemm_core1_1(48, 47, 45, 45);
-
-                                sgemm_final(62, 48);
-                                */
-                                //#endif
+                                sgemm_final(62, 33);
+#endif
                             }
                         }
                     }

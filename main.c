@@ -243,6 +243,8 @@ int main(int argc, char **argv) {
             (Uint)(all_nanosec[SOFTMAX][6]/1000/iter),
             (Uint)(all_nanosec[SOFTMAX][7]/1000/iter));
     #elif defined(USE_CUDA)
+        all_nanosec[SPMM][2] = all_nanosec[SPMM][0] + all_nanosec[SPMM][1];
+        all_nanosec[MM][2] = all_nanosec[MM][0] + all_nanosec[MM][1];
         printf("SpMM usec: EXEC:%d CONF:%d total:%d\n",
             (Uint)(all_nanosec[SPMM][0]/1000/iter),
             (Uint)(all_nanosec[SPMM][1]/1000/iter),
