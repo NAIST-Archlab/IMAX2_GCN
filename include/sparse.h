@@ -41,8 +41,12 @@ unsigned long long all_nanosec[NUM_CLASS];
 #define LMM_SIZE 0x4000
 #define MAX_COL_SIZE 0x400 // LMMのサイズの最大値にすると構造上問題が発生するため、1/2にしている
 #ifdef UNIT32
-#define MM_H 16
 #define SPMM_H 20
+#ifndef HARD_UNIT32
+#define MM_H 32
+#else
+#define MM_H 16
+#endif
 #else
 #define MM_H 32
 #define SPMM_H 46

@@ -19,6 +19,7 @@ CPUONLY := 0
 CUDA := 0
 SAME_DISTANCE := 0
 UNIT32 := 1
+HARD_UNIT32 := 1
 EMAX_VER := 7
 EMAX_DEFINE := -DEMAX6 -DDEBUG -DUSE_MP -DNCHIP=$(NCHIP)
 TEST_SPARSE_OBJS := test/test_sparse.o
@@ -157,7 +158,7 @@ CONV_EXE := ./conv-c2c/conv-c2c
 ifeq ($(EMAX_VER), 7)
 CONV_EXE := ./conv-c2d/conv-c2d
 endif
-ifeq ($(UNIT32), 1)
+ifeq ($(HARD_UNIT32), 1)
 CONV_EXE := $(CONV_EXE) -u32
 endif
 $(SRC_DIR)/sparse_imax-emax$(EMAX_VER).c: $(SRC_DIR)/sparse_imax.c

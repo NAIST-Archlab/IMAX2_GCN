@@ -114,7 +114,7 @@ void imax_dense_format_init_from_sparse(IMAXDenseMatrix *imax_m, IMAXSparseMatri
 
     imax_m->blk_row_size = imax_sp->blk_col_size;
     imax_m->row_padded_size = imax_sp->col_padded_size;
-    int lmm_size_div_row_blk = LMM_SIZE/imax_m->blk_row_size;
+    int lmm_size_div_row_blk = (LMM_SIZE/2)/imax_m->blk_row_size; // LMMのサイズの最大値にすると構造上問題が発生するため、1/2にしている
     imax_m->blk_col_size = (imax_m->blk_row_size < MAX_COL_SIZE) ? lmm_size_div_row_blk - (lmm_size_div_row_blk%m_col_blk_min) : m_col_blk_min;
     imax_m->col_padded_size = (imax_m->col_size%MM_H) ? imax_m->col_size+(MM_H-(imax_m->col_size%MM_H)): imax_m->col_size;
     imax_m->row_padded_size = (imax_m->row_padded_size < MM_H) ? MM_H: imax_m->row_padded_size;
@@ -156,12 +156,21 @@ void imax_sparse_format_init(IMAXSparseMatrix *imax_sp, int row, int col, int sp
     imax_sp->row_size = row;
     imax_sp->col_size = col;
 
+    // Virtualized CHIP (64Units/2)
+    #if !defined(HARD_UNIT32) && defined(UNIT32)
+        #define ALL_CHIP 2*NCHIP
+    #else 
+        #define ALL_CHIP NCHIP
+    #endif
+
     imax_sp->nnz_blk_col_size = sp_col_blk;
     imax_sp->blk_min_col = m_col_blk_min;
     imax_sp->nnz = 0;
     imax_sp->blk_row_size = (row < MAX_COL_SIZE) ? row + (row%2) : MAX_COL_SIZE;
+    imax_sp->blk_row_size = (row/imax_sp->blk_row_size >= ALL_CHIP) ? imax_sp->blk_row_size : imax_sp->blk_row_size/ALL_CHIP;
     imax_sp->row_padded_size = (row%imax_sp->blk_row_size) ? row + (imax_sp->blk_row_size - (row%imax_sp->blk_row_size)): row;
     imax_sp->blk_col_size = (col < MAX_COL_SIZE) ? col + ((col%m_col_blk_min)?col:0) - (col%m_col_blk_min) : MAX_COL_SIZE;
+    imax_sp->blk_col_size = (col/imax_sp->blk_col_size >= ALL_CHIP) ? imax_sp->blk_col_size : imax_sp->blk_col_size/ALL_CHIP;
     imax_sp->col_padded_size = (col%imax_sp->blk_col_size) ? col + (imax_sp->blk_col_size - (col%imax_sp->blk_col_size)): col;
     imax_sp->sub = (IMAXSparseMatrixSub *)malloc(sizeof(IMAXSparseMatrixSub) * (imax_sp->col_padded_size / imax_sp->blk_col_size));
     for (int i = 0; i < (imax_sp->col_padded_size / imax_sp->blk_col_size); i++) {
