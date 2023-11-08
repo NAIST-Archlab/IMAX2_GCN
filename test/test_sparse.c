@@ -112,7 +112,7 @@ int main(int argc, char **argv) {
         timespec_get(&t2, TIME_UTC);
         printf("Convert to IMAX_MM: %lf usec.\n", cal_time(&t2, &t1));
         spmm(&imax_r, &imax_sp, &imax_m);
-        convert_dense_format(&result.matrix, &imax_r);
+        convert_dense_format(&result, &imax_r);
     #else
         timespec_get(&t0, TIME_UTC);
         #ifdef USE_CUDA

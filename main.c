@@ -24,7 +24,7 @@ int main(int argc, char **argv) {
     GCNNetwork network;
     SparseGraph graph;
     SparseGraph *new_graph = &graph;
-    FILE *fp_weight, *fp_graph, *fp_feats, *fp_dims, *fp_mask;
+    FILE *fp_weight, *fp_graph, *fp_feats, *fp_dims, *fp_mask, *fp_vertices, *fp_edges, *fp_meta;
     int num_layers, dim_in, dim_out;
     DenseMatrix tmp_weight, tmp_vectors;
     char tmp_filename[100];
@@ -44,9 +44,7 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    if((to = atoi(argv[4])) < 0) {
-        return 1;
-    }
+    to = atoi(argv[4]);
 
     if (argc > 5) {
         if((iter = atoi(argv[5])) < 1) iter = 1;
@@ -60,65 +58,158 @@ int main(int argc, char **argv) {
     strcat(tmp_filename, argv[2]);
     strcat(tmp_filename, ".csgr");
     if (!(fp_graph = fopen(tmp_filename, "rb"))) {
-        return 1;
-    }
+        memset(tmp_filename, 0, 100);
+        strcat(tmp_filename, argv[2]);
+        strcat(tmp_filename, "/graph.vertex.bin");
+        if (!(fp_vertices = fopen(tmp_filename, "rb"))) {
+            return 1;
+        }
+        memset(tmp_filename, 0, 100);
+        strcat(tmp_filename, argv[2]);
+        strcat(tmp_filename, "/graph.edge.bin");
+        if (!(fp_edges = fopen(tmp_filename, "rb"))) {
+            return 1;
+        }
+        memset(tmp_filename, 0, 100);
+        strcat(tmp_filename, argv[2]);
+        strcat(tmp_filename, "/graph.meta.txt");
+        if (!(fp_meta = fopen(tmp_filename, "r"))) {
+            return 1;
+        }
 
-    memset(tmp_filename, 0, 100);
-    strcat(tmp_filename, argv[2]);
-    strcat(tmp_filename, "-feats.bin");
-    if (!(fp_feats = fopen(tmp_filename, "rb"))) {
-        return 1;
-    }
+        memset(tmp_filename, 0, 100);
+        strcat(tmp_filename, argv[2]);
+        strcat(tmp_filename, "/graph.feats.bin");
+        if (!(fp_feats = fopen(tmp_filename, "rb"))) {
+            return 1;
+        }
 
-    memset(tmp_filename, 0, 100);
-    strcat(tmp_filename, argv[2]);
-    strcat(tmp_filename, "-dims.txt");
-    if (!(fp_dims = fopen(tmp_filename, "r"))) {
-        return 1;
-    }
+        memset(tmp_filename, 0, 100);
+        strcat(tmp_filename, argv[2]);
+        strcat(tmp_filename, "/val.masks.bin");
+        if (!(fp_mask = fopen(tmp_filename, "rb"))) {
+            return 1;
+        }
+    } else {
+        memset(tmp_filename, 0, 100);
+        strcat(tmp_filename, argv[2]);
+        strcat(tmp_filename, "-feats.bin");
+        if (!(fp_feats = fopen(tmp_filename, "rb"))) {
+            return 1;
+        }
 
-    memset(tmp_filename, 0, 100);
-    strcat(tmp_filename, argv[2]);
-    strcat(tmp_filename, "-val_mask.txt");
-    if (!(fp_mask = fopen(tmp_filename, "r"))) {
-        return 1;
-    }
+        memset(tmp_filename, 0, 100);
+        strcat(tmp_filename, argv[2]);
+        strcat(tmp_filename, "-dims.txt");
+        if (!(fp_dims = fopen(tmp_filename, "r"))) {
+            return 1;
+        }
+
+        memset(tmp_filename, 0, 100);
+        strcat(tmp_filename, argv[2]);
+        strcat(tmp_filename, "-val_mask.txt");
+        if (!(fp_mask = fopen(tmp_filename, "r"))) {
+            return 1;
+        }
+    } 
 
     printf("Reading Graph now...\n");
-    fread(&version, sizeof(Ull), 1, fp_graph);
-    fread(&sizeEdgeTy, sizeof(Ull), 1, fp_graph);
-    fread(&nv, sizeof(Ull), 1, fp_graph);
-    fread(&ne, sizeof(Ull), 1, fp_graph);
-
-    int new_nv = to - from;
-    Ull *vertices_tmp = (Ull *)malloc(sizeof(Ull) * (nv + 1));
-    fread(vertices_tmp, sizeof(Ull), (nv + 1), fp_graph);
-    vertices = (Uint *)malloc(sizeof(Uint) * (new_nv + 1));
-    vertices[0] = 0;
-
-    Uint *edges_tmp = (Uint *)malloc(sizeof(Uint)*vertices_tmp[nv]);
-    Uint *edges_tmp2 = (Uint *)malloc(sizeof(Uint)*vertices_tmp[nv]);
-    fread(edges_tmp, sizeof(Uint), ne, fp_graph);
-
-    int cnt = 0;
-    for (int i = from; i < to; i++) {
-        int row_nnz = 0;
-        for (int j = vertices_tmp[i]; j < vertices_tmp[i+1]; j++) {
-            if ((edges_tmp[j] < to) && (edges_tmp[j] >=from)) {
-                edges_tmp2[cnt] = edges_tmp[j] - from;
-                cnt++;
-                row_nnz++;
-            }
-        }
-        if (row_nnz) {
-            vertices[i+1-from] = vertices[i-from] + row_nnz;
+    int new_nv;
+    Uint *edges_tmp2;
+    if (fp_graph) {
+        fread(&version, sizeof(Ull), 1, fp_graph);
+        fread(&sizeEdgeTy, sizeof(Ull), 1, fp_graph);
+        fread(&nv, sizeof(Ull), 1, fp_graph);
+        fread(&ne, sizeof(Ull), 1, fp_graph);
+    } else {
+        fscanf(fp_meta, "%lld\n", &nv);
+        fscanf(fp_meta, "%lld\n", &ne);
+        printf("%lld %lld\n", nv, ne);
+    }
+    if (to < from) {
+        new_nv = nv;
+        Ull *vertices_tmp = (Ull *)malloc(sizeof(Ull) * (nv + 1));
+        if (fp_graph) {
+            fread(vertices_tmp, sizeof(Ull), (nv + 1), fp_graph);
         } else {
-            vertices[i+1-from] = vertices[i-from];
+            fread(vertices_tmp, sizeof(Ull), (nv + 1), fp_vertices);
+        }
+
+        vertices = (Uint *) malloc(sizeof(Uint) * (nv + 1));
+        for (int i = 0; i < nv + 1; i++) {
+            vertices[i] = (Uint) vertices_tmp[i];
+        }
+
+        edges_tmp2 = (Uint *) malloc(sizeof(Uint) * vertices[nv]);
+        if (fp_graph) {
+            fread(edges_tmp2, sizeof(Uint), ne, fp_graph);
+        } else {
+            fread(edges_tmp2, sizeof(Uint), ne, fp_edges);
+        }
+        free(vertices_tmp);
+    } else {
+        if (fp_graph) {
+            new_nv = to - from;
+            Ull *vertices_tmp = (Ull *)malloc(sizeof(Ull) * (nv + 1));
+            fread(vertices_tmp, sizeof(Ull), (nv + 1), fp_graph);
+            vertices = (Uint *)malloc(sizeof(Uint) * (new_nv + 1));
+            vertices[0] = 0;
+
+            Uint *edges_tmp = (Uint *)malloc(sizeof(Uint)*vertices_tmp[nv]);
+            edges_tmp2 = (Uint *)malloc(sizeof(Uint)*vertices_tmp[nv]);
+            fread(edges_tmp, sizeof(Uint), ne, fp_graph);
+
+            int cnt = 0;
+            for (int i = from; i < to; i++) {
+                int row_nnz = 0;
+                for (int j = vertices_tmp[i]; j < vertices_tmp[i+1]; j++) {
+                    if ((edges_tmp[j] < to) && (edges_tmp[j] >=from)) {
+                        edges_tmp2[cnt] = edges_tmp[j] - from;
+                        cnt++;
+                        row_nnz++;
+                    }
+                }
+                if (row_nnz) {
+                    vertices[i+1-from] = vertices[i-from] + row_nnz;
+                } else {
+                    vertices[i+1-from] = vertices[i-from];
+                }
+            }
+
+            free(edges_tmp);
+            free(vertices_tmp);
+        } else {
+            new_nv = to - from;
+            Ull *vertices_tmp = (Ull *)malloc(sizeof(Ull) * (nv + 1));
+            fread(vertices_tmp, sizeof(Ull), (nv + 1), fp_vertices);
+            vertices = (Uint *)malloc(sizeof(Uint) * (new_nv + 1));
+            vertices[0] = 0;
+
+            Uint *edges_tmp = (Uint *)malloc(sizeof(Uint)*vertices_tmp[nv]);
+            edges_tmp2 = (Uint *)malloc(sizeof(Uint)*vertices_tmp[nv]);
+            fread(edges_tmp, sizeof(Uint), ne, fp_edges);
+
+            int cnt = 0;
+            for (int i = from; i < to; i++) {
+                int row_nnz = 0;
+                for (int j = vertices_tmp[i]; j < vertices_tmp[i+1]; j++) {
+                    if ((edges_tmp[j] < to) && (edges_tmp[j] >=from)) {
+                        edges_tmp2[cnt] = edges_tmp[j] - from;
+                        cnt++;
+                        row_nnz++;
+                    }
+                }
+                if (row_nnz) {
+                    vertices[i+1-from] = vertices[i-from] + row_nnz;
+                } else {
+                    vertices[i+1-from] = vertices[i-from];
+                }
+            }
+
+            free(edges_tmp);
+            free(vertices_tmp);
         }
     }
-
-    free(edges_tmp);
-    free(vertices_tmp);
 
     graph.matrix.row_size = new_nv;
     graph.matrix.col_size = new_nv;
@@ -183,9 +274,18 @@ int main(int argc, char **argv) {
     print_layers(&network);
 
     printf("Reading Features now...\n");
-    fscanf(fp_dims, "%lld %d\n", &f_dim_in, &f_dim_out);
-    fseek(fp_feats, sizeof(float) * f_dim_out * from, SEEK_CUR);
-    fread(network.layers->latent_vectors.val, sizeof(float), new_nv * f_dim_out, fp_feats);
+    if (fp_graph) {
+        fscanf(fp_dims, "%lld %d\n", &f_dim_in, &f_dim_out);
+    } else {
+        dim_in = new_nv;
+        fscanf(fp_meta, "%% %% %% %% %% %lld %% %%\n", &f_dim_out);
+    }
+    //fseek(fp_feats, sizeof(float) * f_dim_out * from, SEEK_CUR);
+    //fread(network.layers->latent_vectors.val, sizeof(float), new_nv * f_dim_out, fp_feats);
+    if (to > from) {
+        fseek(fp_feats, sizeof(float) * network.layers->latent_vectors.col_size * from, SEEK_CUR);
+    }
+    fread(network.layers->latent_vectors.val, sizeof(float), new_nv * network.layers->latent_vectors.col_size, fp_feats);
     #ifdef USE_CUDA
         sendDenseMatrixToGPU(&(network.layers->latent_vectors));
     #endif
@@ -268,8 +368,8 @@ int main(int argc, char **argv) {
         printf("Softmax usec: total:%d\n", (Uint)(all_nanosec[SOFTMAX]/1000/iter));
     #endif
 
-    fclose(fp_graph);
-    fclose(fp_weight);
+    if (fp_graph) fclose(fp_graph);
+    if (fp_weight) fclose(fp_weight);
 
     return 0;
 }

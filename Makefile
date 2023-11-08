@@ -33,6 +33,9 @@ endif
 ifeq ($(UNIT32), 1)
 EMAX_DEFINE := $(EMAX_DEFINE) -DUNIT32
 endif
+ifeq ($(HARD_UNIT32), 1)
+EMAX_DEFINE := $(EMAX_DEFINE) -DHARD_UNIT32
+endif
 
 ifeq ($(MACHTYPE),x86_64)
 	X64 ?= 1
