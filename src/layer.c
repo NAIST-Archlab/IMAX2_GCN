@@ -37,57 +37,7 @@ void print_weight(HiddenLayer *result) {
     printf("]\n");
 }
 
-SparseGraph *spia(SparseGraph *graph) {
-    SparseMatrix *sp_matrix = &graph->matrix;
-    SparseGraph *result = (SparseGraph *)malloc(sizeof(SparseGraph));
-    int nnz = sp_matrix->nnz;
-    int k = 0;
-    char is_added = 0;
-
-    for (int i = 0; i < sp_matrix->row_size; i++) {
-        int col_index_of_index = sp_matrix->row_p[i];
-        is_added = 0;
-        for (int j = col_index_of_index; j < sp_matrix->row_p[i+1]; j++) {
-            int col_index = sp_matrix->col_p[j];
-            if (col_index == i) {
-                is_added = 1;
-                break;
-            }
-        }
-
-        if (!is_added) nnz++;
-    }
-
-    result->matrix.nnz = nnz;
-    result->matrix.col_size = sp_matrix->col_size;
-    result->matrix.row_size = sp_matrix->row_size;
-    allocSparseMatrix(&(result->matrix));
-
-    if (nnz != 0)
-        result->matrix.row_p[0] = 0;
-
-    for (int i = 0; i < sp_matrix->row_size; i++) {
-        int col_index_of_index = sp_matrix->row_p[i];
-        int sub = sp_matrix->row_p[i+1] - sp_matrix->row_p[i];
-        is_added = 0;
-        for (int j = col_index_of_index; j < sp_matrix->row_p[i + 1]; j++) {
-            int col_index = sp_matrix->col_p[j];
-            result->matrix.col_p[k++] = col_index;
-            if (col_index == i) {
-                is_added = 1;
-                break;
-            }
-        }
-
-        if (!is_added) {result->matrix.row_p[i+1] = result->matrix.row_p[i] + sub + 1;result->matrix.col_p[k++]=i;}
-        else result->matrix.row_p[i+1] = result->matrix.row_p[i] + sub;
-        is_added = 0;
-    }
-
-    return result;
-}
-
-void print_layers(GCNNetwork *network) {
+void print_gcn_layers(GCNNetwork *network) {
     GCNLayer *p = network->layers;
 
     while (p != NULL) {
@@ -122,7 +72,7 @@ void add_gcn_layer(GCNNetwork *network, DenseMatrix weight, DenseMatrix vectors)
     layer->latent_vectors.cuda_val = vectors.cuda_val;
 }
 
-void propagation(GCNNetwork *network) {
+void gcn_propagation(GCNNetwork *network) {
     GCNLayer *p = network->layers;
     DenseMatrix r_spmm, r_mm, *last_weight, tmp_h, tmp_w;
     double spmm_time = 0, mm_time = 0, relu_time = 0;

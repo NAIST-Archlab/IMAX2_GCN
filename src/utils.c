@@ -310,13 +310,15 @@ void convert_imax_sparse_format(IMAXSparseMatrix *imax_sp, SparseMatrix *sp) {
                 if (imax_sp->sub[i].row_nnz[row_idx] > 0) {
                     int acc = 0;
                     int base = ((nnz_blk_cnt/nnz_row_blk_size)*nnz_row_blk_size*nnz_blk_col_size) + (nnz_blk_cnt%nnz_row_blk_size)*2;
-                    for (int l = sp->row_p[row_idx]; l < sp->row_p[row_idx+1]; l++) {
-                        if ((sp->col_p[l] < col_th_h) && (sp->col_p[l] >= col_th_l)) {
-                            int nnz_blk_row_idx = acc/nnz_blk_col_size;
-                            int nnz_blk_col_idx = acc%nnz_blk_col_size;
-                            imax_sp->sub[i].val[base + ((nnz_row_blk_size*2)*(nnz_blk_col_idx/2)) + (nnz_blk_row_idx*2) + (nnz_blk_col_idx%2)] = *(Uint*)&(sp->val[l]);
-                            imax_sp->sub[i].col_num[base + ((nnz_row_blk_size*2)*(nnz_blk_col_idx/2)) + (nnz_blk_row_idx*2) + (nnz_blk_col_idx%2)] = sp->col_p[l] - col_th_l;
-                            acc++;
+                    if (row_idx < sp->row_size) {
+                        for (int l = sp->row_p[row_idx]; l < sp->row_p[row_idx+1]; l++) {
+                            if ((sp->col_p[l] < col_th_h) && (sp->col_p[l] >= col_th_l)) {
+                                int nnz_blk_row_idx = acc/nnz_blk_col_size;
+                                int nnz_blk_col_idx = acc%nnz_blk_col_size;
+                                imax_sp->sub[i].val[base + ((nnz_row_blk_size*2)*(nnz_blk_col_idx/2)) + (nnz_blk_row_idx*2) + (nnz_blk_col_idx%2)] = *(Uint*)&(sp->val[l]);
+                                imax_sp->sub[i].col_num[base + ((nnz_row_blk_size*2)*(nnz_blk_col_idx/2)) + (nnz_blk_row_idx*2) + (nnz_blk_col_idx%2)] = sp->col_p[l] - col_th_l;
+                                acc++;
+                            }
                         }
                     }
 

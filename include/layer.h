@@ -36,10 +36,9 @@ typedef struct gcn_network {
 } GCNNetwork;
 
 void print_weight(HiddenLayer *result);
-SparseGraph* spia(SparseGraph *graph);
-void print_layers(GCNNetwork *network);
+void print_gcn_layers(GCNNetwork *network);
 void add_gcn_layer(GCNNetwork *network, DenseMatrix weight, DenseMatrix vectors);
-void propagation(GCNNetwork *network);
+void gcn_propagation(GCNNetwork *network);
 void softmax(HiddenLayer *end_vectors);
 float max_in_array(float *array, int size);
 

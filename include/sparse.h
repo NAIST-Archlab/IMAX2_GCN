@@ -1,5 +1,5 @@
 // EMAX6/7 GCN Test Program            //
-// sparse.c                            //
+// sparse.h                            //
 //         Copyright (C) 2023 by NAIST //
 //          Primary writer: Dohyun Kim //
 //          kim.dohyun.kg7@is.naist.jp //
@@ -122,6 +122,8 @@ void xmax_bzero(Uint *dst, int words);
 #if __cplusplus
 extern "C" {
 #endif
+void gcn_preprocessing(SparseMatrix *matrix);
+void spia(SparseMatrix *result, SparseMatrix *sp_matrix);
 void spmm(DenseMatrix *result, SparseMatrix *sp_matrix, DenseMatrix *matrix);
 void mm(DenseMatrix *result, DenseMatrix *a, DenseMatrix *b);
 void relu(DenseMatrix *result, DenseMatrix *a);
@@ -143,6 +145,8 @@ void destroyCublas();
 }
 #endif
 #else
+void gcn_preprocessing(SparseMatrix *matrix);
+void spia(SparseMatrix *result, SparseMatrix *sp_matrix);
 void allocSparseMatrix(SparseMatrix *sp_matrix);
 void freeSparseMatrix(SparseMatrix *sp_matrix);
 void allocDenseMatrix(DenseMatrix *matrix);
