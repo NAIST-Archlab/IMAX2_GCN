@@ -3,7 +3,7 @@
 //         Copyright (C) 2023 by NAIST //
 //          Primary writer: Dohyun Kim //
 //          kim.dohyun.kg7@is.naist.jp //
-#include "reader.h"
+#include "../include/reader.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

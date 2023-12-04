@@ -38,12 +38,12 @@ unsigned long long all_nanosec[NUM_CLASS];
 
 #define KERNEL_MODE_1 1
 #define KERNEL_MODE_2 2
-#ifndef LMM128
-#define LMM_SIZE 0x4000
-#define MAX_COL_SIZE 0x400 // LMMのサイズの最大値にすると構造上問題が発生するため、1/2にしている
-#else
+#ifdef LMM128
 #define LMM_SIZE 0x8000
 #define MAX_COL_SIZE 0x800 // LMMのサイズの最大値にすると構造上問題が発生するため、1/2にしている
+#else
+#define LMM_SIZE 0x4000
+#define MAX_COL_SIZE 0x400 // LMMのサイズの最大値にすると構造上問題が発生するため、1/2にしている
 #endif
 #ifdef UNIT32
 #define SPMM_H 20
@@ -124,6 +124,8 @@ extern "C" {
 #endif
 void gcn_preprocessing(SparseMatrix *matrix);
 void spia(SparseMatrix *result, SparseMatrix *sp_matrix);
+void softmax(DenseMatrix *end_vectors);
+float max_in_array(float *array, int size);
 void spmm(DenseMatrix *result, SparseMatrix *sp_matrix, DenseMatrix *matrix);
 void mm(DenseMatrix *result, DenseMatrix *a, DenseMatrix *b);
 void relu(DenseMatrix *result, DenseMatrix *a);
@@ -147,6 +149,8 @@ void destroyCublas();
 #else
 void gcn_preprocessing(SparseMatrix *matrix);
 void spia(SparseMatrix *result, SparseMatrix *sp_matrix);
+void softmax(DenseMatrix *end_vectors);
+float max_in_array(float *array, int size);
 void allocSparseMatrix(SparseMatrix *sp_matrix);
 void freeSparseMatrix(SparseMatrix *sp_matrix);
 void allocDenseMatrix(DenseMatrix *matrix);

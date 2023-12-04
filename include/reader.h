@@ -5,8 +5,7 @@
 //          kim.dohyun.kg7@is.naist.jp //
 #ifndef __READER_H__
 #define __READER_H__
-#include "layer.h"
-#include "sparse.h"
+#include "gcn.h"
 
 void read_graph_bin(SparseGraph *g, char *name, int from, int to);
 void read_graph_csgr(SparseGraph *g, char *name, int from, int to);

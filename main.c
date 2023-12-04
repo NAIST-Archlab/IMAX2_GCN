@@ -8,7 +8,7 @@
 #elif defined(EMAX6)
 #include "../conv-c2c/emax6.h"
 #endif
-#include "./include/layer.h"
+#include "./include/gcn.h"
 #include "./include/utils.h"
 #include "./include/sparse.h"
 #include "./include/reader.h"

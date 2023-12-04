@@ -119,6 +119,36 @@ void spia(SparseMatrix *result, SparseMatrix *sp_matrix) {
 }
 
 extern "C"
+void softmax(DenseMatrix *result) {
+    for (int i = 0; i < result->row_size; i++) {
+        float max = max_in_array(&(result->val[i * result->col_size]), result->col_size);
+        float log_max = log(max);
+        float sum = 0;
+
+        if (max <= 1) log_max = 0;
+        for (int j = 0; j < result->col_size; j++) {
+            sum += exp(result->val[i * result->col_size + j] + log_max);
+        }
+        for (int j = 0; j < result->col_size; j++) {
+            result->val[i * result->col_size + j] = exp(result->val[i * result->col_size + j] + log_max) / sum;
+        }
+    }
+}
+
+extern "C"
+float max_in_array(float *array, int size) {
+    int i;
+    float max = -INFINITY;
+
+    for (i = 0; i < size; i++) {
+        if (max < array[i])
+            max = array[i];
+    }
+
+    return max;
+}
+
+extern "C"
 void allocSparseMatrix(SparseMatrix *sp_matrix) {
     sp_matrix->row_p = (int*) malloc(sizeof(int)*(sp_matrix->row_size+1));
     sp_matrix->col_p = (int*) malloc(sizeof(int)*(sp_matrix->nnz));

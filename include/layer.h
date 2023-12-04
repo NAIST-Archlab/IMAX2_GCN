@@ -21,25 +21,6 @@ typedef struct sparse_graph {
 
 typedef DenseMatrix HiddenLayer;
 
-typedef struct gcn_layer {
-    HiddenLayer    hidden_layer; 
-    HiddenLayer  latent_vectors;
-    HiddenLayer    result_layer;
-    struct gcn_layer      *prev;
-    struct gcn_layer      *next;
-} GCNLayer;
-
-typedef struct gcn_network {
-    int     num_layers;
-    SparseGraph *graph;
-    GCNLayer   *layers;
-} GCNNetwork;
-
 void print_weight(HiddenLayer *result);
-void print_gcn_layers(GCNNetwork *network);
-void add_gcn_layer(GCNNetwork *network, DenseMatrix weight, DenseMatrix vectors);
-void gcn_propagation(GCNNetwork *network);
-void softmax(HiddenLayer *end_vectors);
-float max_in_array(float *array, int size);
 
 #endif

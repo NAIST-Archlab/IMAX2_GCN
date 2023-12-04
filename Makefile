@@ -25,10 +25,10 @@ EMAX_VER := 7
 EMAX_DEFINE := -DEMAX6 -DDEBUG -DUSE_MP -DNCHIP=$(NCHIP)
 TEST_SPARSE_OBJS := test/test_sparse.o
 TEST_DENSE_OBJS := test/test_dense.o
-HEADERS := $(CONV)/emax6.h $(INCLUDE)/layer.h $(INCLUDE)/options.h $(INCLUDE)/sparse.h $(INCLUDE)/utils.h $(INCLUDE)/reader.h
+HEADERS := $(CONV)/emax6.h $(INCLUDE)/layer.h $(INCLUDE)/options.h $(INCLUDE)/sparse.h $(INCLUDE)/utils.h $(INCLUDE)/reader.h $(INCLUDE)/gcn.h
 ifeq ($(EMAX_VER), 7)
 CONV := ./conv-c2d
-HEADERS := $(CONV)/emax7.h $(INCLUDE)/layer.h $(INCLUDE)/options.h $(INCLUDE)/sparse.h $(INCLUDE)/utils.h $(INCLUDE)/reader.h
+HEADERS := $(CONV)/emax7.h $(INCLUDE)/layer.h $(INCLUDE)/options.h $(INCLUDE)/sparse.h $(INCLUDE)/utils.h $(INCLUDE)/reader.h $(INCLUDE)/layer.h 
 EMAX_DEFINE := -DCBLAS_GEMM -DEMAX7 -DDEBUG -DUSE_MP -DNCHIP=$(NCHIP)
 endif
 ifeq ($(UNIT32), 1)
@@ -110,9 +110,9 @@ CC   := nvcc
 SRCS := $(wildcard $(SRC_DIR)/*.c)
 SRCS_CU := $(wildcard $(SRC_DIR)/*.cu)
 OBJS := $(SRCS:.c=.o) $(SRCS_CU:.cu=.o)
-CFLAGS := -O3 -I$(INCLUDE) -DUSE_CUDA
+CFLAGS := -O3 -I$(INCLUDE) -Xcompiler -fcommon -DUSE_CUDA
 ifeq ($(SAME_DISTANCE), 1)
-CFLAGS := -O3 -I$(INCLUDE) -DUSE_CUDA -DSAME_DISTANCE
+CFLAGS := -O3 -I$(INCLUDE) -Xcompiler -fcommon -DUSE_CUDA -DSAME_DISTANCE
 endif
 LDFLAGS := -L/usr/lib64 -L/usr/local/lib -lm -lrt -lcusparse -lcublas
 endif

@@ -3,11 +3,11 @@
 //         Copyright (C) 2023 by NAIST //
 //          Primary writer: Dohyun Kim //
 //          kim.dohyun.kg7@is.naist.jp //
-#include "../include/sparse.h"
 #include <stdlib.h>
-#if !(defined(EMAX6) || defined(EMAX7) || defined(USE_CUDA))
 #include <stdio.h>
 #include <math.h>
+#include "../include/sparse.h"
+#if !(defined(EMAX6) || defined(EMAX7) || defined(USE_CUDA))
 #ifdef USE_MP
 #include <omp.h>
 #endif
@@ -148,5 +148,33 @@ void spia(SparseMatrix *result, SparseMatrix *sp_matrix) {
         else result->row_p[i+1] = result->row_p[i];
         is_added = 0;
     }
+}
+
+void softmax(DenseMatrix *result) {
+    for (int i = 0; i < result->row_size; i++) {
+        float max = max_in_array(&(result->val[i * result->col_size]), result->col_size);
+        float log_max = log(max);
+        float sum = 0;
+
+        if (max <= 1) log_max = 0;
+        for (int j = 0; j < result->col_size; j++) {
+            sum += exp(result->val[i * result->col_size + j] + log_max);
+        }
+        for (int j = 0; j < result->col_size; j++) {
+            result->val[i * result->col_size + j] = exp(result->val[i * result->col_size + j] + log_max) / sum;
+        }
+    }
+}
+
+float max_in_array(float *array, int size) {
+    int i;
+    float max = -INFINITY;
+
+    for (i = 0; i < size; i++) {
+        if (max < array[i])
+            max = array[i];
+    }
+
+    return max;
 }
 #endif

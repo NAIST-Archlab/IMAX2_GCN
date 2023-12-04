@@ -26,7 +26,7 @@ Uchar* sysinit(Uint memsize, Uint alignment) {
   membase = emax_info.ddr_mmap;
   {int i; for (i=0; i<(memsize+sizeof(Dll)-1)/sizeof(Dll); i++) *((Dll*)membase+i)=0;}
 #elif defined(ARMZYNQ) && defined(EMAX7)
-  if (emax7_open() == NULL) 
+  if (emax7_open(0) == NULL) 
     exit(1);
   membase = emax_info[0].ddr_mmap;
   {int i; for (i=0; i<(memsize+sizeof(Dll)-1)/sizeof(Dll); i++) *((Dll*)membase+i)=0;}
