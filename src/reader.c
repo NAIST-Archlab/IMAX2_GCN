@@ -174,6 +174,29 @@ void read_graph_bin(SparseGraph *g, char *name, int from, int to) {
     printf("|V|=%d, |E|=%d\n", g->matrix.row_size, g->matrix.nnz);
 }
 
+void read_graph_bin_vlabels(Uchar *vlabels, char *name, int from, int to) {
+    char tmp_name[256];
+    FILE *fp;
+    int new_nv;
+
+    memset(tmp_name, 0, sizeof(tmp_name));
+    sprintf(tmp_name, "%s/graph.vlabels.bin", name);
+    if (!(fp = fopen(tmp_name, "rb"))) {
+        fprintf(stderr, "Error: Cannot open %s\n", tmp_name);
+        return;
+    }
+
+    new_nv = to - from;
+    if (new_nv < 0) {
+        fprintf(stderr, "Error: Invalid range of vertex\n");
+        return;
+    }
+
+    fseek(fp, sizeof(Uchar) * from, SEEK_SET);
+    fread(vlabels, sizeof(Uchar), new_nv, fp);
+    fclose(fp);
+}
+
 void read_gcn_weight(GCNNetwork *n, char *path) {
     FILE *fp;
     DenseMatrix weight, vectors;

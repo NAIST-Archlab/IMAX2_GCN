@@ -12,6 +12,7 @@
 #endif
 #include "sparse.h"
 #include "layer.h"
+#include "optimizer.h"
 
 typedef struct gcn_layer {
     HiddenLayer    hidden_layer; 
@@ -30,5 +31,6 @@ typedef struct gcn_network {
 void print_gcn_layers(GCNNetwork *network);
 void add_gcn_layer(GCNNetwork *network, DenseMatrix weight, DenseMatrix vectors);
 void gcn_propagation(GCNNetwork *network);
+void gcn_backpropagation(GCNNetwork *network, DenseMatrix *labels, void (*optimizer)(DenseMatrix *value, DenseMatrix *grad, OptimizerOption *option), OptimizerOption *option);
 
 #endif

@@ -6,9 +6,11 @@
 #ifndef __READER_H__
 #define __READER_H__
 #include "gcn.h"
+#include "sparse.h"
 
 void read_graph_bin(SparseGraph *g, char *name, int from, int to);
 void read_graph_csgr(SparseGraph *g, char *name, int from, int to);
+void read_graph_bin_vlabels(Uchar *vlabels, char *name, int from, int to);
 void read_gcn_weight(GCNNetwork *n, char *path);
 void read_gcn_feature_bin(GCNNetwork *n, char *name, int from, int to);
 void read_gcn_feature_csgr(GCNNetwork *n, char *name, int from, int to);

@@ -136,6 +136,18 @@ void softmax(DenseMatrix *result) {
 }
 
 extern "C"
+void d_softmax(DenseMatrix *result) {
+    for (int i = 0; i < result->row_size; i++) {
+        for (int j = 0; j < result->col_size; j++) {
+            if (i == j)
+                result->val[i * result->col_size + j] = result->val[i * result->col_size + j] * (1 - result->val[i * result->col_size + j]);
+            else
+                result->val[i * result->col_size + j] = result->val[i * result->col_size + j] * (-result->val[i * result->col_size + j]);
+        }
+    }
+}
+
+extern "C"
 float max_in_array(float *array, int size) {
     int i;
     float max = -INFINITY;
@@ -149,6 +161,19 @@ float max_in_array(float *array, int size) {
 }
 
 extern "C"
+void expand_labels(DenseMatrix *labels, Uchar *vlabels)  {
+    for (int i = 0; i < labels->row_size; i++) {
+        for (int j = 0; j < labels->col_size; j++) {
+            if (j == (int)vlabels[i])
+                labels->val[i*labels->col_size + j] = 1.0;
+            else
+                labels->val[i*labels->col_size + j] = 0.0;
+        }
+    }
+}
+
+
+extern "C"
 void allocSparseMatrix(SparseMatrix *sp_matrix) {
     sp_matrix->row_p = (int*) malloc(sizeof(int)*(sp_matrix->row_size+1));
     sp_matrix->col_p = (int*) malloc(sizeof(int)*(sp_matrix->nnz));
@@ -156,7 +181,6 @@ void allocSparseMatrix(SparseMatrix *sp_matrix) {
     CHECK(cudaMalloc((void**) &sp_matrix->cuda_row_p, sizeof(int)*(sp_matrix->row_size+1)));
     CHECK(cudaMalloc((void**) &sp_matrix->cuda_col_p, sizeof(int)*(sp_matrix->nnz)));
     CHECK(cudaMalloc((void**) &sp_matrix->cuda_val,   sizeof(float)*(sp_matrix->nnz)));
-
 }
 
 extern "C"
@@ -333,8 +357,83 @@ void mm(DenseMatrix *result, DenseMatrix *a, DenseMatrix *b) {
     printf("cuBLAS MM: %lf usec.\n", cal_time(&t2, &t1));
 }
 
+extern "C"
+void msub (DenseMatrix *result, DenseMatrix *a, DenseMatrix *b) {
+    struct timespec t1, t2;
+
+    float alpha = 1;
+    float beta = 0;
+
+    timespec_get(&t1, TIME_UTC);
+    CHECK_CUBLAS(
+        cublasSgeam(cublas_handle,
+            CUBLAS_OP_N, CUBLAS_OP_N,
+            a->row_size, a->col_size,
+            &alpha, a->cuda_val, a->row_size, &beta, b->cuda_val, b->row_size, result->cuda_val, a->row_size
+        )
+    );
+    CHECK(cudaDeviceSynchronize());
+    timespec_get(&t2, TIME_UTC);
+
+    printf("cuBLAS MSUB: %lf usec.\n", cal_time(&t2, &t1));
+}
+
+extern "C"
+float mmeans(DenseMatrix *a) {
+    struct timespec t1, t2;
+    float sum = 0;
+
+    timespec_get(&t1, TIME_UTC);
+    CHECK_CUBLAS(
+        cublasSasum(cublas_handle,
+            a->row_size * a->col_size,
+            a->cuda_val, 1, &sum
+        )
+    );
+    CHECK(cudaDeviceSynchronize());
+    timespec_get(&t2, TIME_UTC);
+
+    printf("cuBLAS MMEANS: %lf usec.\n", cal_time(&t2, &t1));
+
+    return sum / (a->row_size * a->col_size);
+}
+
+extern "C"
+void transpose(DenseMatrix *result, DenseMatrix *a) {
+    struct timespec t1, t2;
+
+    float alpha = 1;
+    float beta = 0;
+
+    timespec_get(&t1, TIME_UTC);
+    CHECK_CUBLAS(
+        cublasSgeam(cublas_handle,
+            CUBLAS_OP_T, CUBLAS_OP_T,
+            a->col_size, a->row_size,
+            &alpha, a->cuda_val, a->row_size, &beta, a->cuda_val, a->row_size, result->cuda_val, a->col_size
+        )
+    );
+    timespec_get(&t2, TIME_UTC);
+
+    CHECK(cudaDeviceSynchronize());
+    printf("cuBLAS Transpose: %lf usec.\n", cal_time(&t2, &t1));
+}
+
 __global__
 void threshold(float *gpuResult, float *input, float threshold, int size) {
+    unsigned int xIdx = blockDim.x * blockIdx.x + threadIdx.x;
+
+    if (xIdx < size) {
+        float input_val = input[xIdx];
+        gpuResult[xIdx] = input_val;
+        if (input_val < 0) {
+            gpuResult[xIdx] = 0;
+        }
+    }
+}
+
+__global__
+void d_threshold(float *gpuResult, float *input, float threshold, int size) {
     unsigned int xIdx = blockDim.x * blockIdx.x + threadIdx.x;
 
     if (xIdx < size) {
@@ -358,6 +457,22 @@ void relu(DenseMatrix *result, DenseMatrix *a) {
 
     timespec_get(&t1, TIME_UTC);
     threshold<<<dimGrid, dimBlock>>>(result->cuda_val, a->cuda_val, 0, a->row_size * a->col_size);
+    CHECK(cudaDeviceSynchronize());
+    timespec_get(&t2, TIME_UTC);
+
+    printf("CUDA ReLU: %lf usec.\n", cal_time(&t2, &t1));
+}
+
+extern "C"
+void d_relu(DenseMatrix *result, DenseMatrix *a) {
+    struct timespec t1, t2;
+    dim3 dimBlock(BLOCK_SIZE_CUDA);
+    dim3 dimGrid((a->row_size * a->col_size) / BLOCK_SIZE_CUDA);
+
+    printf("<<CUDA>>\n");
+
+    timespec_get(&t1, TIME_UTC);
+    d_threshold<<<dimGrid, dimBlock>>>(result->cuda_val, a->cuda_val, 0, a->row_size * a->col_size);
     CHECK(cudaDeviceSynchronize());
     timespec_get(&t2, TIME_UTC);
 

@@ -67,6 +67,16 @@ void relu(DenseMatrix *result, DenseMatrix *a) {
         result->val[i] = (a->val[i] > 0) ? a->val[i] : 0;
     }
 }
+
+void d_relu(DenseMatrix *result, DenseMatrix *a) {
+    printf("<<CPU>>\n");
+    #ifdef USE_MP
+    #pragma omp parallel for
+    #endif
+    for (int i = 0; i < (a->col_size * a->row_size); i++) {
+        result->val[i] = (a->val[i] > 0) ? a->val[i] : 0;
+    }
+}
 #endif
 
 #if !defined(USE_CUDA)
@@ -166,6 +176,17 @@ void softmax(DenseMatrix *result) {
     }
 }
 
+void d_softmax(DenseMatrix *result) {
+    for (int i = 0; i < result->row_size; i++) {
+        for (int j = 0; j < result->col_size; j++) {
+            if (i == j)
+                result->val[i * result->col_size + j] = result->val[i * result->col_size + j] * (1 - result->val[i * result->col_size + j]);
+            else
+                result->val[i * result->col_size + j] = result->val[i * result->col_size + j] * (-result->val[i * result->col_size + j]);
+        }
+    }
+}
+
 float max_in_array(float *array, int size) {
     int i;
     float max = -INFINITY;
@@ -177,4 +198,42 @@ float max_in_array(float *array, int size) {
 
     return max;
 }
+
+void msub(DenseMatrix *result, DenseMatrix *a, DenseMatrix *b) {
+    for (int i = 0; i < a->row_size; i++) {
+        for (int j = 0; j < a->col_size; j++) {
+            result->val[i * a->col_size + j] = a->val[i * a->col_size + j] - b->val[i * a->col_size + j];
+        }
+    }
+}
+
+float mmeans(DenseMatrix *a) {
+    float sum = 0;
+    for (int i = 0; i < a->row_size; i++) {
+        for (int j = 0; j < a->col_size; j++) {
+            sum += a->val[i * a->col_size + j];
+        }
+    }
+    return sum / (a->row_size * a->col_size);
+}
+
+void transpose(DenseMatrix *result, DenseMatrix *a) {
+    for (int i = 0; i < a->row_size; i++) {
+        for (int j = 0; j < a->col_size; j++) {
+            result->val[j * a->row_size + i] = a->val[i * a->col_size + j];
+        }
+    }
+}
+
+void expand_labels(DenseMatrix *labels, Uchar *vlabels)  {
+    for (int i = 0; i < labels->row_size; i++) {
+        for (int j = 0; j < labels->col_size; j++) {
+            if (j == (int)vlabels[i])
+                labels->val[i*labels->col_size + j] = 1.0;
+            else
+                labels->val[i*labels->col_size + j] = 0.0;
+        }
+    }
+}
+
 #endif

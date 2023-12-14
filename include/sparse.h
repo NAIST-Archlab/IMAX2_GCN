@@ -128,7 +128,13 @@ void softmax(DenseMatrix *end_vectors);
 float max_in_array(float *array, int size);
 void spmm(DenseMatrix *result, SparseMatrix *sp_matrix, DenseMatrix *matrix);
 void mm(DenseMatrix *result, DenseMatrix *a, DenseMatrix *b);
+void msub (DenseMatrix *result, DenseMatrix *a, DenseMatrix *b);
+float mmeans(DenseMatrix *a);
 void relu(DenseMatrix *result, DenseMatrix *a);
+void d_relu(DenseMatrix *result, DenseMatrix *a);
+void d_softmax(DenseMatrix *result);
+void transpose(DenseMatrix *result, DenseMatrix *a);
+void expand_labels(DenseMatrix *labels, Uchar *vlabels);
 void allocSparseMatrix(SparseMatrix *sp_matrix);
 void allocDenseMatrix(DenseMatrix *matrix);
 void sendSparseMatrixToGPU(SparseMatrix *sp_matrix);
@@ -150,7 +156,12 @@ void destroyCublas();
 void gcn_preprocessing(SparseMatrix *matrix);
 void spia(SparseMatrix *result, SparseMatrix *sp_matrix);
 void softmax(DenseMatrix *end_vectors);
+void d_softmax(DenseMatrix *result);
 float max_in_array(float *array, int size);
+void msub (DenseMatrix *result, DenseMatrix *a, DenseMatrix *b);
+float mmeans(DenseMatrix *a);
+void transpose(DenseMatrix *result, DenseMatrix *a);
+void expand_labels(DenseMatrix *labels, Uchar *vlabels);
 void allocSparseMatrix(SparseMatrix *sp_matrix);
 void freeSparseMatrix(SparseMatrix *sp_matrix);
 void allocDenseMatrix(DenseMatrix *matrix);
@@ -161,6 +172,7 @@ void freeDenseMatrix(DenseMatrix *matrix);
 void spmm(DenseMatrix *result, SparseMatrix *sp_matrix, DenseMatrix *matrix);
 void mm(DenseMatrix *result, DenseMatrix *a, DenseMatrix *b);
 void relu(DenseMatrix *result, DenseMatrix *a);
+void d_relu(DenseMatrix *result, DenseMatrix *a);
 #endif
 
 #endif

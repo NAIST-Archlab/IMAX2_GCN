@@ -12,6 +12,7 @@
 #include "./include/utils.h"
 #include "./include/sparse.h"
 #include "./include/reader.h"
+#include "./include/optimizer.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -96,6 +97,26 @@ int main(int argc, char **argv) {
     #endif
 
     for (int i = 0; i < iter; i++) {gcn_propagation(&network);}
+    //OptimizerOption opt;
+    //opt.lr = 0.01;
+    //opt.beta1 = 0.9;
+    //opt.beta2 = 0.999;
+    //opt.epsilon = 1e-8;
+    //opt.t = 1;
+    //Uchar *vlabels = (Uchar *)malloc(sizeof(Uchar) * network.graph->matrix.row_size);
+    //read_graph_bin_vlabels(vlabels, argv[2], 0, network.graph->matrix.row_size - 1);
+    //DenseMatrix labels;
+    //labels.row_size = network.layers->result_layer.row_size;
+    //labels.col_size = network.layers->result_layer.col_size;
+    //allocDenseMatrix(&labels);
+    //expand_labels(&labels, vlabels);
+    //#ifdef USE_CUDA
+        //sendDenseMatrixToGPU(&labels);
+    //#endif
+    //for (int i = 0; i < iter; i++) {
+        //gcn_propagation(&network);
+        //gcn_backpropagation(&network, &labels, &adam, &opt);
+    //}
 
     printf("Result\n");
     print_weight(&(network.layers->result_layer));

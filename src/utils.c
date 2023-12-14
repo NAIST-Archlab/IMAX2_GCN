@@ -180,12 +180,14 @@ void imax_sparse_format_init(IMAXSparseMatrix *imax_sp, int row, int col, int sp
     printf("SpM Parameters: Padded(%d,%d) blk(%d,%d) nnz_blk_col(%d)\n", imax_sp->row_padded_size, imax_sp->col_padded_size, imax_sp->blk_row_size, imax_sp->blk_col_size, imax_sp->nnz_blk_col_size);
 }
 
-void imax_gcn_allocation(IMAXSparseMatrix *imax_sp, IMAXDenseMatrix *imax_h, IMAXDenseMatrix *imax_spmm, IMAXDenseMatrix *imax_w, IMAXDenseMatrix *imax_mm) {
+void imax_gcn_allocation(IMAXSparseMatrix *imax_sp, IMAXDenseMatrix *imax_h, IMAXDenseMatrix *imax_spmm, IMAXDenseMatrix *imax_w, IMAXDenseMatrix *imax_mm, IMAXDenseMatrix *imax_mm2, IMAXDenseMatrix *imax_mm3) {
     Uint dense_size = (
         (imax_h->row_padded_size * imax_h->col_padded_size) +
         (imax_spmm->row_padded_size * imax_spmm->col_padded_size) +
         (imax_w->row_padded_size * imax_w->col_padded_size) +
-        (imax_mm->row_padded_size * imax_mm->col_padded_size)
+        (imax_mm->row_padded_size * imax_mm->col_padded_size) +
+        ((imax_mm2 != NULL) ? (imax_mm2->row_padded_size * imax_mm2->col_padded_size) : (0)) +
+        ((imax_mm3 != NULL) ? (imax_mm3->row_padded_size * imax_mm3->col_padded_size) : (0))
     ) * sizeof(Uint);
     #if defined(ARMZYNQ) && (defined(EMAX6) || defined(EMAX7))
     int blk_col_num = imax_sp->col_padded_size / imax_sp->blk_col_size;
@@ -228,6 +230,14 @@ void imax_gcn_allocation(IMAXSparseMatrix *imax_sp, IMAXDenseMatrix *imax_h, IMA
     imax_w->val    = sp_tmp; sp_tmp += (imax_w->row_padded_size * imax_w->col_padded_size);
     if ((Ull)sp_tmp%align_size) sp_tmp += (align_size - ((Ull)sp_tmp%align_size))/sizeof(Uint);
     imax_mm->val   = sp_tmp; sp_tmp += (imax_mm->row_padded_size * imax_mm->col_padded_size);
+    if (imax_mm2 != NULL) {
+        if ((Ull)sp_tmp%align_size) sp_tmp += (align_size - ((Ull)sp_tmp%align_size))/sizeof(Uint);
+        imax_mm2->val   = sp_tmp; sp_tmp += (imax_mm2->row_padded_size * imax_mm2->col_padded_size);
+    }
+    if (imax_mm3 != NULL) {
+        if ((Ull)sp_tmp%align_size) sp_tmp += (align_size - ((Ull)sp_tmp%align_size))/sizeof(Uint);
+        imax_mm3->val   = sp_tmp; sp_tmp += (imax_mm3->row_padded_size * imax_mm3->col_padded_size);
+    }
     #else
     imax_h->val    = (Uint*) malloc(imax_h->row_padded_size * imax_h->col_padded_size * sizeof(Uint));
     imax_spmm->val = (Uint*) malloc(imax_spmm->row_padded_size * imax_spmm->col_padded_size * sizeof(Uint));
@@ -237,6 +247,14 @@ void imax_gcn_allocation(IMAXSparseMatrix *imax_sp, IMAXDenseMatrix *imax_h, IMA
     memset(imax_spmm->val, 0, imax_spmm->row_padded_size * imax_spmm->col_padded_size * sizeof(Uint));
     memset(imax_w->val,    0, imax_w->row_padded_size * imax_w->col_padded_size * sizeof(Uint));
     memset(imax_mm->val,   0, imax_mm->row_padded_size * imax_mm->col_padded_size * sizeof(Uint));
+    if (imax_mm2 != NULL) {
+        imax_mm2->val   = (Uint*) malloc(imax_mm2->row_padded_size * imax_mm2->col_padded_size * sizeof(Uint));
+        memset(imax_mm2->val,   0, imax_mm2->row_padded_size * imax_mm2->col_padded_size * sizeof(Uint));
+    }
+    if (imax_mm3 != NULL) {
+        imax_mm3->val   = (Uint*) malloc(imax_mm3->row_padded_size * imax_mm3->col_padded_size * sizeof(Uint));
+        memset(imax_mm3->val,   0, imax_mm3->row_padded_size * imax_mm3->col_padded_size * sizeof(Uint));
+    }
     #endif
     printf("Dense Input  Head: %08x_%08x\n", (Uint)((Ull)imax_h->val >> 32), (Uint)imax_h->val);
     printf("Dense Input  Head: %08x_%08x\n", (Uint)((Ull)imax_spmm->val >> 32), (Uint)imax_spmm->val);

@@ -26,7 +26,7 @@ Uchar* sysinit(Uint memsize, Uint alignment) {
   membase = emax_info.ddr_mmap;
   {int i; for (i=0; i<(memsize+sizeof(Dll)-1)/sizeof(Dll); i++) *((Dll*)membase+i)=0;}
 #elif defined(ARMZYNQ) && defined(EMAX7)
-  if (emax7_open(0) == NULL) 
+  if (emax7_open(1) == NULL) 
     exit(1);
   membase = emax_info[0].ddr_mmap;
   {int i; for (i=0; i<(memsize+sizeof(Dll)-1)/sizeof(Dll); i++) *((Dll*)membase+i)=0;}
@@ -49,9 +49,9 @@ Uchar* sysinit(Uint memsize, Uint alignment) {
   emax_info.ddr_phys = membase;
   emax_info.ddr_mmap = emax_info.ddr_phys;
 #elif !defined(ARMZYNQ) && defined(EMAX7)
-  emax_info[0].dma_phys = DMA_BASE2_PHYS; /* defined in emax6lib.h */
+  emax_info[0].dma_phys = DMA_BASE2_PHYS; /* defined in emax7lib.h */
   emax_info[0].dma_mmap = emax_info[0].dma_phys;
-  emax_info[0].reg_phys = REG_BASE2_PHYS; /* defined in emax6lib.h */
+  emax_info[0].reg_phys = REG_BASE2_PHYS; /* defined in emax7lib.h */
   emax_info[0].reg_mmap = emax_info[0].reg_phys;
   emax_info[0].lmm_phys = LMM_BASE2_PHYS;
   emax_info[0].lmm_mmap = emax_info[0].lmm_phys;
@@ -947,6 +947,12 @@ void mm(IMAXDenseMatrix *result, IMAXDenseMatrix *imax_a, IMAXDenseMatrix *imax_
 
 void relu(DenseMatrix *result, DenseMatrix *a) {
     for (int i = 0; i < (a->row_size * a->col_size); i++) {
+        result->val[i] = (a->val[i] > 0) ? a->val[i] : 0;
+    }
+}
+
+void d_relu(DenseMatrix *result, DenseMatrix *a) {
+    for (int i = 0; i < (a->col_size * a->row_size); i++) {
         result->val[i] = (a->val[i] > 0) ? a->val[i] : 0;
     }
 }

@@ -25,10 +25,10 @@ EMAX_VER := 7
 EMAX_DEFINE := -DEMAX6 -DDEBUG -DUSE_MP -DNCHIP=$(NCHIP)
 TEST_SPARSE_OBJS := test/test_sparse.o
 TEST_DENSE_OBJS := test/test_dense.o
-HEADERS := $(CONV)/emax6.h $(INCLUDE)/layer.h $(INCLUDE)/options.h $(INCLUDE)/sparse.h $(INCLUDE)/utils.h $(INCLUDE)/reader.h $(INCLUDE)/gcn.h
+HEADERS := $(CONV)/emax6.h $(INCLUDE)/layer.h $(INCLUDE)/options.h $(INCLUDE)/sparse.h $(INCLUDE)/utils.h $(INCLUDE)/reader.h $(INCLUDE)/gcn.h $(INCLUDE)/optimizer.h
 ifeq ($(EMAX_VER), 7)
 CONV := ./conv-c2d
-HEADERS := $(CONV)/emax7.h $(INCLUDE)/layer.h $(INCLUDE)/options.h $(INCLUDE)/sparse.h $(INCLUDE)/utils.h $(INCLUDE)/reader.h $(INCLUDE)/layer.h 
+HEADERS := $(CONV)/emax7.h $(INCLUDE)/layer.h $(INCLUDE)/options.h $(INCLUDE)/sparse.h $(INCLUDE)/utils.h $(INCLUDE)/reader.h $(INCLUDE)/gcn.h  $(INCLUDE)/optimizer.h
 EMAX_DEFINE := -DCBLAS_GEMM -DEMAX7 -DDEBUG -DUSE_MP -DNCHIP=$(NCHIP)
 endif
 ifeq ($(UNIT32), 1)
