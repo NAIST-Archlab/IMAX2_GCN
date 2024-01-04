@@ -3,16 +3,13 @@
 //         Copyright (C) 2023 by NAIST //
 //          Primary writer: Dohyun Kim //
 //          kim.dohyun.kg7@is.naist.jp //
-#if defined(EMAX7)
-#include "../conv-c2d/emax7.h"
-#elif defined(EMAX6)
-#include "../conv-c2c/emax6.h"
-#endif
 #include "./include/gcn.h"
 #include "./include/utils.h"
 #include "./include/sparse.h"
+#include "./include/linalg.h"
 #include "./include/reader.h"
 #include "./include/optimizer.h"
+#include "./include/imax.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>

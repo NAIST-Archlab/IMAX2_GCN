@@ -25,10 +25,10 @@ EMAX_VER := 7
 EMAX_DEFINE := -DEMAX6 -DDEBUG -DUSE_MP -DNCHIP=$(NCHIP)
 TEST_SPARSE_OBJS := test/test_sparse.o
 TEST_DENSE_OBJS := test/test_dense.o
-HEADERS := $(CONV)/emax6.h $(INCLUDE)/layer.h $(INCLUDE)/options.h $(INCLUDE)/sparse.h $(INCLUDE)/utils.h $(INCLUDE)/reader.h $(INCLUDE)/gcn.h $(INCLUDE)/optimizer.h
+HEADERS := $(CONV)/emax6.h $(wildcard $(INCLUDE)/*.h)
 ifeq ($(EMAX_VER), 7)
 CONV := ./conv-c2d
-HEADERS := $(CONV)/emax7.h $(INCLUDE)/layer.h $(INCLUDE)/options.h $(INCLUDE)/sparse.h $(INCLUDE)/utils.h $(INCLUDE)/reader.h $(INCLUDE)/gcn.h  $(INCLUDE)/optimizer.h
+HEADERS := $(CONV)/emax7.h $(wildcard $(INCLUDE)/*.h)
 EMAX_DEFINE := -DCBLAS_GEMM -DEMAX7 -DDEBUG -DUSE_MP -DNCHIP=$(NCHIP)
 endif
 ifeq ($(UNIT32), 1)
@@ -73,28 +73,28 @@ CFLAGS  := -g3 -O3 -Wall -msse3 -Wno-unknown-pragmas -fopenmp -funroll-loops -fc
 ifeq ($(SAME_DISTANCE), 1)
 CFLAGS  := -g3 -O3 -Wall -msse3 -Wno-unknown-pragmas -fopenmp -funroll-loops -fcommon -I$(INCLUDE) -DCBLAS_GEMM -DSAME_DISTANCE $(EMAX_DEFINE)
 endif
-LDFLAGS := -L/usr/lib64 -L/usr/local/lib -lm
+LDFLAGS := -z muldefs -L/usr/lib64 -L/usr/local/lib -lm
 
 ifeq ($(ARM),1)
 CFLAGS  := -O1 -Wall -Wno-unknown-pragmas -funroll-loops -fopenmp -fcommon -I$(INCLUDE) -DARMZYNQ $(EMAX_DEFINE)
 ifeq ($(SAME_DISTANCE), 1)
 CFLAGS  := -O1 -Wall -Wno-unknown-pragmas -funroll-loops -fopenmp -fcommon -I$(INCLUDE) -DARMZYNQ -DSAME_DISTANCE $(EMAX_DEFINE)
 endif
-LDFLAGS := -L/usr/lib64 -L/usr/local/lib -lm -lrt -lX11 -lXext
+LDFLAGS := -z muldefs -L/usr/lib64 -L/usr/local/lib -lm -lrt -lX11 -lXext
 CFLAGS_EMAX  := -O1 -Wall -Wno-unknown-pragmas -funroll-loops -fopenmp -fcommon -I$(INCLUDE) -I$(CONV) -DARMZYNQ $(EMAX_DEFINE)
 CFLAGS_EMAX_NC  := -O1 -Wall -Wno-unknown-pragmas -funroll-loops -fopenmp -fcommon -I$(INCLUDE) -I$(CONV) -DARMZYNQ $(EMAX_DEFINE)
 CFLAGS_EMAX_DMA  := -O1 -Wall -Wno-unknown-pragmas -funroll-loops -fopenmp -fcommon -I$(INCLUDE) -I$(CONV) -DARMZYNQ -DFPDDMA $(EMAX_DEFINE)
-SRCS_EMAX := $(filter-out $(SRC_DIR)/sparse_imax.c, $(SRCS)) $(SRC_DIR)/sparse_imax-emax$(EMAX_VER).c
+SRCS_EMAX := $(filter-out $(SRC_DIR)/linalg_imax.c, $(filter-out $(SRC_DIR)/sparse_imax.c, $(SRCS))) $(SRC_DIR)/sparse_imax-emax$(EMAX_VER).c $(SRC_DIR)/linalg_imax-emax$(EMAX_VER).c
 OBJS_EMAX := $(SRCS_EMAX:.c=.o)
 endif
 
 ifeq ($(ARM_MACOS),1)
 CFLAGS := -g3 -O3 -Wall -Wno-unknown-pragmas -I$(HOMEBREW_DIR)/opt/libomp/include -Xpreprocessor -fopenmp -I$(INCLUDE) -DCBLAS_GEMM $(EMAX_DEFINE)
-LDFLAGS := -L/usr/lib -L/usr/local/lib -L$(HOMEBREW_DIR)/opt/libomp/lib -lm -lomp
+LDFLAGS := -z muldefs -L/usr/lib -L/usr/local/lib -L$(HOMEBREW_DIR)/opt/libomp/lib -lm -lomp
 endif
 
 ifeq ($(ARM_CROSS),1)
-LDFLAGS := -L/usr/lib64 -L/usr/local/lib -lm -fopenmp -fcommon
+LDFLAGS := -z muldefs -L/usr/lib64 -L/usr/local/lib -lm -fopenmp -fcommon
 endif
 DEVICE_DEBUG := 0
 
@@ -168,7 +168,13 @@ endif
 ifeq ($(HARD_UNIT32), 1)
 CONV_EXE := $(CONV_EXE) -u32
 endif
+
 $(SRC_DIR)/sparse_imax-emax$(EMAX_VER).c: $(SRC_DIR)/sparse_imax.c
+	./conv-mark/conv-mark $< > $<-mark.c
+	$(CPP) $(CFLAGS_EMAX_DMA) $<-mark.c > $<-cppo.c
+	$(CONV_EXE) $<-cppo.c
+
+$(SRC_DIR)/linalg_imax-emax$(EMAX_VER).c: $(SRC_DIR)/linalg_imax.c
 	./conv-mark/conv-mark $< > $<-mark.c
 	$(CPP) $(CFLAGS_EMAX_DMA) $<-mark.c > $<-cppo.c
 	$(CONV_EXE) $<-cppo.c
