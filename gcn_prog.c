@@ -1,6 +1,6 @@
 // EMAX6/7 GCN Test Program            //
-// main.c                              //
-//         Copyright (C) 2023 by NAIST //
+// gcn_prog.c                              //
+//         Copyright (C) 2024 by NAIST //
 //          Primary writer: Dohyun Kim //
 //          kim.dohyun.kg7@is.naist.jp //
 #include "./include/gcn.h"
@@ -29,13 +29,13 @@ int main(int argc, char **argv) {
     char tmp_filename[100], graph_type;
     Ull version, sizeEdgeTy, nv, f_dim_in, ne;
     Uint f_dim_out;
-    int from, to, iter=1;
+    int from, to, iter=1, mode=0;
     Uint *vertices;
 
     struct timespec t1, t2;
 
     if (argc < 5) {
-        printf("Usage: %s weight graph from to (iter)\n", argv[0]);
+        printf("Usage: %s weight graph from to (iter) (mode=(infer=0,learn=1))\n", argv[0]);
         return 1;
     }
 
@@ -47,6 +47,10 @@ int main(int argc, char **argv) {
 
     if (argc > 5) {
         if((iter = atoi(argv[5])) < 1) iter = 1;
+    }
+
+    if (argc > 6) {
+        if((mode = atoi(argv[6])) < 0 || mode > 1) mode = 0;
     }
 
     memset(tmp_filename, 0, 100);
@@ -93,27 +97,32 @@ int main(int argc, char **argv) {
         printf("Transform %lf usec.\n", cal_time(&t2, &t1));
     #endif
 
-    for (int i = 0; i < iter; i++) {gcn_propagation(&network);}
-    //OptimizerOption opt;
-    //opt.lr = 0.01;
-    //opt.beta1 = 0.9;
-    //opt.beta2 = 0.999;
-    //opt.epsilon = 1e-8;
-    //opt.t = 1;
-    //Uchar *vlabels = (Uchar *)malloc(sizeof(Uchar) * network.graph->matrix.row_size);
-    //read_graph_bin_vlabels(vlabels, argv[2], 0, network.graph->matrix.row_size - 1);
-    //DenseMatrix labels;
-    //labels.row_size = network.layers->result_layer.row_size;
-    //labels.col_size = network.layers->result_layer.col_size;
-    //allocDenseMatrix(&labels);
-    //expand_labels(&labels, vlabels);
-    //#ifdef USE_CUDA
-        //sendDenseMatrixToGPU(&labels);
-    //#endif
-    //for (int i = 0; i < iter; i++) {
-        //gcn_propagation(&network);
-        //gcn_backpropagation(&network, &labels, &adam, &opt);
-    //}
+    if (mode) {
+        OptimizerOption opt;
+        opt.lr = 0.01;
+        opt.beta1 = 0.9;
+        opt.beta2 = 0.999;
+        opt.epsilon = 1e-8;
+        opt.t = 1;
+        Uchar *vlabels = (Uchar *)malloc(sizeof(Uchar) * network.graph->matrix.row_size);
+        read_graph_bin_vlabels(vlabels, argv[2], 0, network.graph->matrix.row_size - 1);
+        DenseMatrix labels;
+        labels.row_size = network.layers->result_layer.row_size;
+        labels.col_size = network.layers->result_layer.col_size;
+        allocDenseMatrix(&labels);
+        expand_labels(&labels, vlabels);
+        #ifdef USE_CUDA
+            sendDenseMatrixToGPU(&labels);
+        #endif
+        printf("Learning\n");
+        for (int i = 0; i < iter; i++) {
+            gcn_propagation(&network);
+            gcn_backpropagation(&network, &labels, &adam, &opt);
+        }
+    } else {
+        printf("Inference\n");
+        for (int i = 0; i < iter; i++) {gcn_propagation(&network);}
+    }
 
     printf("Result\n");
     print_weight(&(network.layers->result_layer));

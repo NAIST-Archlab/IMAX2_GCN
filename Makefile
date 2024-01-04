@@ -1,8 +1,8 @@
 ## EMAX6/7 GCN Test Program            ##
-##         Copyright (C) 2023 by NAIST ##
+##         Copyright (C) 2024 by NAIST ##
 ##          Primary writer: Dohyun Kim ##
 ##          kim.dohyun.kg7@is.naist.jp ##
-PROGRAM := imax_gcn
+GCN_PROG := imax_gcn
 TEST_SPARSE_PROGRAM := test_sparse
 TEST_DENSE_PROGRAM := test_dense
 SRC_DIR := src
@@ -12,8 +12,8 @@ CONV := ./conv-c2c/
 SRCS := $(wildcard $(SRC_DIR)/*.c)
 TEST_SRCS := $(wildcard $(TEST_DIR)/*.c)
 OBJS := $(SRCS:.c=.o)
-MAIN := main.c
-MAIN_OBJS := main.o
+GCN_PROG_SRC := gcn_prog.c
+GCN_PROG_OBJS := gcn_prog.o
 NCHIP := 1
 CPUONLY := 0
 CUDA := 0
@@ -117,20 +117,20 @@ endif
 LDFLAGS := -L/usr/lib64 -L/usr/local/lib -lm -lrt -lcusparse -lcublas
 endif
 
-all: $(PROGRAM)
+all: $(GCN_PROG)
 
-$(PROGRAM): $(OBJS) $(MAIN_OBJS)
-	$(CC) $(OBJS) $(MAIN_OBJS) -o $(PROGRAM) $(LDFLAGS) $(CFLAGS)
+$(GCN_PROG): $(OBJS) $(GCN_PROG_OBJS)
+	$(CC) $(OBJS) $(GCN_PROG_OBJS) -o $(GCN_PROG) $(LDFLAGS) $(CFLAGS)
 
 ifeq ($(ARM), 1)
-$(PROGRAM).emax$(EMAX_VER): $(OBJS_EMAX) $(MAIN_OBJS)
-	$(CC) $(OBJS_EMAX) $(MAIN_OBJS) -o $(PROGRAM).emax$(EMAX_VER) $(LDFLAGS) $(CFLAGS_EMAX)
+$(GCN_PROG).emax$(EMAX_VER): $(OBJS_EMAX) $(GCN_PROG_OBJS)
+	$(CC) $(OBJS_EMAX) $(GCN_PROG_OBJS) -o $(GCN_PROG).emax$(EMAX_VER) $(LDFLAGS) $(CFLAGS_EMAX)
 
-$(PROGRAM).emax$(EMAX_VER)+dma: $(OBJS_EMAX) $(MAIN_OBJS)
-	$(CC) $(OBJS_EMAX) $(MAIN_OBJS) -o $(PROGRAM).emax$(EMAX_VER)+dma $(LDFLAGS) $(CFLAGS_EMAX_DMA)
+$(GCN_PROG).emax$(EMAX_VER)+dma: $(OBJS_EMAX) $(GCN_PROG_OBJS)
+	$(CC) $(OBJS_EMAX) $(GCN_PROG_OBJS) -o $(GCN_PROG).emax$(EMAX_VER)+dma $(LDFLAGS) $(CFLAGS_EMAX_DMA)
 
-$(PROGRAM).emax$(EMAX_VER)+nc: $(OBJS) $(MAIN_OBJS)
-	$(CC) $(OBJS) $(MAIN_OBJS) -o $(PROGRAM).emax$(EMAX_VER)+nc $(LDFLAGS) $(CFLAGS_EMAX_NC)
+$(GCN_PROG).emax$(EMAX_VER)+nc: $(OBJS) $(GCN_PROG_OBJS)
+	$(CC) $(OBJS) $(GCN_PROG_OBJS) -o $(PROGRAM).emax$(EMAX_VER)+nc $(LDFLAGS) $(CFLAGS_EMAX_NC)
 endif
 
 $(TEST_SPARSE_PROGRAM): $(OBJS) $(TEST_SPARSE_OBJS)

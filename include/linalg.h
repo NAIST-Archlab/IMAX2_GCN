@@ -54,11 +54,6 @@ typedef struct dense_matrix_imax2 {
 void mm(IMAXDenseMatrix *result, IMAXDenseMatrix *imax_a, IMAXDenseMatrix *imax_b);
 void relu(DenseMatrix *result, DenseMatrix *a);
 void d_relu(DenseMatrix *result, DenseMatrix *a);
-Uchar* sysinit(Uint memsize, Uint alignment);
-Uchar* imax_alloc(Uint memsize, Uint alignment);
-void imax_dealloc(Uint memsize, Uint alignment);
-void imemcpy(Uint *dst, Uint *src, int words);
-void xmax_bzero(Uint *dst, int words);
 #endif
 #if __cplusplus
 extern "C" {

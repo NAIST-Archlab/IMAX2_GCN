@@ -54,7 +54,7 @@ void gcn_propagation(GCNNetwork *network) {
     struct timespec t1, t2;
     #if defined(EMAX6) || defined(EMAX7)
         IMAXDenseMatrix imax_h, imax_w, imax_r_spmm, imax_r_mm, imax_dump;
-        //imax_sparse_allocation(&network->graph->imax_matrix);
+        imax_sparse_allocation(&network->graph->imax_matrix);
     #elif defined(USE_CUDA)
         double cusparse_load = 0;
         double cublas_load = 0;
@@ -93,11 +93,10 @@ void gcn_propagation(GCNNetwork *network) {
                 imax_dense_format_init(&imax_w, imax_h.col_size, p->hidden_layer.col_size, imax_h.col_padded_size, p->hidden_layer.col_size + imax_h.blk_col_size - (p->hidden_layer.col_size%imax_h.blk_col_size), MM_H, imax_h.blk_col_size);
                 imax_dense_format_init(&imax_r_mm, imax_h.row_size, imax_w.col_size, imax_h.row_padded_size, imax_w.col_padded_size, imax_h.blk_row_size, imax_w.blk_col_size);
                 imax_dense_format_init(&imax_r_spmm, imax_r_mm.row_size, imax_r_mm.col_size, imax_r_mm.row_padded_size, imax_r_mm.col_padded_size, imax_r_mm.blk_row_size, imax_r_mm.blk_col_size);
-                imax_gcn_allocation(&network->graph->imax_matrix, &imax_h, &imax_r_spmm, &imax_w, &imax_r_mm, NULL, NULL);
-                //imax_dense_allocation(&imax_h);
-                //imax_dense_allocation(&imax_w);
-                //imax_dense_allocation(&imax_r_mm);
-                //imax_dense_allocation(&imax_r_spmm);
+                imax_dense_allocation(&imax_h);
+                imax_dense_allocation(&imax_w);
+                imax_dense_allocation(&imax_r_mm);
+                imax_dense_allocation(&imax_r_spmm);
                 convert_imax_dense_format(&imax_h, &(p->latent_vectors));
                 convert_imax_dense_format(&imax_w, &(p->hidden_layer));
             #endif
@@ -158,11 +157,10 @@ void gcn_propagation(GCNNetwork *network) {
                 imax_dense_format_init(&imax_r_spmm, imax_h.row_size, imax_h.col_size, imax_h.row_padded_size, imax_h.col_padded_size, imax_h.blk_row_size, imax_h.blk_col_size);
                 imax_dense_format_init(&imax_w, imax_r_spmm.col_size, p->hidden_layer.col_size, imax_r_spmm.col_padded_size, p->hidden_layer.col_size + imax_r_spmm.blk_col_size - (p->hidden_layer.col_size%imax_r_spmm.blk_col_size), MM_H, imax_r_spmm.blk_col_size);
                 imax_dense_format_init(&imax_r_mm, imax_r_spmm.row_size, imax_w.col_size, imax_r_spmm.row_padded_size, imax_w.col_padded_size, imax_r_spmm.blk_row_size, imax_w.blk_col_size);
-                imax_gcn_allocation(&network->graph->imax_matrix, &imax_h, &imax_r_spmm, &imax_w, &imax_r_mm, NULL, NULL);
-                //imax_dense_allocation(&imax_h);
-                //imax_dense_allocation(&imax_w);
-                //imax_dense_allocation(&imax_r_mm);
-                //imax_dense_allocation(&imax_r_spmm);
+                imax_dense_allocation(&imax_h);
+                imax_dense_allocation(&imax_w);
+                imax_dense_allocation(&imax_r_mm);
+                imax_dense_allocation(&imax_r_spmm);
                 convert_imax_dense_format(&imax_h, &(p->latent_vectors));
                 convert_imax_dense_format(&imax_w, &(p->hidden_layer));
             #endif
@@ -213,16 +211,16 @@ void gcn_propagation(GCNNetwork *network) {
 
         }
         #if defined(EMAX6) || defined(EMAX7)
-            //imax_dense_deallocation(&imax_h);
-            //imax_dense_deallocation(&imax_w);
-            //imax_dense_deallocation(&imax_r_mm);
-            //imax_dense_deallocation(&imax_r_spmm);
+            imax_dense_deallocation(&imax_h);
+            imax_dense_deallocation(&imax_w);
+            imax_dense_deallocation(&imax_r_mm);
+            imax_dense_deallocation(&imax_r_spmm);
         #endif
         freeDenseMatrix(&r_spmm);freeDenseMatrix(&r_mm);
         p = p->next;
     }
     #if defined(EMAX6) || defined(EMAX7)
-        //imax_sparse_deallocation(&network->graph->imax_matrix);
+        imax_sparse_deallocation(&network->graph->imax_matrix);
     #endif
 
     printf("Softmax\n");
@@ -265,6 +263,7 @@ void gcn_backpropagation(GCNNetwork *network, DenseMatrix *labels, void (*optimi
     struct timespec t1, t2;
     #if defined(EMAX6) || defined(EMAX7)
         IMAXDenseMatrix imax_h, imax_w, imax_r_spmm, imax_r_mm, imax_dump, imax_w_error, imax_h_error, imax_h_next_error, imax_h_transpose, imax_w_transpose;
+        imax_sparse_allocation(&network->graph->imax_matrix);
     #elif defined(USE_CUDA)
         double cusparse_load = 0;
         double cublas_load = 0;
@@ -345,7 +344,14 @@ void gcn_backpropagation(GCNNetwork *network, DenseMatrix *labels, void (*optimi
             imax_dense_format_init(&imax_w, imax_r_spmm.col_size, p->hidden_layer.col_size, imax_r_spmm.col_padded_size, p->hidden_layer.col_size + imax_r_spmm.blk_col_size - (p->hidden_layer.col_size%imax_r_spmm.blk_col_size), MM_H, imax_r_spmm.blk_col_size);
             imax_dense_format_init(&imax_w_transpose, imax_w.col_size, imax_w.row_size, imax_w.col_padded_size, imax_w.row_padded_size, imax_w.blk_row_size, imax_w.blk_col_size);
             imax_dense_format_init(&imax_w_error, imax_r_spmm.col_size, p->hidden_layer.col_size, imax_r_spmm.col_padded_size, p->hidden_layer.col_size + imax_r_spmm.blk_col_size - (p->hidden_layer.col_size%imax_r_spmm.blk_col_size), MM_H, imax_r_spmm.blk_col_size);
-            imax_gcn_allocation(&network->graph->imax_matrix, &imax_h_transpose, &imax_r_spmm, &imax_w_transpose, &imax_h_error, &imax_h_next_error, &imax_w_error);
+            imax_dense_allocation(&imax_h);
+            imax_dense_allocation(&imax_h_transpose);
+            imax_dense_allocation(&imax_r_spmm);
+            imax_dense_allocation(&imax_w);
+            imax_dense_allocation(&imax_w_transpose);
+            imax_dense_allocation(&imax_h_error);
+            imax_dense_allocation(&imax_h_next_error);
+            imax_dense_allocation(&imax_w_error);
             convert_imax_dense_format(&imax_h_transpose, &h_transpose);
             convert_imax_dense_format(&imax_w_transpose, &w_transpose);
             convert_imax_dense_format(&imax_h_error, &h_error);
@@ -395,10 +401,23 @@ void gcn_backpropagation(GCNNetwork *network, DenseMatrix *labels, void (*optimi
         freeDenseMatrix(&h_error);
         h_error = h_next_error;
 
+        #if defined(EMAX6) || defined(EMAX7)
+            imax_dense_deallocation(&imax_h);
+            imax_dense_deallocation(&imax_h_transpose);
+            imax_dense_deallocation(&imax_r_spmm);
+            imax_dense_deallocation(&imax_w);
+            imax_dense_deallocation(&imax_w_transpose);
+            imax_dense_deallocation(&imax_h_error);
+            imax_dense_deallocation(&imax_h_next_error);
+            imax_dense_deallocation(&imax_w_error);
+        #endif
         freeDenseMatrix(&r_spmm);freeDenseMatrix(&w_error);
         p = p->prev;
     }
     freeDenseMatrix(&h_error);
+    #if defined(EMAX6) || defined(EMAX7)
+        imax_sparse_deallocation(&network->graph->imax_matrix);
+    #endif
 
     #ifdef USE_CUDA
         destroyCusparse();
