@@ -1,59 +1,15 @@
 // EMAX6/7 GCN Test Program            //
 // sparse.h                            //
-//         Copyright (C) 2023 by NAIST //
+//         Copyright (C) 2024 by NAIST //
 //          Primary writer: Dohyun Kim //
 //          kim.dohyun.kg7@is.naist.jp //
 #ifndef __SPARSE_H__
 #define __SPARSE_H__
-#if defined(EMAX7) || defined(EMAX6)
-#if defined(EMAX7)
-#include "../conv-c2d/emax7.h"
-#elif defined(EMAX6)
-#include "../conv-c2c/emax6.h"
-#endif
-#else
-#ifndef UTYPEDEF
-#define UTYPEDEF
-typedef unsigned char Uchar;
-typedef unsigned short Ushort;
-typedef unsigned int Uint;
-typedef unsigned long long Ull;
-typedef long long int Sll;
-#if __AARCH64EL__ == 1
-typedef long double Dll;
-#else
-typedef struct { Ull u[2]; } Dll;
-#endif
-#endif
-#endif
+#include "linalg.h"
 
-enum { SPMM, MM, RELU, SOFTMAX, NUM_CLASS };
-#if defined(EMAX6) || defined(EMAX7)
-unsigned long long all_nanosec[NUM_CLASS][8];
-#elif defined(USE_CUDA)
-unsigned long long all_nanosec[NUM_CLASS][3];
-#else
-unsigned long long all_nanosec[NUM_CLASS];
-#endif
-
-#define KERNEL_MODE_1 1
-#define KERNEL_MODE_2 2
-#ifdef LMM128
-#define LMM_SIZE 0x8000
-#define MAX_COL_SIZE 0x800 // LMMのサイズの最大値にすると構造上問題が発生するため、1/2にしている
-#else
-#define LMM_SIZE 0x4000
-#define MAX_COL_SIZE 0x400 // LMMのサイズの最大値にすると構造上問題が発生するため、1/2にしている
-#endif
 #ifdef UNIT32
 #define SPMM_H 20
-#ifndef HARD_UNIT32
-#define MM_H 32
 #else
-#define MM_H 16
-#endif
-#else
-#define MM_H 32
 #define SPMM_H 46
 #endif
 
@@ -68,13 +24,6 @@ typedef struct sparse_matrix {
     int *cuda_col_p; // for CUDA
     float *cuda_val; // for CUDA
 } SparseMatrix;
-
-typedef struct dense_matrix {
-    int   row_size;  // row size
-    int   col_size;  // column size
-    float      *val; // values
-    float *cuda_val; // values for CUDA
-} DenseMatrix;
 
 #if defined(EMAX6) || defined(EMAX7)
 typedef struct sparse_matrix_sub_imax2 {
@@ -101,78 +50,42 @@ typedef struct sparse_matrix_imax2 {
     IMAXSparseMatrixSub *sub; // Sub matrix
 } IMAXSparseMatrix;
 
-typedef struct dense_matrix_imax2 {
-    int        row_size; // real row size
-    int        col_size; // real column size
-    int row_padded_size; // row size padded
-    int col_padded_size; // column size padded
-    int    blk_row_size; // Size of row each block
-    int    blk_col_size; // Size of column each block
-    Uint           *val; // values
-} IMAXDenseMatrix;
-
 void spmm(IMAXDenseMatrix *result, IMAXSparseMatrix *imax_sp_matrix, IMAXDenseMatrix *matrix);
-void mm(IMAXDenseMatrix *result, IMAXDenseMatrix *imax_a, IMAXDenseMatrix *imax_b);
-void relu(DenseMatrix *result, DenseMatrix *a);
-Uchar* sysinit(Uint memsize, Uint alignment);
-void imemcpy(Uint *dst, Uint *src, int words);
-void xmax_bzero(Uint *dst, int words);
 #endif
-#ifdef USE_CUDA
 #if __cplusplus
 extern "C" {
 #endif
+#if !(defined(EMAX6) || defined(EMAX7))
+void spmm(DenseMatrix *result, SparseMatrix *sp_matrix, DenseMatrix *matrix);
+#endif
 void gcn_preprocessing(SparseMatrix *matrix);
 void spia(SparseMatrix *result, SparseMatrix *sp_matrix);
-void softmax(DenseMatrix *end_vectors);
-float max_in_array(float *array, int size);
-void spmm(DenseMatrix *result, SparseMatrix *sp_matrix, DenseMatrix *matrix);
-void mm(DenseMatrix *result, DenseMatrix *a, DenseMatrix *b);
-void msub (DenseMatrix *result, DenseMatrix *a, DenseMatrix *b);
-float mmeans(DenseMatrix *a);
-void relu(DenseMatrix *result, DenseMatrix *a);
-void d_relu(DenseMatrix *result, DenseMatrix *a);
-void d_softmax(DenseMatrix *result);
-void transpose(DenseMatrix *result, DenseMatrix *a);
-void expand_labels(DenseMatrix *labels, Uchar *vlabels);
 void allocSparseMatrix(SparseMatrix *sp_matrix);
-void allocDenseMatrix(DenseMatrix *matrix);
+void freeSparseMatrix(SparseMatrix *sp_matrix);
+#ifdef USE_CUDA
 void sendSparseMatrixToGPU(SparseMatrix *sp_matrix);
 void sendSparseMatrixToCPU(SparseMatrix *sp_matrix);
-void sendDenseMatrixToGPU(DenseMatrix *matrix);
-void sendDenseMatrixToCPU(DenseMatrix *matrix);
-void freeGPUDenseMatrix(DenseMatrix *matrix);
 void freeGPUSparseMatrix(SparseMatrix *sp_matrix);
-void freeDenseMatrix(DenseMatrix *matrix);
-void freeSparseMatrix(SparseMatrix *sp_matrix);
 void createCusparse();
-void createCublas();
 void destroyCusparse();
-void destroyCublas();
-#if __cplusplus
+#define CHECK_CUSPARSE(call)                                                   \
+{                                                                              \
+    cusparseStatus_t err;                                                      \
+    if ((err = (call)) != CUSPARSE_STATUS_SUCCESS)                             \
+    {                                                                          \
+        fprintf(stderr, "Got error %d at %s:%d\n", err, __FILE__, __LINE__);   \
+        cudaError_t cuda_err = cudaGetLastError();                             \
+        if (cuda_err != cudaSuccess)                                           \
+        {                                                                      \
+            fprintf(stderr, "  CUDA error \"%s\" also detected\n",             \
+                    cudaGetErrorString(cuda_err));                             \
+        }                                                                      \
+        exit(1);                                                               \
+    }                                                                          \
 }
 #endif
-#else
-void gcn_preprocessing(SparseMatrix *matrix);
-void spia(SparseMatrix *result, SparseMatrix *sp_matrix);
-void softmax(DenseMatrix *end_vectors);
-void d_softmax(DenseMatrix *result);
-float max_in_array(float *array, int size);
-void msub (DenseMatrix *result, DenseMatrix *a, DenseMatrix *b);
-float mmeans(DenseMatrix *a);
-void transpose(DenseMatrix *result, DenseMatrix *a);
-void expand_labels(DenseMatrix *labels, Uchar *vlabels);
-void allocSparseMatrix(SparseMatrix *sp_matrix);
-void freeSparseMatrix(SparseMatrix *sp_matrix);
-void allocDenseMatrix(DenseMatrix *matrix);
-void freeDenseMatrix(DenseMatrix *matrix);
-#endif
-
-#if !(defined(EMAX6) || defined(EMAX7) || defined(USE_CUDA))
-void spmm(DenseMatrix *result, SparseMatrix *sp_matrix, DenseMatrix *matrix);
-void mm(DenseMatrix *result, DenseMatrix *a, DenseMatrix *b);
-void relu(DenseMatrix *result, DenseMatrix *a);
-void d_relu(DenseMatrix *result, DenseMatrix *a);
+#if __cplusplus
+}
 #endif
 
 #endif

@@ -5,11 +5,6 @@
 //          kim.dohyun.kg7@is.naist.jp //
 #ifndef __GCN_H__
 #define __GCN_H__
-#if defined(EMAX7)
-#include "../conv-c2d/emax7.h"
-#elif defined(EMAX6)
-#include "../conv-c2c/emax6.h"
-#endif
 #include "sparse.h"
 #include "layer.h"
 #include "optimizer.h"

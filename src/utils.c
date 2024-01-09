@@ -1,6 +1,6 @@
 // EMAX6/7 GCN Test Program            //
 // utils.c                             //
-//         Copyright (C) 2023 by NAIST //
+//         Copyright (C) 2024 by NAIST //
 //          Primary writer: Dohyun Kim //
 //          kim.dohyun.kg7@is.naist.jp //
 #include "../include/utils.h"
@@ -8,6 +8,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#if defined(EMAX7)
+#include "../conv-c2d/emax7lib.c"
+#elif defined(EMAX6)
+#include "../conv-c2d/emax6lib.c"
+#endif
 
 char is_allocated = 0;
 
@@ -22,6 +27,9 @@ double cal_time(struct timespec *end, struct timespec *start) {
 }
 
 #if defined(EMAX6) || defined(EMAX7)
+Uchar *membase = NULL;
+Uchar *prev = NULL;
+
 int gcd(int a_, int b_) {
     int r, a = a_, b = b_;
 
@@ -96,6 +104,230 @@ void merge_sort(Uint *num_buffer, int *value_buffer, Uint *num, Uint *value, Ull
     merge(num_buffer, value_buffer, num, value, left, mid, right);
 }
 
+Uchar* sysinit(Uint memsize, Uint alignment) {
+#if defined(ARMZYNQ) && defined(EMAX6)
+    if (emax6_open() == NULL) exit(1);
+    membase = emax_info.ddr_mmap;
+    {int i;for (i = 0; i < (memsize + sizeof(Dll) - 1) / sizeof(Dll); i++)*((Dll *)membase + i) = 0;}
+    prev = (Uchar *)((Dll *)membase + (memsize + sizeof(Dll) - 1) / sizeof(Dll));
+#elif defined(ARMZYNQ) && defined(EMAX7)
+    if (emax7_open(1) == NULL) exit(1);
+    membase = emax_info[0].ddr_mmap;
+    {int i;for (i = 0; i < (memsize + sizeof(Dll) - 1) / sizeof(Dll); i++)*((Dll *)membase + i) = 0;}
+    prev = (Uchar *)((Dll *)membase + (memsize + sizeof(Dll) - 1) / sizeof(Dll));
+#elif __linux__ == 1
+    posix_memalign(&membase, alignment, memsize);
+#else
+    membase = (void *)malloc(memsize + alignment);
+    prev = membase;
+    if ((Ull)membase & (Ull)(alignment - 1)) {membase = (void *)(((Ull)membase & ~(Ull)(alignment - 1)) + alignment);}
+#endif
+
+#if !defined(ARMZYNQ) && defined(EMAX6)
+    emax_info.dma_phys = DMA_BASE2_PHYS; /* defined in emax6lib.h */
+    emax_info.dma_mmap = emax_info.dma_phys;
+    emax_info.reg_phys = REG_BASE2_PHYS; /* defined in emax6lib.h */
+    emax_info.reg_mmap = emax_info.reg_phys;
+    emax_info.lmm_phys = LMM_BASE2_PHYS;
+    emax_info.lmm_mmap = emax_info.lmm_phys;
+    emax_info.ddr_phys = membase;
+    emax_info.ddr_mmap = emax_info.ddr_phys;
+#elif !defined(ARMZYNQ) && defined(EMAX7)
+    emax_info[0].dma_phys = DMA_BASE2_PHYS; /* defined in emax7lib.h */
+    emax_info[0].dma_mmap = emax_info[0].dma_phys;
+    emax_info[0].reg_phys = REG_BASE2_PHYS; /* defined in emax7lib.h */
+    emax_info[0].reg_mmap = emax_info[0].reg_phys;
+    emax_info[0].lmm_phys = LMM_BASE2_PHYS;
+    emax_info[0].lmm_mmap = emax_info[0].lmm_phys;
+    emax_info[0].ddr_phys = membase;
+    emax_info[0].ddr_mmap = emax_info[0].ddr_phys;
+#endif
+#if (defined(ARMSIML) || defined(ARMZYNQ)) && defined(EMAX6)
+    emax6.dma_ctrl = emax_info.dma_mmap;
+    emax6.reg_ctrl = emax_info.reg_mmap;
+    ((struct reg_ctrl *)emax6.reg_ctrl)->i[0].cmd = CMD_RESET;
+#if defined(ARMZYNQ)
+    usleep(1);
+#endif
+    switch (((struct reg_ctrl *)emax6.reg_ctrl)->i[0].stat >> 8 & 0xf) {
+    case 3:
+        EMAX_DEPTH = 64;
+        break;
+    case 2:
+        EMAX_DEPTH = 32;
+        break;
+    case 1:
+        EMAX_DEPTH = 16;
+        break;
+    default:
+        EMAX_DEPTH = 8;
+        break;
+    }
+    ((struct reg_ctrl *)emax6.reg_ctrl)->i[0].adtr = emax_info.ddr_mmap - emax_info.lmm_phys;
+    ((struct reg_ctrl *)emax6.reg_ctrl)->i[0].dmrp = 0LL;
+#endif
+#if (defined(ARMSIML) || defined(ARMZYNQ)) && defined(EMAX7)
+    emax7[0].dma_ctrl = emax_info[0].dma_mmap;
+    emax7[0].reg_ctrl = emax_info[0].reg_mmap;
+    ((struct reg_ctrl *)emax7[0].reg_ctrl)->i[0].cmd = CMD_RESET;
+#if defined(ARMZYNQ)
+    usleep(1);
+#endif
+    switch (((struct reg_ctrl *)emax7[0].reg_ctrl)->i[0].stat >> 8 & 0xf) {
+    case 3:
+        EMAX_DEPTH = 64;
+        break;
+    case 2:
+        EMAX_DEPTH = 32;
+        break;
+    case 1:
+        EMAX_DEPTH = 16;
+        break;
+    default:
+        EMAX_DEPTH = 8;
+        break;
+    }
+    ((struct reg_ctrl *)emax7[0].reg_ctrl)->i[0].adtr = emax_info[0].ddr_mmap - emax_info[0].lmm_phys;
+    ((struct reg_ctrl *)emax7[0].reg_ctrl)->i[0].dmrp = 0LL;
+#endif
+    return membase;
+}
+
+Uchar* imax_alloc(Uint memsize, Uint alignment) {
+    if (membase == NULL) {return sysinit(memsize, alignment);}
+    else {
+#if defined(ARMZYNQ) && (defined(EMAX6) || defined(EMAX7))
+        membase = prev;
+        {int i; for (i=0; i<(memsize+sizeof(Dll)-1)/sizeof(Dll); i++) *((Dll*)prev+i)=0;}
+        prev = (Dll*)prev + ((memsize+sizeof(Dll)-1)/sizeof(Dll));
+#elif __linux__ == 1
+        posix_memalign(&membase, alignment, memsize);
+#else
+        membase = (void*)malloc(memsize+alignment);
+        prev = membase;
+        if ((Ull)membase & (Ull)(alignment-1)) {membase = (void*)(((Ull)membase & ~(Ull)(alignment-1))+alignment);}
+#endif
+        return membase;
+    }
+}
+
+void imax_dealloc(Uint memsize, Uint alignment) {
+    if (membase != NULL) {
+#if defined(ARMZYNQ) && (defined(EMAX6) || defined(EMAX7))
+        prev = (Dll*)prev - ((memsize+sizeof(Dll)-1)/sizeof(Dll));
+#endif
+    }
+}
+
+void imemcpy(Uint *dst, Uint *src, int words) {
+    union {
+        Uint i[4];
+        Ull l[2];
+        Dll d;
+    } buf;
+
+    Uint loop, i;
+    if (words >= 1 && ((Ull)dst & sizeof(Uint))) { /* 4B-access odd */
+        *dst++ = *src++;
+        words--;
+    }
+    if (words >= 2 && ((Ull)dst & sizeof(Ull))) { /* 8B-access odd */
+        if ((Ull)src & sizeof(Uint)) {
+            buf.i[0] = *src++;
+            buf.i[1] = *src++;
+            *(Ull *)dst = buf.l[0];
+        } else {
+            *(Ull *)dst = *(Ull *)src;
+            src += sizeof(Ull) / sizeof(Uint);
+        }
+        dst += sizeof(Ull) / sizeof(Uint);
+        words -= 2;
+    }
+
+    if (loop = words / (sizeof(Dll) / sizeof(Uint))) {
+        if ((Ull)src & sizeof(Uint)) {
+            for (i = 0; i < loop; i++) {
+                buf.i[0] = *src++;
+                buf.i[1] = *src++;
+                buf.i[2] = *src++;
+                buf.i[3] = *src++;
+                *(Dll *)dst = buf.d;
+                dst += sizeof(Dll) / sizeof(Uint);
+            }
+        } else if ((Ull)src & sizeof(Ull)) {
+            for (i = 0; i < loop; i++) {
+                buf.l[0] = *(Ull *)src;
+                src += sizeof(Ull) / sizeof(Uint);
+                buf.l[1] = *(Ull *)src;
+                src += sizeof(Ull) / sizeof(Uint);
+                *(Dll *)dst = buf.d;
+                dst += sizeof(Dll) / sizeof(Uint);
+            }
+        } else {
+            for (i = 0; i < loop; i++) {
+                *(Dll *)dst = *(Dll *)src;
+                src += sizeof(Dll) / sizeof(Uint);
+                dst += sizeof(Dll) / sizeof(Uint);
+            }
+        }
+        words -= loop * (sizeof(Dll) / sizeof(Uint));
+    }
+
+    if (words >= 2) { /* 8B-access */
+        if ((Ull)src & sizeof(Uint)) {
+            buf.i[0] = *src++;
+            buf.i[1] = *src++;
+            *(Ull *)dst = buf.l[0];
+        } else {
+            *(Ull *)dst = *(Ull *)src;
+            src += sizeof(Ull) / sizeof(Uint);
+        }
+        dst += sizeof(Ull) / sizeof(Uint);
+        words -= 2;
+    }
+    if (words >= 1) { /* 4B-access */
+        *dst++ = *src++;
+        words--;
+    }
+}
+
+void xmax_bzero(Uint *dst, int words) {
+    Uint loop, i;
+    if (words >= 1 && ((Ull)dst & sizeof(Uint))) { /* 4B-access odd */
+        *dst++ = 0;
+        words--;
+    }
+    if (words >= 2 && ((Ull)dst & sizeof(Ull))) { /* 8B-access odd */
+        *(Ull *)dst = 0;
+        dst += sizeof(Ull) / sizeof(Uint);
+        words -= 2;
+    }
+
+    if (loop = words / (sizeof(Dll) / sizeof(Uint))) {
+        for (i = 0; i < loop; i++) {
+#if __AARCH64EL__ == 1
+            *((Dll *)dst) = 0;
+#else
+            ((Dll *)dst)->u[0] = 0;
+            ((Dll *)dst)->u[1] = 0;
+#endif
+            dst += sizeof(Dll) / sizeof(Uint);
+        }
+        words -= loop * (sizeof(Dll) / sizeof(Uint));
+    }
+
+    if (words >= 2) { /* 8B-access */
+        *(Ull *)dst = 0;
+        dst += sizeof(Ull) / sizeof(Uint);
+        words -= 2;
+    }
+    if (words >= 1) { /* 4B-access */
+        *dst++ = 0;
+        words--;
+    }
+}
+
+
 void imax_dense_format_init(IMAXDenseMatrix *imax_m, int row, int col, int row_padded, int col_padded, int row_blk, int col_blk) {
     imax_m->row_size = row;
     imax_m->col_size = col;
@@ -120,6 +352,55 @@ void imax_dense_format_init_from_sparse(IMAXDenseMatrix *imax_m, IMAXSparseMatri
     imax_m->row_padded_size = (imax_m->row_padded_size < MM_H) ? MM_H: imax_m->row_padded_size;
     imax_m->col_padded_size = (imax_m->col_padded_size < MM_H) ? MM_H: imax_m->col_padded_size;
     printf("M Params: Orig(%d,%d) Padded(%d,%d) blk(%d,%d)\n", imax_m->row_size, imax_m->col_size, imax_m->row_padded_size, imax_m->col_padded_size, imax_m->blk_row_size, imax_m->blk_col_size);
+}
+
+void imax_matrix_init_spmm(IMAXDenseMatrix *c, IMAXSparseMatrix *a, IMAXDenseMatrix *b, int matrix_flag) {
+    if (matrix_flag == FIT_TO_SPARSE) {
+        b->blk_row_size = a->blk_col_size;
+        b->row_padded_size = a->col_padded_size;
+        int lmm_size_div_row_blk = (LMM_SIZE/2)/b->blk_row_size; // LMMのサイズの最大値にすると構造上問題が発生するため、1/2にしている
+        b->blk_col_size = (b->blk_row_size < MAX_COL_SIZE) ? lmm_size_div_row_blk - (lmm_size_div_row_blk%MM_MIN) : MM_MIN;
+        b->col_padded_size = (b->col_size%MM_H) ? b->col_size+(MM_H-(b->col_size%MM_H)): b->col_size;
+        b->row_padded_size = (b->row_padded_size < MM_H) ? MM_H: b->row_padded_size;
+        b->col_padded_size = (b->col_padded_size < MM_H) ? MM_H: b->col_padded_size;
+    }
+
+    c->row_size = a->row_size;
+    c->col_size = b->col_size;
+    c->row_padded_size = a->row_padded_size;
+    c->col_padded_size = b->col_padded_size;
+    c->blk_row_size = a->blk_row_size;
+    c->blk_col_size = b->blk_col_size;
+    printf("Matrix B Params: Orig(%d,%d) Padded(%d,%d) blk(%d,%d)\n", b->row_size, b->col_size, b->row_padded_size, b->col_padded_size, b->blk_row_size, b->blk_col_size);
+    printf("Matrix C Params: Orig(%d,%d) Padded(%d,%d) blk(%d,%d)\n", c->row_size, c->col_size, c->row_padded_size, c->col_padded_size, c->blk_row_size, c->blk_col_size);
+}
+
+void imax_matrix_init_mm(IMAXDenseMatrix *c, IMAXDenseMatrix *a, IMAXDenseMatrix *b, int matrix_flag) {
+    if (matrix_flag == FIT_TO_DENSE) {
+        int lmm_size_div_row_blk = (LMM_SIZE/2)/a->blk_row_size; // LMMのサイズの最大値にすると構造上問題が発生するため、1/2にしている
+        a->blk_col_size = (a->blk_row_size < MAX_COL_SIZE) ? lmm_size_div_row_blk - (lmm_size_div_row_blk%MM_MIN) : MM_MIN;
+        a->row_padded_size = (a->row_size%a->blk_row_size) ? a->row_size+(a->blk_row_size-(a->row_size%a->blk_row_size)): a->row_size;
+        a->col_padded_size = (a->col_size%a->blk_col_size) ? a->col_size+(a->blk_col_size-(a->col_size%a->blk_col_size)): a->col_size;
+        a->row_padded_size = (a->row_padded_size < MM_H) ? MM_H: a->row_padded_size;
+        a->col_padded_size = (a->col_padded_size < MM_H) ? MM_H: a->col_padded_size;
+    }
+    b->blk_row_size = a->blk_col_size;
+    b->blk_row_size = (b->blk_row_size < MM_H) ? MM_H: b->blk_row_size;
+    b->blk_col_size = a->blk_col_size;
+    b->row_padded_size = a->col_padded_size;
+    b->col_padded_size = (b->col_size%b->blk_col_size) ? b->col_size+(b->blk_col_size-(b->col_size%b->blk_col_size)): b->col_size;
+    b->row_padded_size = (b->row_padded_size < MM_H) ? MM_H: b->row_padded_size;
+    b->col_padded_size = (b->col_padded_size < MM_H) ? MM_H: b->col_padded_size;
+
+    c->row_size = a->row_size;
+    c->col_size = b->col_size;
+    c->row_padded_size = a->row_padded_size;
+    c->col_padded_size = b->col_padded_size;
+    c->blk_row_size = a->blk_row_size;
+    c->blk_col_size = b->blk_col_size;
+    printf("Matrix A Params: Orig(%d,%d) Padded(%d,%d) blk(%d,%d)\n", a->row_size, a->col_size, a->row_padded_size, a->col_padded_size, a->blk_row_size, a->blk_col_size);
+    printf("Matrix B Params: Orig(%d,%d) Padded(%d,%d) blk(%d,%d)\n", b->row_size, b->col_size, b->row_padded_size, b->col_padded_size, b->blk_row_size, b->blk_col_size);
+    printf("Matrix C Params: Orig(%d,%d) Padded(%d,%d) blk(%d,%d)\n", c->row_size, c->col_size, c->row_padded_size, c->col_padded_size, c->blk_row_size, c->blk_col_size);
 }
 
 void convert_imax_dense_format(IMAXDenseMatrix *imax_m, DenseMatrix *m) {
@@ -180,86 +461,63 @@ void imax_sparse_format_init(IMAXSparseMatrix *imax_sp, int row, int col, int sp
     printf("SpM Parameters: Padded(%d,%d) blk(%d,%d) nnz_blk_col(%d)\n", imax_sp->row_padded_size, imax_sp->col_padded_size, imax_sp->blk_row_size, imax_sp->blk_col_size, imax_sp->nnz_blk_col_size);
 }
 
-void imax_gcn_allocation(IMAXSparseMatrix *imax_sp, IMAXDenseMatrix *imax_h, IMAXDenseMatrix *imax_spmm, IMAXDenseMatrix *imax_w, IMAXDenseMatrix *imax_mm, IMAXDenseMatrix *imax_mm2, IMAXDenseMatrix *imax_mm3) {
-    Uint dense_size = (
-        (imax_h->row_padded_size * imax_h->col_padded_size) +
-        (imax_spmm->row_padded_size * imax_spmm->col_padded_size) +
-        (imax_w->row_padded_size * imax_w->col_padded_size) +
-        (imax_mm->row_padded_size * imax_mm->col_padded_size) +
-        ((imax_mm2 != NULL) ? (imax_mm2->row_padded_size * imax_mm2->col_padded_size) : (0)) +
-        ((imax_mm3 != NULL) ? (imax_mm3->row_padded_size * imax_mm3->col_padded_size) : (0))
-    ) * sizeof(Uint);
+#define ALIGN_SIZE sizeof(Dll)
+#define PADDING_SIZE sizeof(Dll) * 10
+
+void imax_sparse_allocation(IMAXSparseMatrix *imax_sp) {
     #if defined(ARMZYNQ) && (defined(EMAX6) || defined(EMAX7))
+    Uint size = imax_sp->mem_size;
+    Uint *sp_tmp = imax_alloc(size+PADDING_SIZE, 32);
+    xmax_bzero(sp_tmp, (size+PADDING_SIZE)/sizeof(Uint));
     int blk_col_num = imax_sp->col_padded_size / imax_sp->blk_col_size;
-    Uint all_size = dense_size + imax_sp->mem_size;
-    printf("Will Allocate Memory Size: %luKiB\n", all_size / 1024);
+    printf("IMAX Allocated Memory Base: %08x_%08x\n", (Uint)((Ull)sp_tmp >> 32), (Uint)sp_tmp);
 
-    Uint *sp_tmp;
-    Ull align_size = sizeof(Dll);
-    Uint padding = align_size * 10;
-    if (!is_allocated) {
-        sp_tmp = sysinit(all_size + padding, 32);
-        xmax_bzero(sp_tmp, (all_size+padding)/sizeof(Uint));
-        printf("IMAX Allocated Memory Base: %08x_%08x\n", (Uint)((Ull)sp_tmp >> 32), (Uint)sp_tmp);
-
-        for (int i = 0; i < blk_col_num; i++) {
-            printf("Sparse Input col[%03d] row_num Head: %08x_%08x\n", i, (Uint)((Ull)sp_tmp >> 32), (Uint)sp_tmp);
-            imemcpy(sp_tmp, imax_sp->sub[i].row_num, imax_sp->sub[i].nnz/imax_sp->nnz_blk_col_size); free(imax_sp->sub[i].row_num); imax_sp->sub[i].row_num = sp_tmp; sp_tmp += (imax_sp->sub[i].nnz/imax_sp->nnz_blk_col_size);
-            if ((Ull)sp_tmp%align_size) sp_tmp += (align_size - ((Ull)sp_tmp%align_size))/sizeof(Uint);
-            printf("Sparse Input col[%03d] row_nnz Head: %08x_%08x\n", i, (Uint)((Ull)sp_tmp >> 32), (Uint)sp_tmp);
-            imemcpy(sp_tmp, imax_sp->sub[i].row_nnz,                      imax_sp->row_padded_size); free(imax_sp->sub[i].row_nnz); imax_sp->sub[i].row_nnz = sp_tmp; sp_tmp += imax_sp->row_padded_size;
-            if ((Ull)sp_tmp%align_size) sp_tmp += (align_size - ((Ull)sp_tmp%align_size))/sizeof(Uint);
-            printf("Sparse Input col[%03d] col_num Head: %08x_%08x\n", i, (Uint)((Ull)sp_tmp >> 32), (Uint)sp_tmp);
-            imemcpy(sp_tmp, imax_sp->sub[i].col_num,                           imax_sp->sub[i].nnz); free(imax_sp->sub[i].col_num); imax_sp->sub[i].col_num = sp_tmp; sp_tmp += imax_sp->sub[i].nnz;
-            if ((Ull)sp_tmp%align_size) sp_tmp += (align_size - ((Ull)sp_tmp%align_size))/sizeof(Uint);
-            printf("Sparse Input col[%03d]     val Head: %08x_%08x\n", i, (Uint)((Ull)sp_tmp >> 32), (Uint)sp_tmp); 
-            imemcpy(sp_tmp, imax_sp->sub[i].val,                               imax_sp->sub[i].nnz); free(    imax_sp->sub[i].val); imax_sp->sub[i].val     = sp_tmp; sp_tmp += imax_sp->sub[i].nnz;
-            if ((Ull)sp_tmp%align_size) sp_tmp += (align_size - ((Ull)sp_tmp%align_size))/sizeof(Uint);
-        } 
-        printf("The Sparse Matrix was allocated!\n");
-        is_allocated = 1;
-    } else {
-        sp_tmp = imax_sp->sub[blk_col_num-1].val + imax_sp->sub[blk_col_num-1].nnz;
-        if ((Ull)sp_tmp%align_size) sp_tmp += (align_size - ((Ull)sp_tmp%align_size))/sizeof(Uint);
-        xmax_bzero(sp_tmp, (dense_size+padding)/sizeof(Uint));
-    }
-    imax_h->val    = sp_tmp; sp_tmp += (imax_h->row_padded_size * imax_h->col_padded_size);
-    if ((Ull)sp_tmp%align_size) sp_tmp += (align_size - ((Ull)sp_tmp%align_size))/sizeof(Uint);
-    imax_spmm->val = sp_tmp; sp_tmp += (imax_spmm->row_padded_size * imax_spmm->col_padded_size);
-    if ((Ull)sp_tmp%align_size) sp_tmp += (align_size - ((Ull)sp_tmp%align_size))/sizeof(Uint);
-    imax_w->val    = sp_tmp; sp_tmp += (imax_w->row_padded_size * imax_w->col_padded_size);
-    if ((Ull)sp_tmp%align_size) sp_tmp += (align_size - ((Ull)sp_tmp%align_size))/sizeof(Uint);
-    imax_mm->val   = sp_tmp; sp_tmp += (imax_mm->row_padded_size * imax_mm->col_padded_size);
-    if (imax_mm2 != NULL) {
-        if ((Ull)sp_tmp%align_size) sp_tmp += (align_size - ((Ull)sp_tmp%align_size))/sizeof(Uint);
-        imax_mm2->val   = sp_tmp; sp_tmp += (imax_mm2->row_padded_size * imax_mm2->col_padded_size);
-    }
-    if (imax_mm3 != NULL) {
-        if ((Ull)sp_tmp%align_size) sp_tmp += (align_size - ((Ull)sp_tmp%align_size))/sizeof(Uint);
-        imax_mm3->val   = sp_tmp; sp_tmp += (imax_mm3->row_padded_size * imax_mm3->col_padded_size);
-    }
-    #else
-    imax_h->val    = (Uint*) malloc(imax_h->row_padded_size * imax_h->col_padded_size * sizeof(Uint));
-    imax_spmm->val = (Uint*) malloc(imax_spmm->row_padded_size * imax_spmm->col_padded_size * sizeof(Uint));
-    imax_w->val    = (Uint*) malloc(imax_w->row_padded_size * imax_w->col_padded_size * sizeof(Uint));
-    imax_mm->val   = (Uint*) malloc(imax_mm->row_padded_size * imax_mm->col_padded_size * sizeof(Uint));
-    memset(imax_h->val,    0, imax_h->row_padded_size * imax_h->col_padded_size * sizeof(Uint));
-    memset(imax_spmm->val, 0, imax_spmm->row_padded_size * imax_spmm->col_padded_size * sizeof(Uint));
-    memset(imax_w->val,    0, imax_w->row_padded_size * imax_w->col_padded_size * sizeof(Uint));
-    memset(imax_mm->val,   0, imax_mm->row_padded_size * imax_mm->col_padded_size * sizeof(Uint));
-    if (imax_mm2 != NULL) {
-        imax_mm2->val   = (Uint*) malloc(imax_mm2->row_padded_size * imax_mm2->col_padded_size * sizeof(Uint));
-        memset(imax_mm2->val,   0, imax_mm2->row_padded_size * imax_mm2->col_padded_size * sizeof(Uint));
-    }
-    if (imax_mm3 != NULL) {
-        imax_mm3->val   = (Uint*) malloc(imax_mm3->row_padded_size * imax_mm3->col_padded_size * sizeof(Uint));
-        memset(imax_mm3->val,   0, imax_mm3->row_padded_size * imax_mm3->col_padded_size * sizeof(Uint));
-    }
+    for (int i = 0; i < blk_col_num; i++) {
+        printf("Sparse Input col[%03d] row_num Head: %08x_%08x\n", i, (Uint)((Ull)sp_tmp >> 32), (Uint)sp_tmp);
+        imemcpy(sp_tmp, imax_sp->sub[i].row_num, imax_sp->sub[i].nnz/imax_sp->nnz_blk_col_size); free(imax_sp->sub[i].row_num); imax_sp->sub[i].row_num = sp_tmp; sp_tmp += (imax_sp->sub[i].nnz/imax_sp->nnz_blk_col_size);
+        if ((Ull)sp_tmp%ALIGN_SIZE) sp_tmp += (ALIGN_SIZE - ((Ull)sp_tmp%ALIGN_SIZE))/sizeof(Uint);
+        printf("Sparse Input col[%03d] row_nnz Head: %08x_%08x\n", i, (Uint)((Ull)sp_tmp >> 32), (Uint)sp_tmp);
+        imemcpy(sp_tmp, imax_sp->sub[i].row_nnz,                      imax_sp->row_padded_size); free(imax_sp->sub[i].row_nnz); imax_sp->sub[i].row_nnz = sp_tmp; sp_tmp += imax_sp->row_padded_size;
+        if ((Ull)sp_tmp%ALIGN_SIZE) sp_tmp += (ALIGN_SIZE - ((Ull)sp_tmp%ALIGN_SIZE))/sizeof(Uint);
+        printf("Sparse Input col[%03d] col_num Head: %08x_%08x\n", i, (Uint)((Ull)sp_tmp >> 32), (Uint)sp_tmp);
+        imemcpy(sp_tmp, imax_sp->sub[i].col_num,                           imax_sp->sub[i].nnz); free(imax_sp->sub[i].col_num); imax_sp->sub[i].col_num = sp_tmp; sp_tmp += imax_sp->sub[i].nnz;
+        if ((Ull)sp_tmp%ALIGN_SIZE) sp_tmp += (ALIGN_SIZE - ((Ull)sp_tmp%ALIGN_SIZE))/sizeof(Uint);
+        printf("Sparse Input col[%03d]     val Head: %08x_%08x\n", i, (Uint)((Ull)sp_tmp >> 32), (Uint)sp_tmp); 
+        imemcpy(sp_tmp, imax_sp->sub[i].val,                               imax_sp->sub[i].nnz); free(    imax_sp->sub[i].val); imax_sp->sub[i].val     = sp_tmp; sp_tmp += imax_sp->sub[i].nnz;
+        if ((Ull)sp_tmp%ALIGN_SIZE) sp_tmp += (ALIGN_SIZE - ((Ull)sp_tmp%ALIGN_SIZE))/sizeof(Uint);
+    } 
+    printf("The Sparse Matrix was allocated!\n");
     #endif
-    printf("Dense Input  Head: %08x_%08x\n", (Uint)((Ull)imax_h->val >> 32), (Uint)imax_h->val);
-    printf("Dense Input  Head: %08x_%08x\n", (Uint)((Ull)imax_spmm->val >> 32), (Uint)imax_spmm->val);
-    printf("Dense Input  Head: %08x_%08x\n", (Uint)((Ull)imax_w->val >> 32), (Uint)imax_w->val);
-    printf("Dense Input  Head: %08x_%08x\n", (Uint)((Ull)imax_mm->val >> 32), (Uint)imax_mm->val);
+}
+
+void imax_sparse_deallocation(IMAXSparseMatrix *imax_sp) {
+    #if defined(ARMZYNQ) && (defined(EMAX6) || defined(EMAX7))
+    imax_dealloc(imax_sp->mem_size+PADDING_SIZE, 32);
+    #endif
+}
+
+void imax_dense_allocation(IMAXDenseMatrix *imax_m) {
+    Uint size = imax_m->row_padded_size * imax_m->col_padded_size * sizeof(Uint);
+    printf("Will Allocate Memory Size: %luKiB\n", size / 1024);
+    #if defined(ARMZYNQ) && (defined(EMAX6) || defined(EMAX7))
+    Uint *sp_tmp = imax_alloc(size, 32);
+    xmax_bzero(sp_tmp, size/sizeof(Uint));
+    imax_m->val = sp_tmp;
+    printf("IMAX Allocated Memory Base: %08x_%08x\n", (Uint)((Ull)sp_tmp >> 32), (Uint)sp_tmp);
+    #else
+    imax_m->val = (Uint*) malloc(imax_m->row_padded_size * imax_m->col_padded_size * sizeof(Uint));
+    memset(imax_m->val, 0, imax_m->row_padded_size * imax_m->col_padded_size * sizeof(Uint));
+    #endif
+    printf("Dense Input  Head: %08x_%08x\n", (Uint)((Ull)imax_m->val >> 32), (Uint)imax_m->val);
+    printf("The Dense Matrix was allocated!\n");
+}
+
+void imax_dense_deallocation(IMAXDenseMatrix *imax_m) {
+    #if defined(ARMZYNQ) && (defined(EMAX6) || defined(EMAX7))
+    imax_dealloc(imax_m->row_padded_size * imax_m->col_padded_size * sizeof(Uint), 32);
+    #else
+    free(imax_m->val);
+    #endif
 }
 
 void convert_imax_sparse_format(IMAXSparseMatrix *imax_sp, SparseMatrix *sp) {

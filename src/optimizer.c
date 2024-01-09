@@ -1,3 +1,8 @@
+// EMAX6/7 GCN Test Program            //
+// optimizer.c                         //
+//         Copyright (C) 2024 by NAIST //
+//          Primary writer: Dohyun Kim //
+//          kim.dohyun.kg7@is.naist.jp //
 #include "../include/optimizer.h"
 #include <stdlib.h>
 

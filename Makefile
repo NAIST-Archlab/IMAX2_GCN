@@ -1,8 +1,8 @@
 ## EMAX6/7 GCN Test Program            ##
-##         Copyright (C) 2023 by NAIST ##
+##         Copyright (C) 2024 by NAIST ##
 ##          Primary writer: Dohyun Kim ##
 ##          kim.dohyun.kg7@is.naist.jp ##
-PROGRAM := imax_gcn
+GCN_PROG := imax_gcn
 TEST_SPARSE_PROGRAM := test_sparse
 TEST_DENSE_PROGRAM := test_dense
 SRC_DIR := src
@@ -12,8 +12,8 @@ CONV := ./conv-c2c/
 SRCS := $(wildcard $(SRC_DIR)/*.c)
 TEST_SRCS := $(wildcard $(TEST_DIR)/*.c)
 OBJS := $(SRCS:.c=.o)
-MAIN := main.c
-MAIN_OBJS := main.o
+GCN_PROG_SRC := gcn_prog.c
+GCN_PROG_OBJS := gcn_prog.o
 NCHIP := 1
 CPUONLY := 0
 CUDA := 0
@@ -25,10 +25,10 @@ EMAX_VER := 7
 EMAX_DEFINE := -DEMAX6 -DDEBUG -DUSE_MP -DNCHIP=$(NCHIP)
 TEST_SPARSE_OBJS := test/test_sparse.o
 TEST_DENSE_OBJS := test/test_dense.o
-HEADERS := $(CONV)/emax6.h $(INCLUDE)/layer.h $(INCLUDE)/options.h $(INCLUDE)/sparse.h $(INCLUDE)/utils.h $(INCLUDE)/reader.h $(INCLUDE)/gcn.h $(INCLUDE)/optimizer.h
+HEADERS := $(CONV)/emax6.h $(wildcard $(INCLUDE)/*.h)
 ifeq ($(EMAX_VER), 7)
 CONV := ./conv-c2d
-HEADERS := $(CONV)/emax7.h $(INCLUDE)/layer.h $(INCLUDE)/options.h $(INCLUDE)/sparse.h $(INCLUDE)/utils.h $(INCLUDE)/reader.h $(INCLUDE)/gcn.h  $(INCLUDE)/optimizer.h
+HEADERS := $(CONV)/emax7.h $(wildcard $(INCLUDE)/*.h)
 EMAX_DEFINE := -DCBLAS_GEMM -DEMAX7 -DDEBUG -DUSE_MP -DNCHIP=$(NCHIP)
 endif
 ifeq ($(UNIT32), 1)
@@ -73,28 +73,28 @@ CFLAGS  := -g3 -O3 -Wall -msse3 -Wno-unknown-pragmas -fopenmp -funroll-loops -fc
 ifeq ($(SAME_DISTANCE), 1)
 CFLAGS  := -g3 -O3 -Wall -msse3 -Wno-unknown-pragmas -fopenmp -funroll-loops -fcommon -I$(INCLUDE) -DCBLAS_GEMM -DSAME_DISTANCE $(EMAX_DEFINE)
 endif
-LDFLAGS := -L/usr/lib64 -L/usr/local/lib -lm
+LDFLAGS := -z muldefs -L/usr/lib64 -L/usr/local/lib -lm
 
 ifeq ($(ARM),1)
 CFLAGS  := -O1 -Wall -Wno-unknown-pragmas -funroll-loops -fopenmp -fcommon -I$(INCLUDE) -DARMZYNQ $(EMAX_DEFINE)
 ifeq ($(SAME_DISTANCE), 1)
 CFLAGS  := -O1 -Wall -Wno-unknown-pragmas -funroll-loops -fopenmp -fcommon -I$(INCLUDE) -DARMZYNQ -DSAME_DISTANCE $(EMAX_DEFINE)
 endif
-LDFLAGS := -L/usr/lib64 -L/usr/local/lib -lm -lrt -lX11 -lXext
+LDFLAGS := -z muldefs -L/usr/lib64 -L/usr/local/lib -lm -lrt -lX11 -lXext
 CFLAGS_EMAX  := -O1 -Wall -Wno-unknown-pragmas -funroll-loops -fopenmp -fcommon -I$(INCLUDE) -I$(CONV) -DARMZYNQ $(EMAX_DEFINE)
 CFLAGS_EMAX_NC  := -O1 -Wall -Wno-unknown-pragmas -funroll-loops -fopenmp -fcommon -I$(INCLUDE) -I$(CONV) -DARMZYNQ $(EMAX_DEFINE)
 CFLAGS_EMAX_DMA  := -O1 -Wall -Wno-unknown-pragmas -funroll-loops -fopenmp -fcommon -I$(INCLUDE) -I$(CONV) -DARMZYNQ -DFPDDMA $(EMAX_DEFINE)
-SRCS_EMAX := $(filter-out $(SRC_DIR)/sparse_imax.c, $(SRCS)) $(SRC_DIR)/sparse_imax-emax$(EMAX_VER).c
+SRCS_EMAX := $(filter-out $(SRC_DIR)/linalg_imax.c, $(filter-out $(SRC_DIR)/sparse_imax.c, $(SRCS))) $(SRC_DIR)/sparse_imax-emax$(EMAX_VER).c $(SRC_DIR)/linalg_imax-emax$(EMAX_VER).c
 OBJS_EMAX := $(SRCS_EMAX:.c=.o)
 endif
 
 ifeq ($(ARM_MACOS),1)
 CFLAGS := -g3 -O3 -Wall -Wno-unknown-pragmas -I$(HOMEBREW_DIR)/opt/libomp/include -Xpreprocessor -fopenmp -I$(INCLUDE) -DCBLAS_GEMM $(EMAX_DEFINE)
-LDFLAGS := -L/usr/lib -L/usr/local/lib -L$(HOMEBREW_DIR)/opt/libomp/lib -lm -lomp
+LDFLAGS := -z muldefs -L/usr/lib -L/usr/local/lib -L$(HOMEBREW_DIR)/opt/libomp/lib -lm -lomp
 endif
 
 ifeq ($(ARM_CROSS),1)
-LDFLAGS := -L/usr/lib64 -L/usr/local/lib -lm -fopenmp -fcommon
+LDFLAGS := -z muldefs -L/usr/lib64 -L/usr/local/lib -lm -fopenmp -fcommon
 endif
 DEVICE_DEBUG := 0
 
@@ -117,20 +117,20 @@ endif
 LDFLAGS := -L/usr/lib64 -L/usr/local/lib -lm -lrt -lcusparse -lcublas
 endif
 
-all: $(PROGRAM)
+all: $(GCN_PROG)
 
-$(PROGRAM): $(OBJS) $(MAIN_OBJS)
-	$(CC) $(OBJS) $(MAIN_OBJS) -o $(PROGRAM) $(LDFLAGS) $(CFLAGS)
+$(GCN_PROG): $(OBJS) $(GCN_PROG_OBJS)
+	$(CC) $(OBJS) $(GCN_PROG_OBJS) -o $(GCN_PROG) $(LDFLAGS) $(CFLAGS)
 
 ifeq ($(ARM), 1)
-$(PROGRAM).emax$(EMAX_VER): $(OBJS_EMAX) $(MAIN_OBJS)
-	$(CC) $(OBJS_EMAX) $(MAIN_OBJS) -o $(PROGRAM).emax$(EMAX_VER) $(LDFLAGS) $(CFLAGS_EMAX)
+$(GCN_PROG).emax$(EMAX_VER): $(OBJS_EMAX) $(GCN_PROG_OBJS)
+	$(CC) $(OBJS_EMAX) $(GCN_PROG_OBJS) -o $(GCN_PROG).emax$(EMAX_VER) $(LDFLAGS) $(CFLAGS_EMAX)
 
-$(PROGRAM).emax$(EMAX_VER)+dma: $(OBJS_EMAX) $(MAIN_OBJS)
-	$(CC) $(OBJS_EMAX) $(MAIN_OBJS) -o $(PROGRAM).emax$(EMAX_VER)+dma $(LDFLAGS) $(CFLAGS_EMAX_DMA)
+$(GCN_PROG).emax$(EMAX_VER)+dma: $(OBJS_EMAX) $(GCN_PROG_OBJS)
+	$(CC) $(OBJS_EMAX) $(GCN_PROG_OBJS) -o $(GCN_PROG).emax$(EMAX_VER)+dma $(LDFLAGS) $(CFLAGS_EMAX_DMA)
 
-$(PROGRAM).emax$(EMAX_VER)+nc: $(OBJS) $(MAIN_OBJS)
-	$(CC) $(OBJS) $(MAIN_OBJS) -o $(PROGRAM).emax$(EMAX_VER)+nc $(LDFLAGS) $(CFLAGS_EMAX_NC)
+$(GCN_PROG).emax$(EMAX_VER)+nc: $(OBJS) $(GCN_PROG_OBJS)
+	$(CC) $(OBJS) $(GCN_PROG_OBJS) -o $(PROGRAM).emax$(EMAX_VER)+nc $(LDFLAGS) $(CFLAGS_EMAX_NC)
 endif
 
 $(TEST_SPARSE_PROGRAM): $(OBJS) $(TEST_SPARSE_OBJS)
@@ -168,7 +168,13 @@ endif
 ifeq ($(HARD_UNIT32), 1)
 CONV_EXE := $(CONV_EXE) -u32
 endif
+
 $(SRC_DIR)/sparse_imax-emax$(EMAX_VER).c: $(SRC_DIR)/sparse_imax.c
+	./conv-mark/conv-mark $< > $<-mark.c
+	$(CPP) $(CFLAGS_EMAX_DMA) $<-mark.c > $<-cppo.c
+	$(CONV_EXE) $<-cppo.c
+
+$(SRC_DIR)/linalg_imax-emax$(EMAX_VER).c: $(SRC_DIR)/linalg_imax.c
 	./conv-mark/conv-mark $< > $<-mark.c
 	$(CPP) $(CFLAGS_EMAX_DMA) $<-mark.c > $<-cppo.c
 	$(CONV_EXE) $<-cppo.c
