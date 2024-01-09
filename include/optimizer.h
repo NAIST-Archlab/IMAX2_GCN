@@ -1,3 +1,8 @@
+// EMAX6/7 GCN Test Program            //
+// optimizer.h                         //
+//         Copyright (C) 2024 by NAIST //
+//          Primary writer: Dohyun Kim //
+//          kim.dohyun.kg7@is.naist.jp //
 #ifndef __OPTIMIZER_H__
 #define __OPTIMIZER_H__
 #include "sparse.h"

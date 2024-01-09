@@ -354,6 +354,55 @@ void imax_dense_format_init_from_sparse(IMAXDenseMatrix *imax_m, IMAXSparseMatri
     printf("M Params: Orig(%d,%d) Padded(%d,%d) blk(%d,%d)\n", imax_m->row_size, imax_m->col_size, imax_m->row_padded_size, imax_m->col_padded_size, imax_m->blk_row_size, imax_m->blk_col_size);
 }
 
+void imax_matrix_init_spmm(IMAXDenseMatrix *c, IMAXSparseMatrix *a, IMAXDenseMatrix *b, int matrix_flag) {
+    if (matrix_flag == FIT_TO_SPARSE) {
+        b->blk_row_size = a->blk_col_size;
+        b->row_padded_size = a->col_padded_size;
+        int lmm_size_div_row_blk = (LMM_SIZE/2)/b->blk_row_size; // LMMのサイズの最大値にすると構造上問題が発生するため、1/2にしている
+        b->blk_col_size = (b->blk_row_size < MAX_COL_SIZE) ? lmm_size_div_row_blk - (lmm_size_div_row_blk%MM_MIN) : MM_MIN;
+        b->col_padded_size = (b->col_size%MM_H) ? b->col_size+(MM_H-(b->col_size%MM_H)): b->col_size;
+        b->row_padded_size = (b->row_padded_size < MM_H) ? MM_H: b->row_padded_size;
+        b->col_padded_size = (b->col_padded_size < MM_H) ? MM_H: b->col_padded_size;
+    }
+
+    c->row_size = a->row_size;
+    c->col_size = b->col_size;
+    c->row_padded_size = a->row_padded_size;
+    c->col_padded_size = b->col_padded_size;
+    c->blk_row_size = a->blk_row_size;
+    c->blk_col_size = b->blk_col_size;
+    printf("Matrix B Params: Orig(%d,%d) Padded(%d,%d) blk(%d,%d)\n", b->row_size, b->col_size, b->row_padded_size, b->col_padded_size, b->blk_row_size, b->blk_col_size);
+    printf("Matrix C Params: Orig(%d,%d) Padded(%d,%d) blk(%d,%d)\n", c->row_size, c->col_size, c->row_padded_size, c->col_padded_size, c->blk_row_size, c->blk_col_size);
+}
+
+void imax_matrix_init_mm(IMAXDenseMatrix *c, IMAXDenseMatrix *a, IMAXDenseMatrix *b, int matrix_flag) {
+    if (matrix_flag == FIT_TO_DENSE) {
+        int lmm_size_div_row_blk = (LMM_SIZE/2)/a->blk_row_size; // LMMのサイズの最大値にすると構造上問題が発生するため、1/2にしている
+        a->blk_col_size = (a->blk_row_size < MAX_COL_SIZE) ? lmm_size_div_row_blk - (lmm_size_div_row_blk%MM_MIN) : MM_MIN;
+        a->row_padded_size = (a->row_size%a->blk_row_size) ? a->row_size+(a->blk_row_size-(a->row_size%a->blk_row_size)): a->row_size;
+        a->col_padded_size = (a->col_size%a->blk_col_size) ? a->col_size+(a->blk_col_size-(a->col_size%a->blk_col_size)): a->col_size;
+        a->row_padded_size = (a->row_padded_size < MM_H) ? MM_H: a->row_padded_size;
+        a->col_padded_size = (a->col_padded_size < MM_H) ? MM_H: a->col_padded_size;
+    }
+    b->blk_row_size = a->blk_col_size;
+    b->blk_row_size = (b->blk_row_size < MM_H) ? MM_H: b->blk_row_size;
+    b->blk_col_size = a->blk_col_size;
+    b->row_padded_size = a->col_padded_size;
+    b->col_padded_size = (b->col_size%b->blk_col_size) ? b->col_size+(b->blk_col_size-(b->col_size%b->blk_col_size)): b->col_size;
+    b->row_padded_size = (b->row_padded_size < MM_H) ? MM_H: b->row_padded_size;
+    b->col_padded_size = (b->col_padded_size < MM_H) ? MM_H: b->col_padded_size;
+
+    c->row_size = a->row_size;
+    c->col_size = b->col_size;
+    c->row_padded_size = a->row_padded_size;
+    c->col_padded_size = b->col_padded_size;
+    c->blk_row_size = a->blk_row_size;
+    c->blk_col_size = b->blk_col_size;
+    printf("Matrix A Params: Orig(%d,%d) Padded(%d,%d) blk(%d,%d)\n", a->row_size, a->col_size, a->row_padded_size, a->col_padded_size, a->blk_row_size, a->blk_col_size);
+    printf("Matrix B Params: Orig(%d,%d) Padded(%d,%d) blk(%d,%d)\n", b->row_size, b->col_size, b->row_padded_size, b->col_padded_size, b->blk_row_size, b->blk_col_size);
+    printf("Matrix C Params: Orig(%d,%d) Padded(%d,%d) blk(%d,%d)\n", c->row_size, c->col_size, c->row_padded_size, c->col_padded_size, c->blk_row_size, c->blk_col_size);
+}
+
 void convert_imax_dense_format(IMAXDenseMatrix *imax_m, DenseMatrix *m) {
     for (int b = 0; b < (imax_m->row_padded_size/imax_m->blk_row_size); b++) {
         #ifdef USE_MP

@@ -1,3 +1,8 @@
+// EMAX6/7 GCN Test Program            //
+// imax.h                              //
+//         Copyright (C) 2024 by NAIST //
+//          Primary writer: Dohyun Kim //
+//          kim.dohyun.kg7@is.naist.jp //
 #ifndef __IMAX_H__
 #define __IMAX_H__
 #include <stdio.h>

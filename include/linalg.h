@@ -33,6 +33,8 @@ unsigned long long all_nanosec[NUM_CLASS];
 #define MM_H 32
 #endif
 
+#define MM_MIN 8
+
 typedef struct dense_matrix {
     int   row_size;  // row size
     int   col_size;  // column size

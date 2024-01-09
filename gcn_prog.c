@@ -1,5 +1,5 @@
 // EMAX6/7 GCN Test Program            //
-// gcn_prog.c                              //
+// gcn_prog.c                          //
 //         Copyright (C) 2024 by NAIST //
 //          Primary writer: Dohyun Kim //
 //          kim.dohyun.kg7@is.naist.jp //
