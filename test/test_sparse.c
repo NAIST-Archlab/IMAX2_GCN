@@ -5,6 +5,7 @@
 //          kim.dohyun.kg7@is.naist.jp //
 #include "../include/layer.h"
 #include "../include/utils.h"
+#include "../include/sparse.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -95,18 +96,23 @@ int main(int argc, char **argv) {
 
     #if defined(EMAX6) || defined(EMAX7)
         IMAXSparseMatrix imax_sp;
-        IMAXDenseMatrix imax_m, imax_r, imax_r2, imax_r3;
+        IMAXDenseMatrix imax_m, imax_r;
+        imax_m.row_size = m.row_size;
+        imax_m.col_size = m.col_size;
+        imax_r.row_size = result.row_size;
+        imax_r.col_size = result.col_size;
+
         timespec_get(&t0, TIME_UTC);
         timespec_get(&t1, TIME_UTC);
         imax_sparse_format_init(&imax_sp, row, row, SPMM_H, 8 * NCHIP);
         convert_imax_sparse_format(&imax_sp, &sp);
+        imax_sparse_allocation(&imax_sp);
         timespec_get(&t2, TIME_UTC);
+
         printf("Convert to IMAX_SpM: %lf usec.\n", cal_time(&t2, &t1));
-        imax_dense_format_init_from_sparse(&imax_m, &imax_sp, out_size, 8 * NCHIP);
-        imax_dense_format_init(&imax_r, row, out_size, imax_sp.row_padded_size, imax_m.col_padded_size, imax_sp.blk_row_size, imax_m.blk_row_size);
-        imax_dense_format_init(&imax_r2, row, out_size, imax_sp.row_padded_size, imax_m.col_padded_size, imax_sp.blk_row_size, imax_m.blk_row_size);
-        imax_dense_format_init(&imax_r3, row, out_size, imax_sp.row_padded_size, imax_m.col_padded_size, imax_sp.blk_row_size, imax_m.blk_row_size);
-        imax_gcn_allocation(&imax_sp, &imax_m, &imax_r, &imax_r2, &imax_r3);
+        imax_matrix_init_spmm(&imax_r, &imax_sp, &imax_m, FIT_TO_SPARSE);
+        imax_dense_allocation(&imax_m);
+        imax_dense_allocation(&imax_r);
         timespec_get(&t1, TIME_UTC);
         convert_imax_dense_format(&imax_m, &m);
         timespec_get(&t2, TIME_UTC);

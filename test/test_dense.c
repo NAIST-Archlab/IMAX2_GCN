@@ -5,6 +5,7 @@
 //          kim.dohyun.kg7@is.naist.jp //
 #include "../include/layer.h"
 #include "../include/utils.h"
+#include "../include/linalg.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -58,12 +59,17 @@ int main(int argc, char **argv) {
     }
     #if defined(EMAX6) || defined(EMAX7)
         IMAXDenseMatrix imax_m1, imax_m2, imax_r;
-        imax_dense_format_init(&imax_m1, row, row, row, row, row, 16);
-        imax_dense_format_init(&imax_m2, row, out_size, row, out_size, 16, 16);
-        imax_dense_format_init(&imax_r, row, out_size, row, out_size, row, 16);
-        imax_m1.val = (Uint*) malloc(sizeof(Uint) * row * row);
-        imax_m2.val = (Uint*) malloc(sizeof(Uint) * row * out_size);
-        imax_r.val = (Uint*) malloc(sizeof(Uint) * row * out_size);
+        imax_m1.row_size = m1.row_size;
+        imax_m1.col_size = m1.col_size;
+        imax_m1.blk_row_size = (imax_m1.row_size < 1024) ? imax_m1.row_size + (MM_H - imax_m1.row_size%MM_H) : 1024;
+        imax_m2.row_size = m2.row_size;
+        imax_m2.col_size = m2.col_size;
+        imax_r.row_size = result.row_size;
+        imax_r.col_size = result.col_size;
+        imax_matrix_init_mm(&imax_r, &imax_m1, &imax_m2, FIT_TO_DENSE);
+        imax_dense_allocation(&imax_r);
+        imax_dense_allocation(&imax_m1);
+        imax_dense_allocation(&imax_m2);
         convert_imax_dense_format(&imax_m1, &m1);
         convert_imax_dense_format(&imax_m2, &m2);
         convert_imax_dense_format(&imax_r, &result);
