@@ -12,3 +12,7 @@ data_backup/
 *.cpu*
 *.gpu*
 test_dense
+test_gat
+datasets/
+output/
+*.bak

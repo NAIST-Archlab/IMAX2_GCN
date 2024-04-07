@@ -17,6 +17,7 @@ typedef struct sparse_matrix {
     int         nnz; // Number of Non-zero values
     int    col_size; // column size
     int    row_size; // row size
+    int  depth_size;
     int      *row_p; // row pointer
     int      *col_p; // col pointer
     float      *val; // value of each index/Floating

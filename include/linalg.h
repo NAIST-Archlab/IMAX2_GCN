@@ -7,7 +7,7 @@
 #define __LINALG_H__
 #include "imax.h"
 
-enum { SPMM, MM, RELU, SOFTMAX, NUM_CLASS };
+enum { SPMM, MM, RELU, SOFTMAX, ATTENTION, ELU, LOG_SOFTMAX, NUM_CLASS };
 #if defined(EMAX6) || defined(EMAX7)
 unsigned long long all_nanosec[NUM_CLASS][8];
 #elif defined(USE_CUDA)
@@ -38,6 +38,7 @@ unsigned long long all_nanosec[NUM_CLASS];
 typedef struct dense_matrix {
     int   row_size;  // row size
     int   col_size;  // column size
+    int   depth_size;
     float      *val; // values
     float *cuda_val; // values for CUDA
 } DenseMatrix;
