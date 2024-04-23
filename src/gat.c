@@ -2,29 +2,25 @@
 #include "../include/layer.h"
 #include "../include/utils.h"
 #include "../include/sparse.h"
-#include "../include/linalg.h"
+// #include "../include/linalg.h"
 #include "../include/gat.h"
 #include <time.h>
 
 void logsoftmax(DenseMatrix *A) {
     #pragma omp parallel for
-    for (int i=0; i < A->depth_size; i++){
-        for (int j = 0; j < A->row_size; j++) {
-            float sum = 0.0;
-            for (int k = 0; k < A->col_size; k++) {
-                int idx;
-                idx = get_index(A->row_size, A->col_size, j, k, 0);
-                A->val[idx] = exp(A->val[idx]);
-                sum += A->val[idx];
-            }
-            for (int k = 0; k < A->col_size; k++) {
-                int idx;
-                idx = get_index(A->row_size, A->col_size, j, k, 0);
-                A->val[idx] = log(A->val[idx] / sum);
-            }
+    for (int i = 0; i < A->row_size; i++) {
+        float sum = 0.0;
+        for (int k = 0; k < A->col_size; k++) {
+            A->val[i * A->col_size + k] = exp(A->val[i * A->col_size + k]);
+            sum += A->val[i * A->col_size + k];
+        }
+        for (int k = 0; k < A->col_size; k++) {
+            A->val[i * A->col_size + k] = log(A->val[i * A->col_size + k] / sum);
         }
     }
 }
+
+// TODO: implement func of normalizing feature matrix
 
 // void norm_feature(SparseMatrix *A) {
 //     #pragma omp parallel for
@@ -38,43 +34,40 @@ void logsoftmax(DenseMatrix *A) {
 void matrix_elu(DenseMatrix *A) {
     float alpha = 1.0;
     #pragma omp parallel for
-    for (int k = 0; k < A->depth_size; k++){
-        for (int i = 0; i < A->row_size; i++) {
-            for (int j = 0; j < A->col_size; j++) {
-                int idx = get_index(A->row_size, A->col_size, i, j, k);
-                float x = A->val[idx];
-                A->val[idx] = x <= 0.0 ? alpha * (exp(x) - 1.0) : x;
-            }
-        } 
-    }
-}
-
-void attention_coeff(DenseMatrix *linear_lr, DenseMatrix *linear, DenseMatrix *self_attn) {
-    #pragma omp parallel for
-    for (int depth = 0; depth < linear->depth_size; depth++) {
-        for (int nid = 0; nid < linear->row_size; nid++) {
-            float left = 0;
-            for (int fid = 0; fid < linear->col_size; fid++) {
-                int idx0 = get_index(self_attn->row_size, self_attn->col_size, 0, fid, depth);
-                int idx1 = get_index(linear->row_size, linear->col_size, nid, fid, depth);
-                left += self_attn->val[idx0] * linear->val[idx1];
-            }
-            int idx2 = get_index(linear_lr->row_size, linear_lr->col_size, 0, nid, depth);
-            linear_lr->val[idx2] = left;
+    for (int i = 0; i < A->row_size; i++) {
+        for (int j = 0; j < A->col_size; j ++) {
+            float x = A->val[i * A->col_size + j];
+            A->val[i * A->col_size + j] = x <= 0.0 ? alpha * (exp(x) - 1.0) : x;
         }
+    } 
+}
+
+// void transpose(DenseMatrix *A, DenseMatrix *B) {
+//     init_dense(A, B->col_size, B->row_size);
+//     for (int i = 0; i < B->row_size; i++) {
+//         for (int j = 0; j < B->col_size; j++) {
+//             A->val[j * B->row_size + i] = B->val[i * B->col_size + j];
+//         }
+//     }
+// }
+
+// mv
+void attention_coeff(Vector *linear_lr, DenseMatrix *linear, Vector *self_attn) {
+    #pragma omp parallel for
+    for (int nid = 0; nid < linear->row_size; nid++) {
+        float left = 0;
+        for (int fid = 0; fid < linear->col_size; fid++) {
+            left += self_attn->val[fid] * linear->val[nid * linear->col_size + fid];
+        }
+        linear_lr->val[nid] = left;
     }
 }
 
-void EleWiseSum(DenseMatrix *a, DenseMatrix *linear_l, DenseMatrix *linear_r){ 
+void computeEleWiseSum(DenseMatrix *a, Vector *linear_l, Vector *linear_r){ 
     #pragma omp parallel for
-    for (int d = 0; d < linear_l->depth_size; d++){
-        for (int i = 0; i < linear_l->col_size; i++) {
-            for (int j = 0; j < linear_l->col_size; j++) {
-                int idx0 = get_index(a->row_size, a->col_size, i, j, d);
-                int idx1 = get_index(linear_l->row_size, linear_l->col_size, 0, j, d);
-                int idx2 = get_index(linear_r->row_size, linear_r->col_size, 0, j, d);
-                a->val[idx0] = linear_l->val[idx1] + linear_r->val[idx2];
-            }
+    for (int i = 0; i < linear_l->col_size; i++) {
+        for (int j = 0; j < linear_l->col_size; j++) {
+            a->val[i * linear_l->col_size + j] = linear_l->val[i] + linear_r->val[j];
         }
     }
 }
@@ -83,80 +76,60 @@ void mask(SparseMatrix *c, DenseMatrix *a, SparseMatrix *adj_matrix) {
     c->row_p = adj_matrix->row_p;
     c->col_p = adj_matrix->col_p;
     #pragma omp parallel for
-    for (int d = 0; d < a->depth_size; d++){
-        for (int i = 0; i < adj_matrix->row_size; i++) {
-            for (int k = adj_matrix->row_p[i]; k < adj_matrix->row_p[i + 1]; k++) {
-                int j = adj_matrix->col_p[k];
-                c->val[k] = a->val[i * a->col_size + j];
-            }
+    for (int i = 0; i < adj_matrix->row_size; i++) {
+        for (int k = adj_matrix->row_p[i]; k < adj_matrix->row_p[i + 1]; k++) {
+            int j = adj_matrix->col_p[k];
+            c->val[k] = a->val[i * a->col_size + j];
         }
     }
 }
 
 
 void matrix_lrelu(DenseMatrix *A) {
-    for (int d=0; d < A->depth_size; d++) {
-        #pragma omp parallel for
-        for (int i = 0; i < A->row_size; i++) {
-            for (int j = 0; j < A->col_size; j ++) {
-                int idx = get_index(A->row_size, A->col_size, i, j, d);
-                float x = A->val[idx];
-                A->val[idx] = x < 0 ? ALPHA * x : x;
-            }
-        } 
-    }
+    #pragma omp parallel for
+
+    for (int i = 0; i < A->row_size; i++) {
+        for (int j = 0; j < A->col_size; j ++) {
+            float x = A->val[i * A->col_size + j];
+            A->val[i * A->col_size + j] = x < 0 ? ALPHA * x : x;
+        }
+    } 
 }
 
 void s_softmax(SparseMatrix *A) {
     #pragma omp parallel for
-    for (int d=0; d < A->depth_size; d++) {
-        for (int i = 0; i < A->row_size; i++) {
-            float sum = 0.0;
-            for (int k = A->row_p[i]; k < A->row_p[i + 1]; k++) {
-                int idx = get_index(A->row_size, A->col_size, i, k, d);
-                A->val[k] = exp(A->val[k]);
-                sum += A->val[k];
-            }
+    
+    for (int i = 0; i < A->row_size; i++) {
+        float sum = 0.0;
+        for (int k = A->row_p[i]; k < A->row_p[i + 1]; k++) {
+            A->val[k] = exp(A->val[k]);
+            sum += A->val[k];
+        }
 
-            for (int k = A->row_p[i]; k < A->row_p[i + 1]; k++) {
-                A->val[k] /= sum;
-            }
+        for (int k = A->row_p[i]; k < A->row_p[i + 1]; k++) {
+            A->val[k] /= sum;
         }
     }
 }
 
-void concat(DenseMatrix *source, DenseMatrix *destination, int num_heads) {
-    init_dense(destination, 1, source->row_size, num_heads * source->col_size);
+// source of matrices, destination matrix
+void concat(DenseMatrix **source, DenseMatrix *destination, int num_heads) {
+    init_dense(destination, source[0]->row_size, num_heads * source[0]->col_size);
     #pragma omp parallel for
-    for (int i = 0; i < source->row_size; i++) {
+    for (int i = 0; i < source[0]->row_size; i++) {
         for (int j = 0; j < num_heads; j++) {
-            for (int k = 0; k < source->col_size; k++) {
-                int idx0 = get_index(destination->row_size, destination->col_size, i, (j * source->col_size) + k, 0);
-                int idx1 = get_index(source->row_size, source->col_size, i, k, j);
-                destination->val[idx0] = source->val[idx1];
+            for (int k = 0; k < source[j]->col_size; k++) {
+                destination->val[i * destination->col_size + j * source[j]->col_size + k] = source[j]->val[i * source[j]->col_size + k]; //
             }
         }
     }
 }
 
-void split(DenseMatrix *source, DenseMatrix *destination, int num) {
-    init_dense(destination, num, source->row_size, source->col_size / num);
-    for (int i = 0; i < num; i++) {
-        for (int j = 0; j < source->row_size; j++) {
-            for (int k = 0; k < source->col_size / num; k++) {
-                int idx0 = get_index(source->row_size, source->col_size, j, k + (i * (source->col_size / num)), 0);
-                int idx1 = get_index(destination->row_size, destination->col_size, j, k, i);
-                destination->val[idx1] = source->val[idx0];
-            }
-        }
-    }
-}
-
-void multiple_split(DenseMatrix *source, DenseMatrix **destination, int num) {
+void split(DenseMatrix *source, DenseMatrix **destination, int num) {
     int col_per_dest = source->col_size / num;
 
     for (int i = 0; i < num; i++) {
-        init_dense(destination[i], 1, source->row_size, col_per_dest);
+        init_dense(destination[i], source->row_size, col_per_dest);
     }
 
     for (int i = 0; i < num; i++) {
@@ -169,42 +142,32 @@ void multiple_split(DenseMatrix *source, DenseMatrix **destination, int num) {
     }
 }
 
-void multiple_concat(DenseMatrix **source, DenseMatrix *destination, int num_heads) {
-    init_dense(destination, 1, source[0]->row_size, num_heads * source[0]->col_size);
+
+
+
+void concat_average(GATGraph *g, int num_heads, int out) {
+    g->concatfeature = (DenseMatrix *)malloc(sizeof(DenseMatrix));
+    init_dense(g->concatfeature, g->features->row_size, out);
+    printf("concat : %d %d ", g->features->row_size, out);
+    
     #pragma omp parallel for
-    for (int i = 0; i < source[0]->row_size; i++) {
-        for (int j = 0; j < num_heads; j++) {
-            for (int k = 0; k < source[j]->col_size; k++) {
-                destination->val[i * destination->col_size + j * source[j]->col_size + k] = source[j]->val[i * source[j]->col_size + k]; //
+    for (int i = 0; i < g->newfeatures[0]->row_size; i++) {
+        for (int j = 0; j < out; j++) {
+            float sum = 0.0;
+            for (int k = 0; k < num_heads; k++) {
+                int col_size = g->newfeatures[k]->col_size;
+                sum += g->newfeatures[k]->val[i * col_size + j];  
             }
+
+            for (int k = 0; k < num_heads; k++) {
+                g->concatfeature->val[i * out + j] = sum / num_heads; 
+            }
+
         }
     }
 }
 
-
-// void concat_average(GATGraph *g, int num_heads, int out) {
-//     g->concatfeature = (DenseMatrix *)malloc(sizeof(DenseMatrix));
-//     init_dense(g->concatfeature, 1, g->features->row_size, out);
-//     printf("concat : %d %d ", g->features->row_size, out);
-    
-//     #pragma omp parallel for
-//     for (int i = 0; i < g->newfeatures->row_size; i++) {
-//         for (int j = 0; j < out; j++) {
-//             float sum = 0.0;
-//             for (int k = 0; k < num_heads; k++) {
-//                 int col_size = g->newfeatures[k]->col_size;
-//                 sum += g->newfeatures[k]->val[i * col_size + j];  
-//             }
-
-//             for (int k = 0; k < num_heads; k++) {
-//                 g->concatfeature->val[i * out + j] = sum / num_heads; 
-//             }
-
-//         }
-//     }
-// }
-
-void freeDenseMatrix(DenseMatrix *A) {
+void freeVector(Vector *A) {
     free(A->val);
 }
 
@@ -255,70 +218,77 @@ void mm_imax(DenseMatrix *C, DenseMatrix *A, DenseMatrix *B) {
         convert_dense_format(C, &imax_r);
         convert_dense_format(A, &imax_m1);
         convert_dense_format(B, &imax_m2);
+        imax_dense_deallocation(&imax_r);
+        imax_dense_deallocation(&imax_m1);
+        imax_dense_deallocation(&imax_m2);
 }
 #endif
+
 
 void GATLayer_forward(GATLayer *L, GATGraph *g, bool cat, bool issparse) {
     int nnode = g->neighbor->row_size;
     int nhead = L->num_heads;
     SparseMatrix *adj_matrix = g->neighbor;
-    Param *params = L->params;
+    Param **params = L->params;
 
-    int out = L->params->out_feature;
+    int out = L->params[0]->out_feature;
     struct timespec t1, t2;
 
     L->merged_weight = malloc(sizeof(DenseMatrix *));
-    init_dense(L->merged_weight, 1, L->params->weights->row_size, L->params->weights->col_size * L->num_heads);
+    init_dense(L->merged_weight, L->params[0]->weights->row_size, L->params[0]->weights->col_size * L->num_heads);
 
     L->merged_linear = malloc(sizeof(DenseMatrix *));
-    init_dense(L->merged_linear, 1, L->params->linear->row_size, L->params->weights->col_size * L->num_heads);
+    init_dense(L->merged_linear, L->params[0]->linear->row_size, L->params[0]->weights->col_size * L->num_heads);
 
-    DenseMatrix *temp_merge = malloc(sizeof(DenseMatrix *));
+    DenseMatrix **temp_merge = malloc(sizeof(DenseMatrix *) * L->num_heads);
 
-    L->separated_linear = malloc(sizeof(DenseMatrix *)); // C
-    temp_merge = L->params->weights;
-    L->separated_linear = (DenseMatrix *)malloc(sizeof(DenseMatrix));
-    init_dense(L->separated_linear, L->params->linear->depth_size, L->params->linear->row_size, L->params->linear->col_size);
-
+    // init for n heads
+    L->separated_linear = malloc(sizeof(DenseMatrix **) * L->num_heads); // C
+    for (int i = 0; i < nhead ; i++) {
+        temp_merge[i] = L->params[i]->weights;
+        L->separated_linear[i] = (DenseMatrix *)malloc(sizeof(DenseMatrix));
+        init_dense(L->separated_linear[i], L->params[0]->linear->row_size, L->params[0]->linear->col_size);
+    }
 
     concat(temp_merge, L->merged_weight, L->num_heads);
-    // printDMatrix(L->merged_weight,"merged");
-    // printDMatrix(temp_merge,"unmerged");
 
-    DenseMatrix *linear_l = (DenseMatrix *)malloc(sizeof(DenseMatrix));
-    init_dense(linear_l, nhead, 1, nnode);
+    Vector *linear_l = (Vector *)malloc(sizeof(Vector));
+    init_vector(linear_l, nnode);
 
-    DenseMatrix *linear_r = (DenseMatrix *)malloc(sizeof(DenseMatrix));
-    init_dense(linear_r, nhead, 1, nnode);
+    Vector *linear_r = (Vector *)malloc(sizeof(Vector));
+    init_vector(linear_r, nnode);
 
-    // DenseMatrix *tmp_sum = (DenseMatrix *)malloc(sizeof(DenseMatrix));
-    // init_dense(tmp_sum, nnode);
+    Vector *tmp_sum = (Vector *)malloc(sizeof(Vector));
+    init_vector(tmp_sum, nnode);
 
     SparseMatrix *sfeatures; // A
     DenseMatrix *dfeatures; // A
 
-    // SpMM1(concat)
+    // SpMM(concatenated)
     DenseMatrix *weights = L->merged_weight; // B
     DenseMatrix *merged_linear = L->merged_linear; // C
 
-    // SpMM1
+    // MatMul (depend on whether feature of layer is sparse or not)
     if (issparse) {
         sfeatures = g->features;
 #if defined(EMAX6) || defined(EMAX7)
-        spmm_imax(merged_linear, sfeatures, weights);  
+        spmm_imax(merged_linear, sfeatures, weights);          
 
 #elif defined(USE_MP)
-
-        // printf("spmm1 row: %d col: %d", weights->row_size, weights->col_size);
         timespec_get(&t1, TIME_UTC);
         spmm(merged_linear, sfeatures, weights);
         timespec_get(&t2, TIME_UTC);
         all_nanosec[SPMM] += (Ull)cal_time(&t2, &t1) * 1000;
 
-// TODO: spmm for gpu
-
+#elif USE_CUDA
+        sendSparseMatrixToGPU(sfeatures);
+        sendDenseMatrixToGPU(weights);
+        createCusparse();
+        spmm(merged_linear, sfeatures, weights);
+        sendDenseMatrixToCPU(merged_linear);
+        destroyCusparse();
 #endif
-
+        //spmm for GPU
     }
 
     else {
@@ -332,66 +302,67 @@ void GATLayer_forward(GATLayer *L, GATGraph *g, bool cat, bool issparse) {
         timespec_get(&t2, TIME_UTC);
         all_nanosec[MM] += (Ull)cal_time(&t2, &t1) * 1000;
 #endif
+        //mm for GPU
 
     }
+    freeDenseMatrix(weights);
 
-    g->newfeatures = (DenseMatrix *)malloc(sizeof(DenseMatrix));
-    init_dense(g->newfeatures, nhead, nnode, L->params->out_feature);
-    DenseMatrix *linear = L->separated_linear;
+    g->newfeatures = (DenseMatrix **)malloc(nhead * sizeof(DenseMatrix));
+
+    DenseMatrix **linear = L->separated_linear;
     split(merged_linear, linear, nhead);
-
-// Attention section
-    DenseMatrix *a_l = params->a_l;
-    DenseMatrix *a_r = params->a_r;
-    // printDenseMatrix(a_l, "aaa");
-
-    timespec_get(&t1, TIME_UTC);
-    attention_coeff(linear_l, linear, a_l);
-    attention_coeff(linear_r, linear, a_r);
-
-    DenseMatrix *Linear_lr = (DenseMatrix *)malloc(sizeof(DenseMatrix));
-    init_dense(Linear_lr, nhead, linear_l->col_size, linear_r->col_size);
-    EleWiseSum(Linear_lr, linear_l, linear_r);
-    matrix_lrelu(Linear_lr);
-
-    SparseMatrix *masked_Linear_lr = (SparseMatrix *)malloc(sizeof(SparseMatrix));
-    init_csr(masked_Linear_lr, nhead, adj_matrix->row_size, adj_matrix->col_size, adj_matrix->nnz);
-    mask(masked_Linear_lr, Linear_lr, adj_matrix);
-    s_softmax(masked_Linear_lr);
-    timespec_get(&t2, TIME_UTC);
-
-#if defined(EMAX6) || defined(EMAX7)
-    all_nanosec[ATTENTION][0] += (Ull)cal_time(&t2, &t1) * 1000;
-#elif defined(USE_MP)
-    all_nanosec[ATTENTION] += (Ull)cal_time(&t2, &t1) * 1000;
-#endif
+    freeDenseMatrix(merged_linear);
     
-//MatMul2(batched spmm) for IMAX
+    // Attention section
+    for (int headid = 0; headid < nhead; headid++) {
+        
+        g->newfeatures[headid] = (DenseMatrix *)malloc(sizeof(DenseMatrix));
+        init_dense(g->newfeatures[headid], nnode, L->params[0]->out_feature);
 
-    /*  
-        depthwisesplit_csr(): masked_linear_lr(x,y,z) -> masked_linear_lr[x](y,z)
-        depthwisesplit_dense(): linear(x,y,z) -> linear[x](y,z)
-        for (heads):
-            spmm(a[],b[],c[])
-        multiple_concat(): result[x](y,z) -> result(x,y,z)
-    */
+        Vector *a_l = params[headid]->a_l;
+        Vector *a_r = params[headid]->a_r;
 
-    for (int headid=0; headid < nhead; headid++){
+        timespec_get(&t1, TIME_UTC);
+        attention_coeff(linear_l, linear[headid], a_l);
+        attention_coeff(linear_r, linear[headid], a_r);
+
+        DenseMatrix *Linear_lr = (DenseMatrix *)malloc(sizeof(DenseMatrix));
+        init_dense(Linear_lr, linear_l->col_size, linear_r->col_size);
+
+        computeEleWiseSum(Linear_lr, linear_l, linear_r);
+        matrix_lrelu(Linear_lr);
+
+        SparseMatrix *masked_Linear_lr = (SparseMatrix *)malloc(sizeof(SparseMatrix));
+        init_csr(masked_Linear_lr, adj_matrix->row_size, adj_matrix->col_size, adj_matrix->nnz);
+        mask(masked_Linear_lr, Linear_lr, adj_matrix);
+        s_softmax(masked_Linear_lr);    
+        timespec_get(&t2, TIME_UTC);
+        freeDenseMatrix(Linear_lr);
+
 #if defined(EMAX6) || defined(EMAX7)
-
+        all_nanosec[ATTENTION][0] += (Ull)cal_time(&t2, &t1) * 1000;
+#elif defined(USE_MP)
+        all_nanosec[ATTENTION] += (Ull)cal_time(&t2, &t1) * 1000;
+#endif
+        
+        //MatMul2 for IMAX
+#if defined(EMAX6) || defined(EMAX7)
         spmm_imax(g->newfeatures[headid], masked_Linear_lr, linear[headid]);
 
-// MatMul2(batched spmm) for CPU     
+        // MatMul2 for CPU     
 #elif defined(USE_MP) 
-        timespec_get(&t1, TIME_UTC);    
-        spmm(g->newfeatures, masked_Linear_lr, linear); 
-        timespec_get(&t2, TIME_UTC);    
-        all_nanosec[SPMM] += (Ull)cal_time(&t2, &t1) * 1000;    
+        timespec_get(&t1, TIME_UTC);
+        spmm(g->newfeatures[headid], masked_Linear_lr, linear[headid]);
+        timespec_get(&t2, TIME_UTC);
+        all_nanosec[SPMM] += (Ull)cal_time(&t2, &t1) * 1000;
+        // printDMatrix(g->newfeatures[headid], "MatMul2");
 #endif
-// TODO: batched spmm for gpu
+        // spmm for gpu
+        freeDenseMatrix(linear[headid]);
+        
     }
-    
     if(cat) {
         concat(g->newfeatures, g->concatfeature, nhead);
     }
+    free(L);
 }

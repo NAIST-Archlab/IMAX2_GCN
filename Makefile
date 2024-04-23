@@ -3,7 +3,7 @@
 ##          Primary writer: Dohyun Kim ##
 ##          kim.dohyun.kg7@is.naist.jp ##
 GCN_PROG := imax_gcn
-TEST_GAT_PROGRAM := test_gat
+GAT_PROG := imax_gat
 TEST_SPARSE_PROGRAM := test_sparse
 TEST_DENSE_PROGRAM := test_dense
 SRC_DIR := src
@@ -24,7 +24,7 @@ HARD_UNIT32 := 0
 LMM128 := 1
 EMAX_VER := 7
 EMAX_DEFINE := -DEMAX6 -DDEBUG -DUSE_MP -DNCHIP=$(NCHIP)
-TEST_GAT_OBJS := test/test_gat.o
+GAT_PROG_OBJS := gat_prog.o
 TEST_SPARSE_OBJS := test/test_sparse.o
 TEST_DENSE_OBJS := test/test_dense.o
 HEADERS := $(CONV)/emax6.h $(wildcard $(INCLUDE)/*.h)
@@ -137,18 +137,18 @@ endif
 
 # GAT
 
-$(TEST_GAT_PROGRAM): $(OBJS) $(TEST_GAT_OBJS)
-	$(CC) $(OBJS) $(TEST_GAT_OBJS) -o $(TEST_GAT_PROGRAM) $(LDFLAGS) $(CFLAGS)
+$(GAT_PROG): $(OBJS) $(GAT_PROG_OBJS)
+	$(CC) $(OBJS) $(GAT_PROG_OBJS) -o $(GAT_PROG) $(LDFLAGS) $(CFLAGS)
 
 ifeq ($(ARM), 1)
-$(TEST_GAT_PROGRAM).emax$(EMAX_VER): $(OBJS_EMAX) $(TEST_GAT_OBJS)
-	$(CC) $(OBJS_EMAX) $(TEST_GAT_OBJS) -o $(TEST_GAT_PROGRAM).emax$(EMAX_VER) $(LDFLAGS) $(CFLAGS_EMAX)
+$(GAT_PROG).emax$(EMAX_VER): $(OBJS_EMAX) $(GAT_PROG_OBJS)
+	$(CC) $(OBJS_EMAX) $(GAT_PROG_OBJS) -o $(GAT_PROG).emax$(EMAX_VER) $(LDFLAGS) $(CFLAGS_EMAX)
 
-$(TEST_GAT_PROGRAM).emax$(EMAX_VER)+dma: $(OBJS_EMAX) $(TEST_GAT_OBJS)
-	$(CC) $(OBJS_EMAX) $(TEST_GAT_OBJS) -o $(TEST_GAT_PROGRAM).emax$(EMAX_VER)+dma $(LDFLAGS) $(CFLAGS_EMAX_DMA)
+$(GAT_PROG).emax$(EMAX_VER)+dma: $(OBJS_EMAX) $(GAT_PROG_OBJS)
+	$(CC) $(OBJS_EMAX) $(GAT_PROG_OBJS) -o $(GAT_PROG).emax$(EMAX_VER)+dma $(LDFLAGS) $(CFLAGS_EMAX_DMA)
 
-$(TEST_GAT_PROGRAM).emax$(EMAX_VER)+nc: $(OBJS) $(TEST_GAT_OBJS)
-	$(CC) $(OBJS) $(TEST_GAT_OBJS) -o $(TEST_GAT_PROGRAM).emax$(EMAX_VER)+nc $(LDFLAGS) $(CFLAGS_EMAX_NC)
+$(GAT_PROG).emax$(EMAX_VER)+nc: $(OBJS) $(GAT_PROG_OBJS)
+	$(CC) $(OBJS) $(GAT_PROG_OBJS) -o $(GAT_PROG).emax$(EMAX_VER)+nc $(LDFLAGS) $(CFLAGS_EMAX_NC)
 endif
 
 
@@ -211,4 +211,4 @@ $(SRC_DIR)/linalg_imax-emax$(EMAX_VER).c: $(SRC_DIR)/linalg_imax.c
 	$(CC) $(CFLAGS) -o $@ -c $<
 
 clean:
-	$(RM) *.o *.a *.so *.gch test_gat test_gat.emax7+dma $(SRC_DIR)/*-*.c $(SRC_DIR)/*.o $(TEST_DIR)/*.o
+	$(RM) *.o *.a *.so *.gch *.emax7 imax_gat imax_gat.emax7+dma $(SRC_DIR)/*-*.c $(SRC_DIR)/*.o $(TEST_DIR)/*.o

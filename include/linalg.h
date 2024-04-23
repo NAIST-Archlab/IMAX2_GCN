@@ -38,7 +38,6 @@ unsigned long long all_nanosec[NUM_CLASS];
 typedef struct dense_matrix {
     int   row_size;  // row size
     int   col_size;  // column size
-    int   depth_size;
     float      *val; // values
     float *cuda_val; // values for CUDA
 } DenseMatrix;

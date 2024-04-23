@@ -2,10 +2,15 @@
 ## 概要
 IMAXでGNNを実装するプロジェクト。
 
-## コンパイル方法
+## 使い方
 GCN
 ```shell
 make imax_gcn
+```
+GAT
+```shell
+make imax_gat
+./imax_gat $(graph) $(layer_1) $(layer_2) ...
 ```
 SpMMテスト
 ```shell
