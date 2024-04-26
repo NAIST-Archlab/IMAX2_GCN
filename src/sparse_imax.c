@@ -159,7 +159,7 @@ void spmm(IMAXDenseMatrix *result, IMAXSparseMatrix *imax_sp_matrix, IMAXDenseMa
                             c03[CHIP] = (Uint*)c0[CHIP] + C_blk_row_size * 6;
                         #endif
                     }
-
+                    Uint force = 0;
                     #define spmm_core1(r, rm1, offset) \
                                 exe(OP_FMA, &AR[r][0], AR[rm1][0], EXP_H3210, BR[rm1][2][1], EXP_H1010, BR[rm1][0][1], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL); \
                                 exe(OP_FMA, &AR[r][1], AR[rm1][1], EXP_H3210, BR[rm1][2][1], EXP_H1010, BR[rm1][0][0], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL); \
@@ -346,10 +346,10 @@ void spmm(IMAXDenseMatrix *result, IMAXSparseMatrix *imax_sp_matrix, IMAXDenseMa
                                 exe(OP_FAD, &AR[r][1], AR[rm1][1], EXP_H3210, BR[r][1][1], EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);           \
                                 exe(OP_FAD, &AR[r][2], AR[rm1][2], EXP_H3210, BR[r][2][1], EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);           \
                                 exe(OP_FAD, &AR[r][3], AR[rm1][3], EXP_H3210, BR[r][3][1], EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);           \
-                                mop(OP_STR, 3, &AR[r][0], (Ull)offset, (Ull)c00[CHIP], MSK_D0, (Ull)c0[CHIP], C_blk_size, 0, 1, (Ull)NULL, C_blk_size);    \
-                                mop(OP_STR, 3, &AR[r][1], (Ull)offset, (Ull)c01[CHIP], MSK_D0, (Ull)c0[CHIP], C_blk_size, 0, 1, (Ull)NULL, C_blk_size);    \
-                                mop(OP_STR, 3, &AR[r][2], (Ull)offset, (Ull)c02[CHIP], MSK_D0, (Ull)c0[CHIP], C_blk_size, 0, 1, (Ull)NULL, C_blk_size);    \
-                                mop(OP_STR, 3, &AR[r][3], (Ull)offset, (Ull)c03[CHIP], MSK_D0, (Ull)c0[CHIP], C_blk_size, 0, 1, (Ull)NULL, C_blk_size)
+                                mop(OP_STR, 3, &AR[r][0], (Ull)offset, (Ull)c00[CHIP], MSK_D0, (Ull)c0[CHIP], C_blk_size, 0, force, (Ull)NULL, C_blk_size);    \
+                                mop(OP_STR, 3, &AR[r][1], (Ull)offset, (Ull)c01[CHIP], MSK_D0, (Ull)c0[CHIP], C_blk_size, 0, force, (Ull)NULL, C_blk_size);    \
+                                mop(OP_STR, 3, &AR[r][2], (Ull)offset, (Ull)c02[CHIP], MSK_D0, (Ull)c0[CHIP], C_blk_size, 0, force, (Ull)NULL, C_blk_size);    \
+                                mop(OP_STR, 3, &AR[r][3], (Ull)offset, (Ull)c03[CHIP], MSK_D0, (Ull)c0[CHIP], C_blk_size, 0, force, (Ull)NULL, C_blk_size)
 
                     #define spmm_final_1(r, rm1, offset) \
                                 mop(OP_LDR, 3, &BR[r][0][1], (Ull)c10[CHIP], (Ull)offset, MSK_W0, (Ull)c1[CHIP], C_blk_size, 0, 1, (Ull)NULL, C_blk_size); \
@@ -360,10 +360,10 @@ void spmm(IMAXDenseMatrix *result, IMAXSparseMatrix *imax_sp_matrix, IMAXDenseMa
                                 exe(OP_FAD, &AR[r][1], AR[rm1][1], EXP_H3210, BR[r][1][1], EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);           \
                                 exe(OP_FAD, &AR[r][2], AR[rm1][2], EXP_H3210, BR[r][2][1], EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);           \
                                 exe(OP_FAD, &AR[r][3], AR[rm1][3], EXP_H3210, BR[r][3][1], EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);           \
-                                mop(OP_STR, 3, &AR[r][0], (Ull)offset, (Ull)c10[CHIP], MSK_D0, (Ull)c1[CHIP], C_blk_size, 0, 1, (Ull)NULL, C_blk_size);    \
-                                mop(OP_STR, 3, &AR[r][1], (Ull)offset, (Ull)c11[CHIP], MSK_D0, (Ull)c1[CHIP], C_blk_size, 0, 1, (Ull)NULL, C_blk_size);    \
-                                mop(OP_STR, 3, &AR[r][2], (Ull)offset, (Ull)c12[CHIP], MSK_D0, (Ull)c1[CHIP], C_blk_size, 0, 1, (Ull)NULL, C_blk_size);    \
-                                mop(OP_STR, 3, &AR[r][3], (Ull)offset, (Ull)c13[CHIP], MSK_D0, (Ull)c1[CHIP], C_blk_size, 0, 1, (Ull)NULL, C_blk_size)
+                                mop(OP_STR, 3, &AR[r][0], (Ull)offset, (Ull)c10[CHIP], MSK_D0, (Ull)c1[CHIP], C_blk_size, 0, force, (Ull)NULL, C_blk_size);    \
+                                mop(OP_STR, 3, &AR[r][1], (Ull)offset, (Ull)c11[CHIP], MSK_D0, (Ull)c1[CHIP], C_blk_size, 0, force, (Ull)NULL, C_blk_size);    \
+                                mop(OP_STR, 3, &AR[r][2], (Ull)offset, (Ull)c12[CHIP], MSK_D0, (Ull)c1[CHIP], C_blk_size, 0, force, (Ull)NULL, C_blk_size);    \
+                                mop(OP_STR, 3, &AR[r][3], (Ull)offset, (Ull)c13[CHIP], MSK_D0, (Ull)c1[CHIP], C_blk_size, 0, force, (Ull)NULL, C_blk_size)
 
 
 //EMAX5A begin spmm1 mapdist=0
@@ -532,6 +532,7 @@ void spmm(IMAXDenseMatrix *result, IMAXSparseMatrix *imax_sp_matrix, IMAXDenseMa
                         }
                     }
 //EMAX5A end
+                    if (!force) force = 1;
                 }
             }
         }
