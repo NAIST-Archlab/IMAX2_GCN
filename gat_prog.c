@@ -38,7 +38,11 @@ int main(int argc, char **argv) {
         }
 
     }
-    printDMatrix(g->newfeatures[0], "cora_output");
+    // printDMatrix(g->newfeatures[0], "cora_output");
+    print_weight(g->newfeatures[0]);
+    free(g);
+    free(new_layer);
+    free(new_layer_s);
     #if defined(EMAX6) || defined(EMAX7)
         printf("SpMM usec: ARM:%d DRAIN:%d CONF:%d REGV:%d RANGE:%d LOAD:%d EXEC:%d total:%d\n",
             (Uint)(all_nanosec[SPMM][0]/1000/iter),

@@ -203,6 +203,7 @@ $(SRC_DIR)/linalg_imax-emax$(EMAX_VER).c: $(SRC_DIR)/linalg_imax.c
 .c.o: $(HEADERS)
 	@[ -d $(SRC_DIR) ]
 	@[ -d $(TEST_DIR) ]
+	# $(CC) -V
 	$(CC) $(CFLAGS) -o $@ -c $<
 
 .cu.o: $(HEADERS)

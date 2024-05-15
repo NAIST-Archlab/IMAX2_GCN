@@ -16,7 +16,6 @@
 #endif
 
 void mm(IMAXDenseMatrix *result, IMAXDenseMatrix *imax_a, IMAXDenseMatrix *imax_b) {
-
     Ull CHIP;
     Ull LOOP1, LOOP0;
     Ull INIT1, INIT0;
@@ -108,7 +107,7 @@ void mm(IMAXDenseMatrix *result, IMAXDenseMatrix *imax_a, IMAXDenseMatrix *imax_
                         b2[k] = (Uint*)b0[k] + B_blk_row_size * 4;
                         b3[k] = (Uint*)b0[k] + B_blk_row_size * 6;
                     }
-                    Uint force = 1;
+
                     #define sgemm_core1_0(r, rm1, index, a_index) \
                                 mop(OP_LDR,  3, &BR[rm1][0][1], (Ull)b0[index],      (Ull)cofs, MSK_W1, (Ull)b0[index], B_blk_size, 0, 0, (Ull)NULL, B_blk_size);  \
                                 mop(OP_LDR,  3, &BR[rm1][0][0], (Ull)b1[index],      (Ull)cofs, MSK_W1, (Ull)b0[index], B_blk_size, 0, 0, (Ull)NULL, B_blk_size);  \
@@ -139,10 +138,10 @@ void mm(IMAXDenseMatrix *result, IMAXDenseMatrix *imax_a, IMAXDenseMatrix *imax_
                                 exe(OP_FAD, &AR[r][1], AR[rm1][1], EXP_H3210, BR[r][1][1], EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);          \
                                 exe(OP_FAD, &AR[r][2], AR[rm1][2], EXP_H3210, BR[r][2][1], EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);          \
                                 exe(OP_FAD, &AR[r][3], AR[rm1][3], EXP_H3210, BR[r][3][1], EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);          \
-                                mop(OP_STR, 3, &AR[r][0], (Ull)oofs, (Ull)c00[CHIP], MSK_D0, (Ull)c0[CHIP], C_blk_size, 0, force, (Ull)NULL, C_blk_size);     \
-                                mop(OP_STR, 3, &AR[r][1], (Ull)oofs, (Ull)c01[CHIP], MSK_D0, (Ull)c0[CHIP], C_blk_size, 0, force, (Ull)NULL, C_blk_size);     \
-                                mop(OP_STR, 3, &AR[r][2], (Ull)oofs, (Ull)c02[CHIP], MSK_D0, (Ull)c0[CHIP], C_blk_size, 0, force, (Ull)NULL, C_blk_size);     \
-                                mop(OP_STR, 3, &AR[r][3], (Ull)oofs, (Ull)c03[CHIP], MSK_D0, (Ull)c0[CHIP], C_blk_size, 0, force, (Ull)NULL, C_blk_size)
+                                mop(OP_STR, 3, &AR[r][0], (Ull)oofs, (Ull)c00[CHIP], MSK_D0, (Ull)c0[CHIP], C_blk_size, 0, 1, (Ull)NULL, C_blk_size);     \
+                                mop(OP_STR, 3, &AR[r][1], (Ull)oofs, (Ull)c01[CHIP], MSK_D0, (Ull)c0[CHIP], C_blk_size, 0, 1, (Ull)NULL, C_blk_size);     \
+                                mop(OP_STR, 3, &AR[r][2], (Ull)oofs, (Ull)c02[CHIP], MSK_D0, (Ull)c0[CHIP], C_blk_size, 0, 1, (Ull)NULL, C_blk_size);     \
+                                mop(OP_STR, 3, &AR[r][3], (Ull)oofs, (Ull)c03[CHIP], MSK_D0, (Ull)c0[CHIP], C_blk_size, 0, 1, (Ull)NULL, C_blk_size)
                 
 //EMAX5A begin sgemm1 mapdist=0
                     for (CHIP=0;CHIP<NCHIP;CHIP++) {
@@ -207,7 +206,6 @@ void mm(IMAXDenseMatrix *result, IMAXDenseMatrix *imax_a, IMAXDenseMatrix *imax_
                         }
                     }
 //EMAX5A end
-                    if (force) force = 0;
                 }
             }
         }

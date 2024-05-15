@@ -2,7 +2,7 @@
 #include "../include/layer.h"
 #include "../include/utils.h"
 #include "../include/sparse.h"
-// #include "../include/linalg.h"
+#include "../include/linalg.h"
 #include "../include/gat.h"
 #include <time.h>
 
@@ -52,7 +52,7 @@ void matrix_elu(DenseMatrix *A) {
 // }
 
 // mv
-void attention_coeff(Vector *linear_lr, DenseMatrix *linear, Vector *self_attn) {
+void mv(Vector *linear_lr, DenseMatrix *linear, Vector *self_attn) {
     #pragma omp parallel for
     for (int nid = 0; nid < linear->row_size; nid++) {
         float left = 0;
@@ -63,7 +63,7 @@ void attention_coeff(Vector *linear_lr, DenseMatrix *linear, Vector *self_attn) 
     }
 }
 
-void computeEleWiseSum(DenseMatrix *a, Vector *linear_l, Vector *linear_r){ 
+void elewise_sum(DenseMatrix *a, Vector *linear_l, Vector *linear_r){ 
     #pragma omp parallel for
     for (int i = 0; i < linear_l->col_size; i++) {
         for (int j = 0; j < linear_l->col_size; j++) {
@@ -268,7 +268,6 @@ void GATLayer_forward(GATLayer *L, GATGraph *g, bool cat, bool issparse) {
     DenseMatrix *weights = L->merged_weight; // B
     DenseMatrix *merged_linear = L->merged_linear; // C
 
-    // MatMul (depend on whether feature of layer is sparse or not)
     if (issparse) {
         sfeatures = g->features;
 #if defined(EMAX6) || defined(EMAX7)
@@ -280,7 +279,7 @@ void GATLayer_forward(GATLayer *L, GATGraph *g, bool cat, bool issparse) {
         timespec_get(&t2, TIME_UTC);
         all_nanosec[SPMM] += (Ull)cal_time(&t2, &t1) * 1000;
 
-#elif USE_CUDA
+#elif defined(USE_CUDA)
         sendSparseMatrixToGPU(sfeatures);
         sendDenseMatrixToGPU(weights);
         createCusparse();
@@ -288,7 +287,6 @@ void GATLayer_forward(GATLayer *L, GATGraph *g, bool cat, bool issparse) {
         sendDenseMatrixToCPU(merged_linear);
         destroyCusparse();
 #endif
-        //spmm for GPU
     }
 
     else {
@@ -301,9 +299,19 @@ void GATLayer_forward(GATLayer *L, GATGraph *g, bool cat, bool issparse) {
         mm(merged_linear, dfeatures, weights);
         timespec_get(&t2, TIME_UTC);
         all_nanosec[MM] += (Ull)cal_time(&t2, &t1) * 1000;
-#endif
-        //mm for GPU
 
+#elif defined(USE_CUDA)
+        timespec_get(&t1, TIME_UTC);
+        createCublas();
+        sendDenseMatrixToGPU(dfeatures);
+        sendDenseMatrixToGPU(weights);
+        timespec_get(&t1, TIME_UTC);
+        mm(merged_linear, dfeatures, weights);
+        timespec_get(&t2, TIME_UTC);
+        sendDenseMatrixToCPU(merged_linear);
+        // printDMatrix(merged_linear, "newfeat");
+        destroyCublas();
+#endif
     }
     freeDenseMatrix(weights);
 
@@ -323,13 +331,13 @@ void GATLayer_forward(GATLayer *L, GATGraph *g, bool cat, bool issparse) {
         Vector *a_r = params[headid]->a_r;
 
         timespec_get(&t1, TIME_UTC);
-        attention_coeff(linear_l, linear[headid], a_l);
-        attention_coeff(linear_r, linear[headid], a_r);
+        mv(linear_l, linear[headid], a_l);
+        mv(linear_r, linear[headid], a_r);
 
         DenseMatrix *Linear_lr = (DenseMatrix *)malloc(sizeof(DenseMatrix));
         init_dense(Linear_lr, linear_l->col_size, linear_r->col_size);
 
-        computeEleWiseSum(Linear_lr, linear_l, linear_r);
+        elewise_sum(Linear_lr, linear_l, linear_r);
         matrix_lrelu(Linear_lr);
 
         SparseMatrix *masked_Linear_lr = (SparseMatrix *)malloc(sizeof(SparseMatrix));
@@ -338,6 +346,7 @@ void GATLayer_forward(GATLayer *L, GATGraph *g, bool cat, bool issparse) {
         s_softmax(masked_Linear_lr);    
         timespec_get(&t2, TIME_UTC);
         freeDenseMatrix(Linear_lr);
+        printf("Attention: %lf", cal_time(&t2, &t1));
 
 #if defined(EMAX6) || defined(EMAX7)
         all_nanosec[ATTENTION][0] += (Ull)cal_time(&t2, &t1) * 1000;
@@ -345,24 +354,30 @@ void GATLayer_forward(GATLayer *L, GATGraph *g, bool cat, bool issparse) {
         all_nanosec[ATTENTION] += (Ull)cal_time(&t2, &t1) * 1000;
 #endif
         
-        //MatMul2 for IMAX
 #if defined(EMAX6) || defined(EMAX7)
         spmm_imax(g->newfeatures[headid], masked_Linear_lr, linear[headid]);
-
-        // MatMul2 for CPU     
+    
 #elif defined(USE_MP) 
         timespec_get(&t1, TIME_UTC);
         spmm(g->newfeatures[headid], masked_Linear_lr, linear[headid]);
         timespec_get(&t2, TIME_UTC);
         all_nanosec[SPMM] += (Ull)cal_time(&t2, &t1) * 1000;
         // printDMatrix(g->newfeatures[headid], "MatMul2");
+
+#elif defined(USE_CUDA)
+        sendSparseMatrixToGPU(masked_Linear_lr);
+        sendDenseMatrixToGPU(linear[headid]);
+        createCusparse();
+        spmm(g->newfeatures[headid], masked_Linear_lr, linear[headid]);
+        sendDenseMatrixToCPU(g->newfeatures[headid]);
+        destroyCusparse();
 #endif
-        // spmm for gpu
         freeDenseMatrix(linear[headid]);
+        // printf("headid: %d", headid);
         
     }
     if(cat) {
         concat(g->newfeatures, g->concatfeature, nhead);
     }
-    free(L);
+
 }

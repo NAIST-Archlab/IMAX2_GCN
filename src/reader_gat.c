@@ -1,6 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+
+#if defined(USE_CUDA)
+#include <cuda.h>
+#include <cusparse_v2.h>
+#include <cublas_v2.h>
+#endif
+
 #include "../include/linalg.h"
 #include "../include/sparse.h"
 #include "../include/reader_gat.h"
@@ -70,12 +77,21 @@ void init_csr(SparseMatrix *matrix, int row, int col, int nz) {
     matrix->row_p = calloc(row+1, sizeof(int));
     matrix->col_p = calloc(nz, sizeof(int));
     matrix->val = calloc(nz, sizeof(float));
+
+# if defined(USE_CUDA)
+    CHECK(cudaMalloc((void**) &matrix->cuda_row_p, sizeof(int)*(matrix->row_size+1)));
+    CHECK(cudaMalloc((void**) &matrix->cuda_col_p, sizeof(int)*(matrix->nnz)));
+    CHECK(cudaMalloc((void**) &matrix->cuda_val,   sizeof(float)*(matrix->nnz)));
+#endif
 }
 
 void init_dense(DenseMatrix *matrix, int row, int col) {
     matrix->val = calloc(row * col, sizeof(float));
     matrix->row_size = row;
     matrix->col_size = col;
+# if defined(USE_CUDA)
+    CHECK(cudaMalloc((void**) &matrix->cuda_val, sizeof(float)*(matrix->row_size*matrix->col_size)));
+#endif
 }
 
 void init_vector(Vector *vector, int col) {

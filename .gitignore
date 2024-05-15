@@ -16,3 +16,5 @@ test_gat
 datasets/
 output/
 *.bak
+imax_gat
+imax_gcn
