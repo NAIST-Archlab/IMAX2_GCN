@@ -13,8 +13,6 @@
 #include "../include/reader_gat.h"
 #include "../include/layer.h"
 
-
-
 void printDMatrix(DenseMatrix *A, char *s){
     printf("row: %d\ncol: %d\n", A->row_size, A->col_size);
     int col =  A->col_size;
@@ -99,15 +97,25 @@ void init_vector(Vector *vector, int col) {
     vector->col_size = col;
 }
 
-void init_graph(GATGraph *g, int nnode, int nedge, int nfeature, int nz_nei, int nz_fea) {
+void init_graph(GATGraph *g, int nnode, int nedge, int nfeature, int nz_nei, int nz_fea, bool inductive) {
 
-    g->concatfeature = calloc(nnode * nfeature, sizeof(float));
+    g->out_feature = calloc(nnode * nfeature, sizeof(float));
 
-    g->neighbor = malloc(sizeof(SparseMatrix));
-    init_csr(g->neighbor, nnode, nnode, nz_nei);
+    if (!inductive) {
+        g->s_neighbor = malloc(sizeof(SparseMatrix));
+        init_csr(g->s_neighbor, nnode, nnode, nz_nei);
 
-    g->features = malloc(sizeof(SparseMatrix)); // features
-    init_csr(g->features, nnode, nfeature, nz_fea);
+        g->s_features = malloc(sizeof(SparseMatrix)); // features
+        init_csr(g->s_features, nnode, nfeature, nz_fea);
+    }
+
+    else {
+        g->d_neighbor = malloc(sizeof(DenseMatrix));
+        init_dense(g->d_neighbor, nnode, nnode);
+
+        g->d_features = malloc(sizeof(DenseMatrix)); // features
+        init_dense(g->d_features, nnode, nfeature);
+    }
 
 }
 
@@ -139,7 +147,7 @@ void read_metadata(FILE *infile) {
 
 }
 
-void read_graph(GATGraph *g, char *path) {
+void read_graph(GATGraph *g, char *path, bool inductive) {
     char allpath[256];
     sprintf(allpath, "datasets/%s.bin",path);
     // printf("%s", allpath);
@@ -148,7 +156,6 @@ void read_graph(GATGraph *g, char *path) {
     
     if (!infile) {
         perror("Error opening graph.bin");
-        
     }
 
     // read meta data
@@ -156,15 +163,27 @@ void read_graph(GATGraph *g, char *path) {
     fread(&nnode, sizeof(int), 1, infile);
     fread(&nedge, sizeof(int), 1, infile);
     fread(&nfeature, sizeof(int), 1, infile);
-    fread(&nz_nei, sizeof(int), 1, infile);
-    fread(&nz_fea, sizeof(int), 1, infile);
-    // printf("nnode:%d nedge:%d nfeature:%d nz_nei:%d nz_fea:%d", nnode, nedge, nfeature, nz_nei, nz_fea);
+
+    if (!inductive) {
+        fread(&nz_nei, sizeof(int), 1, infile);
+        fread(&nz_fea, sizeof(int), 1, infile);
+    }
+
+    printf("nnode:%d nedge:%d nfeature:%d nz_nei:%d nz_fea:%d", nnode, nedge, nfeature, nz_nei, nz_fea);
 
     // graph init
-    init_graph(g, nnode, nedge, nfeature, nz_nei, nz_fea);
+    init_graph(g, nnode, nedge, nfeature, nz_nei, nz_fea, inductive);
 
-    read_csr(g->neighbor, infile);
-    read_csr(g->features, infile);
+    if (!inductive) {
+        read_csr(g->s_neighbor, infile);
+        read_csr(g->s_features, infile);
+    }
+
+    else {
+        read_dense(g->d_neighbor, infile);
+        read_dense(g->d_features, infile);
+    }
+
 }
 
 Param *param_init(int in, int out, int nnode) {
@@ -190,10 +209,9 @@ Param *param_init(int in, int out, int nnode) {
 void read_layer(GATLayer *layer, int nnode, char *path) {
     char allpath[256];
     sprintf(allpath, "datasets/%s.bin", path);
-    // printf("%s", allpath);
 
     FILE *infile = fopen(allpath, "rb");
-    
+
     if (!infile) {
         perror("Error opening layer");
         return;
@@ -203,12 +221,10 @@ void read_layer(GATLayer *layer, int nnode, char *path) {
     fread(&nhead, sizeof(int), 1, infile);
     fread(&in_feature, sizeof(int), 1, infile);
     fread(&out_feature, sizeof(int), 1, infile);
-
     printf("in_feat:%d\nout_feat:%d\nnnode:%d\nnhead:%d", in_feature, out_feature, nnode, nhead);
     layer->num_heads = nhead;
     Param **params = malloc(sizeof(Param *) * nhead);
     layer->params = params;
-
     for (int hid = 0; hid < nhead; hid++) { // for nheads
         params[hid] = param_init(in_feature, out_feature, nnode);
     }

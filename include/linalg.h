@@ -11,7 +11,7 @@ enum { SPMM, MM, RELU, SOFTMAX, ATTENTION, ELU, LOG_SOFTMAX, NUM_CLASS };
 #if defined(EMAX6) || defined(EMAX7)
 unsigned long long all_nanosec[NUM_CLASS][8];
 #elif defined(USE_CUDA)
-unsigned long long all_nanosec[NUM_CLASS][3];
+// unsigned long long all_nanosec[NUM_CLASS][3];
 #else
 unsigned long long all_nanosec[NUM_CLASS];
 #endif

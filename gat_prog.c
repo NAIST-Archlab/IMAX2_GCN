@@ -3,46 +3,45 @@
 #include "include/sparse.h"
 #include "include/gat.h"
 #include "include/imax.h"
+#include "include/linalg.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
-
 int main(int argc, char **argv) {
+    
     // read adj, features and weights
     GATGraph *g = malloc(sizeof(GATGraph));
 
-    read_graph(g, argv[1]);
+    read_graph(g, argv[1], 0);
 
-    GATLayer *new_layer = malloc(sizeof(GATLayer));
-    GATLayer *new_layer_s = malloc(sizeof(GATLayer));
+    GATLayer *layer_0 = malloc(sizeof(GATLayer));
+    GATLayer *layer_1 = NULL;
 
-    read_layer(new_layer, g->neighbor->row_size, argv[2]);
-    int iter;
-    if (argc > 4) {
-        read_layer(new_layer_s, g->neighbor->row_size, argv[3]);
-        iter = atoi(argv[4]);
+    read_layer(layer_0, g->s_neighbor->row_size, argv[2]);
+
+    int iter = atoi(argv[argc - 1]);
+
+    if(argc >= 5) {
+            layer_1 = malloc(sizeof(GATLayer));
+            read_layer(layer_1, g->s_neighbor->row_size, argv[3]);
     }
-    else {
-        iter = atoi(argv[3]);
-    }
+// GATLayer_forward( cat, issparse, inductive, first_layer, activation )
 
     for (int i = 0 ; i < iter ; i++) {
-        GATLayer_forward(new_layer, g, 1, 1);   
-        if (argc > 4) {
-            GATLayer_forward(new_layer_s, g, 0, 0);
-            matrix_elu(g->newfeatures[0]);
-            logsoftmax(g->newfeatures[0]);
+        GATLayer_forward(layer_0, g, 1, 1, 0, 1, 0);
+        print_weight(g->out_feature);
+        if (argc >= 5) {
+            GATLayer_forward(layer_1, g, 0, 0, 0, 0, 1);
+            logsoftmax(g->out_feature);
         }
-
     }
-    // printDMatrix(g->newfeatures[0], "cora_output");
-    print_weight(g->newfeatures[0]);
+
+    print_weight(g->out_feature);
     free(g);
-    free(new_layer);
-    free(new_layer_s);
+
     #if defined(EMAX6) || defined(EMAX7)
         printf("SpMM usec: ARM:%d DRAIN:%d CONF:%d REGV:%d RANGE:%d LOAD:%d EXEC:%d total:%d\n",
             (Uint)(all_nanosec[SPMM][0]/1000/iter),

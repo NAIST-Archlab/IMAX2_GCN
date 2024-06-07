@@ -22,10 +22,11 @@ typedef struct vector {
 
 typedef struct gat_graph{
 
-    SparseMatrix *neighbor;
-    SparseMatrix *features;
-    DenseMatrix **newfeatures;
-    DenseMatrix *concatfeature;
+    SparseMatrix *s_neighbor;
+    DenseMatrix *d_neighbor;
+    SparseMatrix *s_features;
+    DenseMatrix *d_features;
+    DenseMatrix *out_feature;
     int nfeature;
     
 } GATGraph;

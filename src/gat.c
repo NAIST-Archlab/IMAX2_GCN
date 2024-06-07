@@ -20,17 +20,6 @@ void logsoftmax(DenseMatrix *A) {
     }
 }
 
-// TODO: implement func of normalizing feature matrix
-
-// void norm_feature(SparseMatrix *A) {
-//     #pragma omp parallel for
-//     //row wise sum
-//     for (int i = 0; i < A->row_size; i++) {
-//         for (int j = A->col_p[i]; j < A->col_p[i+1]) {
-//         }
-//     }
-// }
-
 void matrix_elu(DenseMatrix *A) {
     float alpha = 1.0;
     #pragma omp parallel for
@@ -42,16 +31,6 @@ void matrix_elu(DenseMatrix *A) {
     } 
 }
 
-// void transpose(DenseMatrix *A, DenseMatrix *B) {
-//     init_dense(A, B->col_size, B->row_size);
-//     for (int i = 0; i < B->row_size; i++) {
-//         for (int j = 0; j < B->col_size; j++) {
-//             A->val[j * B->row_size + i] = B->val[i * B->col_size + j];
-//         }
-//     }
-// }
-
-// mv
 void mv(Vector *linear_lr, DenseMatrix *linear, Vector *self_attn) {
     #pragma omp parallel for
     for (int nid = 0; nid < linear->row_size; nid++) {
@@ -98,7 +77,6 @@ void matrix_lrelu(DenseMatrix *A) {
 
 void s_softmax(SparseMatrix *A) {
     #pragma omp parallel for
-    
     for (int i = 0; i < A->row_size; i++) {
         float sum = 0.0;
         for (int k = A->row_p[i]; k < A->row_p[i + 1]; k++) {
@@ -142,30 +120,27 @@ void split(DenseMatrix *source, DenseMatrix **destination, int num) {
     }
 }
 
-
-
-
-void concat_average(GATGraph *g, int num_heads, int out) {
-    g->concatfeature = (DenseMatrix *)malloc(sizeof(DenseMatrix));
-    init_dense(g->concatfeature, g->features->row_size, out);
-    printf("concat : %d %d ", g->features->row_size, out);
+// void concat_average(GATGraph *g, int num_heads, int out) {
+//     g->concatfeature = (DenseMatrix *)malloc(sizeof(DenseMatrix));
+//     init_dense(g->concatfeature, g->s_features->row_size, out);
+//     printf("concat : %d %d ", g->s_features->row_size, out);
     
-    #pragma omp parallel for
-    for (int i = 0; i < g->newfeatures[0]->row_size; i++) {
-        for (int j = 0; j < out; j++) {
-            float sum = 0.0;
-            for (int k = 0; k < num_heads; k++) {
-                int col_size = g->newfeatures[k]->col_size;
-                sum += g->newfeatures[k]->val[i * col_size + j];  
-            }
+//     #pragma omp parallel for
+//     for (int i = 0; i < g->newfeatures[0]->row_size; i++) {
+//         for (int j = 0; j < out; j++) {
+//             float sum = 0.0;
+//             for (int k = 0; k < num_heads; k++) {
+//                 int col_size = g->newfeatures[k]->col_size;
+//                 sum += g->newfeatures[k]->val[i * col_size + j];  
+//             }
 
-            for (int k = 0; k < num_heads; k++) {
-                g->concatfeature->val[i * out + j] = sum / num_heads; 
-            }
+//             for (int k = 0; k < num_heads; k++) {
+//                 g->concatfeature->val[i * out + j] = sum / num_heads; 
+//             }
 
-        }
-    }
-}
+//         }
+//     }
+// }
 
 void freeVector(Vector *A) {
     free(A->val);
@@ -225,13 +200,19 @@ void mm_imax(DenseMatrix *C, DenseMatrix *A, DenseMatrix *B) {
 #endif
 
 
-void GATLayer_forward(GATLayer *L, GATGraph *g, bool cat, bool issparse) {
-    int nnode = g->neighbor->row_size;
+void GATLayer_forward(GATLayer *L, GATGraph *g, bool cat, bool issparse, bool inductive, bool first_layer, bool activation) {
     int nhead = L->num_heads;
-    SparseMatrix *adj_matrix = g->neighbor;
-    Param **params = L->params;
+    SparseMatrix *adj_matrix;
+    int nnode;
+    if (!inductive) {
+        adj_matrix = g->s_neighbor;
+        nnode = g->s_neighbor->row_size;
+    }
 
-    int out = L->params[0]->out_feature;
+    else nnode = g->d_neighbor->row_size;
+
+    Param **params = L->params;
+    
     struct timespec t1, t2;
 
     L->merged_weight = malloc(sizeof(DenseMatrix *));
@@ -258,18 +239,14 @@ void GATLayer_forward(GATLayer *L, GATGraph *g, bool cat, bool issparse) {
     Vector *linear_r = (Vector *)malloc(sizeof(Vector));
     init_vector(linear_r, nnode);
 
-    Vector *tmp_sum = (Vector *)malloc(sizeof(Vector));
-    init_vector(tmp_sum, nnode);
+    SparseMatrix *sfeatures;
+    DenseMatrix *dfeatures;
 
-    SparseMatrix *sfeatures; // A
-    DenseMatrix *dfeatures; // A
-
-    // SpMM(concatenated)
-    DenseMatrix *weights = L->merged_weight; // B
-    DenseMatrix *merged_linear = L->merged_linear; // C
-
+    DenseMatrix *weights = L->merged_weight;
+    DenseMatrix *merged_linear = L->merged_linear;
+    // Linear
     if (issparse) {
-        sfeatures = g->features;
+        sfeatures = g->s_features;
 #if defined(EMAX6) || defined(EMAX7)
         spmm_imax(merged_linear, sfeatures, weights);          
 
@@ -277,7 +254,7 @@ void GATLayer_forward(GATLayer *L, GATGraph *g, bool cat, bool issparse) {
         timespec_get(&t1, TIME_UTC);
         spmm(merged_linear, sfeatures, weights);
         timespec_get(&t2, TIME_UTC);
-        all_nanosec[SPMM] += (Ull)cal_time(&t2, &t1) * 1000;
+        // all_nanosec[SPMM] += (Ull)cal_time(&t2, &t1) * 1000;
 
 #elif defined(USE_CUDA)
         sendSparseMatrixToGPU(sfeatures);
@@ -290,16 +267,16 @@ void GATLayer_forward(GATLayer *L, GATGraph *g, bool cat, bool issparse) {
     }
 
     else {
-        dfeatures = g->concatfeature;
+        if (first_layer) dfeatures = g->d_features;
+        else dfeatures = g->out_feature;
+
 #if defined(EMAX6) || defined(EMAX7)
         mm_imax(merged_linear, dfeatures, weights);
-        
 #elif defined(USE_MP)
         timespec_get(&t1, TIME_UTC);
         mm(merged_linear, dfeatures, weights);
         timespec_get(&t2, TIME_UTC);
         all_nanosec[MM] += (Ull)cal_time(&t2, &t1) * 1000;
-
 #elif defined(USE_CUDA)
         timespec_get(&t1, TIME_UTC);
         createCublas();
@@ -309,23 +286,20 @@ void GATLayer_forward(GATLayer *L, GATGraph *g, bool cat, bool issparse) {
         mm(merged_linear, dfeatures, weights);
         timespec_get(&t2, TIME_UTC);
         sendDenseMatrixToCPU(merged_linear);
-        // printDMatrix(merged_linear, "newfeat");
         destroyCublas();
 #endif
     }
     freeDenseMatrix(weights);
-
-    g->newfeatures = (DenseMatrix **)malloc(nhead * sizeof(DenseMatrix));
-
+    DenseMatrix **new_features = (DenseMatrix **)malloc(nhead * sizeof(DenseMatrix));
     DenseMatrix **linear = L->separated_linear;
     split(merged_linear, linear, nhead);
     freeDenseMatrix(merged_linear);
     
     // Attention section
     for (int headid = 0; headid < nhead; headid++) {
-        
-        g->newfeatures[headid] = (DenseMatrix *)malloc(sizeof(DenseMatrix));
-        init_dense(g->newfeatures[headid], nnode, L->params[0]->out_feature);
+
+        new_features[headid] = (DenseMatrix *)malloc(sizeof(DenseMatrix));
+        init_dense(new_features[headid], nnode, L->params[0]->out_feature);
 
         Vector *a_l = params[headid]->a_l;
         Vector *a_r = params[headid]->a_r;
@@ -341,11 +315,15 @@ void GATLayer_forward(GATLayer *L, GATGraph *g, bool cat, bool issparse) {
         matrix_lrelu(Linear_lr);
 
         SparseMatrix *masked_Linear_lr = (SparseMatrix *)malloc(sizeof(SparseMatrix));
-        init_csr(masked_Linear_lr, adj_matrix->row_size, adj_matrix->col_size, adj_matrix->nnz);
-        mask(masked_Linear_lr, Linear_lr, adj_matrix);
-        s_softmax(masked_Linear_lr);    
+        if (!inductive) {
+            init_csr(masked_Linear_lr, adj_matrix->row_size, adj_matrix->col_size, adj_matrix->nnz);
+            mask(masked_Linear_lr, Linear_lr, adj_matrix);
+            freeDenseMatrix(Linear_lr);
+            s_softmax(masked_Linear_lr);    
+        }
+
+        else d_softmax(Linear_lr);
         timespec_get(&t2, TIME_UTC);
-        freeDenseMatrix(Linear_lr);
         printf("Attention: %lf", cal_time(&t2, &t1));
 
 #if defined(EMAX6) || defined(EMAX7)
@@ -353,31 +331,59 @@ void GATLayer_forward(GATLayer *L, GATGraph *g, bool cat, bool issparse) {
 #elif defined(USE_MP)
         all_nanosec[ATTENTION] += (Ull)cal_time(&t2, &t1) * 1000;
 #endif
-        
+
+    // Aggregation (SpMM)    
+        if(inductive) {
 #if defined(EMAX6) || defined(EMAX7)
-        spmm_imax(g->newfeatures[headid], masked_Linear_lr, linear[headid]);
+            mm_imax(new_features[headid], Linear_lr, linear[headid]);
     
 #elif defined(USE_MP) 
-        timespec_get(&t1, TIME_UTC);
-        spmm(g->newfeatures[headid], masked_Linear_lr, linear[headid]);
-        timespec_get(&t2, TIME_UTC);
-        all_nanosec[SPMM] += (Ull)cal_time(&t2, &t1) * 1000;
-        // printDMatrix(g->newfeatures[headid], "MatMul2");
+            timespec_get(&t1, TIME_UTC);
+            mm(new_features[headid], Linear_lr, linear[headid]);
+            timespec_get(&t2, TIME_UTC);
+            all_nanosec[SPMM] += (Ull)cal_time(&t2, &t1) * 1000;
 
 #elif defined(USE_CUDA)
-        sendSparseMatrixToGPU(masked_Linear_lr);
-        sendDenseMatrixToGPU(linear[headid]);
-        createCusparse();
-        spmm(g->newfeatures[headid], masked_Linear_lr, linear[headid]);
-        sendDenseMatrixToCPU(g->newfeatures[headid]);
-        destroyCusparse();
-#endif
+            sendDenseMatrixToGPU(Linear_lr);
+            sendDenseMatrixToGPU(linear[headid]);
+            createCublas();
+            mm(new_features[headid], Linear_lr, linear[headid]);
+            sendDenseMatrixToCPU(new_features[headid]);
+            destroyCublas();
+#endif        
+            freeDenseMatrix(Linear_lr);
+        }
+
+        else {
+
+            printf("\nSpMM2: (%d, %d) = (%d, %d) x (%d, %d)\n",
+            new_features[headid]->row_size, new_features[headid]->col_size,
+            masked_Linear_lr->row_size, masked_Linear_lr->col_size,
+            linear[headid]->row_size, linear[headid]->col_size);
+#if defined(EMAX6) || defined(EMAX7)
+            spmm_imax(new_features[headid], masked_Linear_lr, linear[headid]);
+            
+    
+#elif defined(USE_MP) 
+            timespec_get(&t1, TIME_UTC);
+            spmm(new_features[headid], masked_Linear_lr, linear[headid]);
+            timespec_get(&t2, TIME_UTC);
+            all_nanosec[SPMM] += (Ull)cal_time(&t2, &t1) * 1000;
+
+#elif defined(USE_CUDA)
+            sendSparseMatrixToGPU(masked_Linear_lr);
+            sendDenseMatrixToGPU(linear[headid]);
+            createCusparse();
+            spmm(new_features[headid], masked_Linear_lr, linear[headid]);
+            sendDenseMatrixToCPU(new_features[headid]);
+            destroyCusparse();
+#endif     
+            free(masked_Linear_lr);
+        }
         freeDenseMatrix(linear[headid]);
-        // printf("headid: %d", headid);
-        
-    }
-    if(cat) {
-        concat(g->newfeatures, g->concatfeature, nhead);
     }
 
+    if(cat) concat(new_features, g->out_feature, nhead);
+    else g->out_feature = new_features[0];
+    if(activation) matrix_elu(g->out_feature);    
 }
